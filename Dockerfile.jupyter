@@ -1,0 +1,33 @@
+# syntax=docker/dockerfile:1
+
+FROM python:3.11-slim AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    NOTEBOOK_DIR=/workspace/notebooks
+
+WORKDIR /workspace
+
+# System dependencies for audio and Whisper workloads
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ffmpeg \
+        libsndfile1 \
+        git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install backend dependencies to keep notebooks aligned with the app runtime
+COPY backend/pyproject.toml backend/README.md backend/default-config.yaml ./backend/
+COPY backend/src ./backend/src
+RUN pip install --upgrade pip \
+    && pip install ./backend \
+    && pip install "jupyterlab>=4.1" "ipykernel>=6.29"
+
+# Bundle existing notebooks (mount the directory at runtime to persist changes)
+COPY notebooks ./notebooks
+
+VOLUME ["/workspace/notebooks"]
+EXPOSE 8888
+
+CMD ["jupyter", "lab", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--ServerApp.token=", "--ServerApp.password=", "--ServerApp.root_dir=/workspace/notebooks"]

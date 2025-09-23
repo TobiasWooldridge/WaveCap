@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=67", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wavecap-backend"
+version = "0.1.0"
+description = "Backend service for the multi-stream WaveCap console"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Tobias Wooldridge", email = "wavecap@thw.au" }]
+license = { text = "MIT" }
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.23",
+  "pydantic>=2.6",
+  "python-multipart>=0.0.7",
+  "aiofiles>=23.0",
+  "httpx>=0.26",
+  "faster-whisper>=0.10.0",
+  "soundfile>=0.12",
+  "numpy>=1.26",
+  "sqlmodel>=0.0.16",
+  "aiosqlite>=0.19",
+  "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.4",
+  "pytest-asyncio>=0.23",
+  "httpx[http2]>=0.26",
+  "pytest-mock>=3.12",
+  "coverage>=7.4",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra"
+testpaths = ["tests"]

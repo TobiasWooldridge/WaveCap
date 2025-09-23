@@ -1,0 +1,111 @@
+server:
+  host: 0.0.0.0
+  port: 8000
+  corsOrigin: "*"
+
+logging:
+  enabled: true
+  backend:
+    enabled: true
+    clearOnStart: false
+    fileName: backend.log
+  frontend:
+    enabled: true
+    clearOnStart: false
+    fileName: frontend.log
+
+whisper:
+  # Try base.en or small for a balance of speed and accuracy. Larger checkpoints
+  # (large-v2, large-v3, large-v3-turbo) need a strong GPU but minimise errors.
+  model: large-v3-turbo
+  # Use a smaller checkpoint when the GPU is unavailable so CPU fallbacks stay
+  # responsive. Set to null to reuse the primary model on CPU.
+  cpuFallbackModel: base
+  language: en
+  sampleRate: 16000
+  # Lower values (15-30) push words to the UI faster, higher values (45-120)
+  # improve sentence structure.
+  chunkLength: 20
+  # Keep a few seconds lower than chunkLength so partial transmissions still
+  # flush to the UI. When the radio is quiet the backend emits a chunk after
+  # roughly minChunkDurationSeconds + silenceHoldSeconds seconds, so a lower
+  # minimum keeps "blank" updates snappy.
+  minChunkDurationSeconds: 12
+  # Smaller overlaps (around 0.5s) keep latency down; raise toward 2-6s if
+  # punctuation drifts.
+  contextSeconds: 0.5
+  # Raise when noisy rooms break chunks too early; lower for quiet dispatch
+  # feeds.
+  silenceThreshold: 0.02
+  silenceLookbackSeconds: 2.0
+  activeSamplesInLookbackPct: 0.10
+  # Increase if trailing words are lost, decrease to shave latency.
+  silenceHoldSeconds: 1.2
+  maxConcurrentProcesses: 2
+  # Decoder tweaks to keep phrases consistent across bursts.
+  beamSize: 8
+  decodeTemperature: 0.0
+  temperatureIncrementOnFallback: 0.2
+  conditionOnPreviousText: false
+  initialPrompt: >-
+    Priority callouts include Adelaide, Adelaide fire out, Noarlunga, and
+    SITREP. Spell them exactly when they are heard on air.
+  # Front-end filtering keeps speech crisp and level.
+  highpassCutoffHz: 250
+  lowpassCutoffHz: 3800
+  deemphasisTimeConstantMicros: 75
+  agcTargetRms: 0.04
+  silenceHallucinationPhrases:
+    - "thank you"
+    - "transcription by castingwords"
+    - "casting words"
+    - "all right let's go"
+    - "alright let's go"
+
+ui:
+  themeMode: system
+  colorCodingEnabled: false
+  transcriptCorrectionEnabled: false
+  reviewExportStatuses:
+    - corrected
+    - verified
+
+defaultStreams:
+  - id: broadcastify-2653
+    name: South Australian State Emergency Service
+    url: https://broadcastify.cdnstream1.com/2653
+    enabled: true
+    ignoreFirstSeconds: 30
+  - id: broadcastify-34010
+    name: Primary Emergency Services - Statewide NSW
+    url: https://broadcastify.cdnstream1.com/34010
+    enabled: true
+    ignoreFirstSeconds: 30
+
+alerts:
+  enabled: true
+  rules:
+    - id: distress-mayday
+      label: "Distress: MAYDAY"
+      phrases:
+        - mayday
+      playSound: true
+    - id: distress-pan-pan
+      label: "Urgency: PAN-PAN"
+      phrases:
+        - pan-pan
+        - pan pan
+      playSound: true
+    - id: distress-securite
+      label: "Safety: SÉCURITÉ"
+      phrases:
+        - sécurité
+        - securite
+      playSound: true
+
+access:
+  defaultRole: read_only
+  tokenTtlMinutes: 1440
+  credentials:
+    - password: change-me
+      role: editor

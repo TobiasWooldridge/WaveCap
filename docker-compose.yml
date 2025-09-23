@@ -1,0 +1,10 @@
+services:
+  wavecap:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./state:/app/state
+    environment:
+      - WAVECAP_PROJECT_ROOT=/app
+    restart: unless-stopped

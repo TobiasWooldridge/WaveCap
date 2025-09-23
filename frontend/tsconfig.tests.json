@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist-tests",
+    "declaration": false,
+    "emitDeclarationOnly": false,
+    "types": ["node"],
+    "allowImportingTsExtensions": false,
+    "module": "ESNext",
+    "moduleResolution": "bundler"
+  },
+  "include": [
+    "src/components/StreamTranscriptionPanel.tsx",
+    "src/components/StreamTranscriptionPanel.logic.ts",
+    "src/components/StreamTranscriptionPanel.test.ts",
+    "src/hooks/useTranscriptions.ts",
+    "src/hooks/useTranscriptions.test.ts",
+    "src/types/**/*.ts"
+  ],
+  "exclude": ["node_modules", "dist", "dist-tests"]
+}
