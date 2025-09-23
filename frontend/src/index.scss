@@ -37,14 +37,17 @@
 }
 
 :root[data-bs-theme='dark'] {
+  --bs-border-color-rgb: 51, 65, 85;
+  --bs-border-color: rgba(51, 65, 85, 0.85);
+  --bs-border-color-translucent: rgba(51, 65, 85, 0.65);
   --app-header-surface-rgb: 11, 17, 35;
   --app-header-surface-subtle-rgb: 6, 9, 22;
   --app-header-highlight-rgb: 96, 165, 250;
   --app-header-highlight-soft-rgb: 244, 114, 182;
-  --app-header-border-rgb: 71, 85, 105;
+  --app-header-border-rgb: 56, 70, 92;
   --app-header-shadow-rgb: 4, 7, 18;
   --transcript-segment-surface-rgb: 38, 44, 54;
-  --transcript-segment-surface-border-rgb: 55, 63, 75;
+  --transcript-segment-surface-border-rgb: 46, 55, 70;
   --transcript-segment-time-rgb: 47, 54, 66;
 }
 

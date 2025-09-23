@@ -1046,7 +1046,10 @@ class StreamWorker:
         total_tokens = len(tokens)
         if total_tokens < 6:
             return False
-        max_ngram = min(4, total_tokens // 2)
+        # Repetitive hallucinations often repeat longer phrases verbatim.
+        # Allow n-gram windows beyond short phrases so we can catch patterns like
+        # "if you want to go ahead and see" which Whisper occasionally loops.
+        max_ngram = min(12, total_tokens // 2)
         for ngram_size in range(1, max_ngram + 1):
             min_repetitions = 6 if ngram_size == 1 else 3
             required_tokens = ngram_size * min_repetitions

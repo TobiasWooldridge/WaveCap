@@ -60,6 +60,9 @@ transcribing multiple radio or pager feeds in real time.
 - Append `format` to the webhook query (for example `format=cfs-flex`) to submit
   structured CAD payloads that the backend will normalise into readable
   transcripts before they appear in the UI.
+- CFS Flex submissions extract incident numbers, call types, map grids,
+  talkgroups, narratives, and responding units from the raw FLEX string while
+  preserving the original pager line in the transcript details.
 - Export reviewed transcripts as a ZIP with audio via header controls, choosing corrected, verified, or pending items.
 - `python -m wavecap_backend.tools.export_transcriptions --output-dir <path>` builds a fine-tuning dataset with JSONL metadata, optional audio copies, and notebook guidance.
 - Transcripts and stream definitions persist on disk in `state/runtime.sqlite` and `state/recordings/` for external archiving.

@@ -140,9 +140,11 @@ const TranscriptSegmentTimeRange = ({
   </span>
 );
 
-const TranscriptSegmentText = ({ text }: { text: string }) => (
-  <span className="transcript-segment__text">{text}</span>
-);
+const TranscriptSegmentText = ({
+  children,
+}: {
+  children: ReactNode;
+}) => <span className="transcript-segment__text">{children}</span>;
 
 interface TranscriptSegmentContentProps {
   startTime: number;
@@ -157,14 +159,15 @@ const TranscriptSegmentContent = ({
   duration,
   text,
 }: TranscriptSegmentContentProps) => (
-  <div className="d-flex align-items-center gap-2">
+  <TranscriptSegmentText>
     <TranscriptSegmentTimeRange
       startTime={startTime}
       endTime={endTime}
       duration={duration}
     />
-    <TranscriptSegmentText text={text} />
-  </div>
+    {" "}
+    {text}
+  </TranscriptSegmentText>
 );
 
 export const TranscriptSegmentListItem = ({
