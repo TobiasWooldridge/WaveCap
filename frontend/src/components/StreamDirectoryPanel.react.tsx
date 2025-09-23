@@ -11,6 +11,7 @@ import {
 import { Stream, type StreamCommandState } from "@types";
 import Spinner from "./primitives/Spinner.react";
 import Button from "./primitives/Button.react";
+import Flex from "./primitives/Flex.react";
 
 interface StreamDirectoryPanelProps {
   streams: Stream[];
@@ -99,7 +100,13 @@ export const StreamDirectoryPanel = ({
 
   return (
     <section className="card shadow-sm mb-4">
-      <div className="card-header bg-body-tertiary d-flex align-items-center justify-content-between flex-wrap gap-3">
+      <Flex
+        className="card-header bg-body-tertiary"
+        align="center"
+        justify="between"
+        wrap="wrap"
+        gap={3}
+      >
         <h2 className="h5 mb-0">Stream management</h2>
         <Button
           type="button"
@@ -110,7 +117,7 @@ export const StreamDirectoryPanel = ({
         >
           {showAddForm ? "Hide form" : "Add stream"}
         </Button>
-      </div>
+      </Flex>
 
       <div className="card-body">
         {showAddForm && (
@@ -179,7 +186,7 @@ export const StreamDirectoryPanel = ({
                 </select>
               </div>
             </div>
-            <div className="d-flex flex-wrap gap-2 mt-3">
+            <Flex wrap="wrap" gap={2} className="mt-3">
               <Button type="submit" size="sm" use="primary">
                 Add stream
               </Button>
@@ -191,7 +198,7 @@ export const StreamDirectoryPanel = ({
               >
                 Cancel
               </Button>
-            </div>
+            </Flex>
           </form>
         )}
 
@@ -221,14 +228,18 @@ export const StreamDirectoryPanel = ({
               const disableAll =
                 isStopping || isStarting || isRemoving || isResetting || isUpdating;
               return (
-                <div
+                <Flex
                   key={stream.id}
-                  className="list-group-item d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3"
+                  className="list-group-item"
+                  direction={{ base: "column", lg: "row" }}
+                  align={{ lg: "center" }}
+                  justify="between"
+                  gap={3}
                 >
-                  <div className="d-flex align-items-start gap-3 flex-grow-1">
+                  <Flex align="start" gap={3} className="flex-grow-1">
                     <Radio size={20} className="text-body-tertiary" />
                     <div className="flex-grow-1">
-                      <div className="d-flex align-items-center gap-2 mb-1">
+                      <Flex align="center" gap={2} className="mb-1">
                         <h3 className="h6 mb-0">{stream.name}</h3>
                         <span
                           className={`badge d-inline-flex align-items-center gap-2 ${getStatusBadgeClass(variant)}`}
@@ -238,7 +249,7 @@ export const StreamDirectoryPanel = ({
                             {stream.status}
                           </span>
                         </span>
-                      </div>
+                      </Flex>
                       <a
                         href={stream.url}
                         target="_blank"
@@ -252,9 +263,9 @@ export const StreamDirectoryPanel = ({
                         {stream.transcriptions?.length || 0} transcriptions
                       </div>
                     </div>
-                  </div>
+                  </Flex>
 
-                  <div className="d-flex flex-wrap gap-2 justify-content-lg-end">
+                  <Flex wrap="wrap" gap={2} justify={{ lg: "end" }}>
                     {(() => {
                       if (stream.enabled) {
                         if (stream.status === "queued") {
@@ -350,8 +361,8 @@ export const StreamDirectoryPanel = ({
                     >
                       <span>{isRemoving ? "Removing…" : "Remove"}</span>
                     </Button>
-                  </div>
-                </div>
+                  </Flex>
+                </Flex>
               );
             })}
           </div>

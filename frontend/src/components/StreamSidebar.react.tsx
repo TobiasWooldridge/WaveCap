@@ -4,6 +4,7 @@ import { StreamSource } from "@types";
 import Spinner from "./primitives/Spinner.react";
 import Button from "./primitives/Button.react";
 import Badge from "./primitives/Badge.react";
+import Flex from "./primitives/Flex.react";
 
 export interface StreamSidebarItem {
   id: string;
@@ -123,7 +124,12 @@ const StreamSidebar = ({
       aria-hidden={isMobileViewport && !isMobileSidebarOpen}
     >
       <aside id="app-stream-sidebar" className="stream-sidebar">
-        <div className="stream-sidebar__header d-flex align-items-start justify-content-between gap-3">
+        <Flex
+          className="stream-sidebar__header"
+          align="start"
+          justify="between"
+          gap={3}
+        >
           <div>
             <p className="text-uppercase small fw-semibold text-body-secondary mb-1">
               Streams
@@ -132,7 +138,7 @@ const StreamSidebar = ({
               Ordered by latest activity
             </p>
           </div>
-          <div className="d-flex align-items-center gap-2">
+          <Flex align="center" gap={2}>
             {!isReadOnly ? (
               <Button
                 size="sm"
@@ -155,8 +161,8 @@ const StreamSidebar = ({
             >
               <X size={16} />
             </Button>
-          </div>
-        </div>
+          </Flex>
+        </Flex>
 
         {!isReadOnly && showAddStreamForm ? (
           <form
@@ -292,7 +298,7 @@ const StreamSidebar = ({
                   {addStreamError}
                 </div>
               ) : null}
-              <div className="d-flex flex-wrap gap-2">
+              <Flex wrap="wrap" gap={2}>
                 <Button
                   type="submit"
                   size="sm"
@@ -319,16 +325,20 @@ const StreamSidebar = ({
                 >
                   Cancel
                 </Button>
-              </div>
+              </Flex>
           </form>
         ) : null}
 
         <div className="stream-sidebar__list">
           {loading ? (
-            <div className="stream-sidebar__status d-flex align-items-center gap-2 text-body-secondary small">
+            <Flex
+              className="stream-sidebar__status text-body-secondary small"
+              align="center"
+              gap={2}
+            >
               <Spinner size="sm" label="Updating streams" />
               <span>Updating streams…</span>
-            </div>
+            </Flex>
           ) : null}
 
           {renderEmptyState()}

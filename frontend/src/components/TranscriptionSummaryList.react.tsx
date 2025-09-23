@@ -1,6 +1,7 @@
 import React from "react";
 import { TranscriptionResult } from "@types";
 import { TranscriptionSummaryCard } from "./TranscriptionSummaryCard.react";
+import Flex from "./primitives/Flex.react";
 
 interface TranscriptionSummaryListProps {
   transcriptions: TranscriptionResult[];
@@ -19,13 +20,13 @@ export const TranscriptionSummaryList: React.FC<
   }
 
   return (
-    <div className="d-flex flex-column gap-3">
+    <Flex direction="column" gap={3}>
       {transcriptions.map((transcription) => (
         <TranscriptionSummaryCard
           key={transcription.id}
           transcription={transcription}
         />
       ))}
-    </div>
+    </Flex>
   );
 };
