@@ -288,6 +288,7 @@ whisper:
     - "thank you"
     - "transcription by castingwords"
     - "casting words"
+    - "all right here we go"
     - "standing by"
 ```
 

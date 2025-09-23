@@ -930,6 +930,70 @@ async def test_worker_discards_hallucinated_silence(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_worker_discards_all_right_here_we_go_hallucination(tmp_path):
+    config = WhisperConfig(
+        sampleRate=16000,
+        chunkLength=4,
+        minChunkDurationSeconds=1.0,
+        contextSeconds=0.0,
+        silenceThreshold=0.01,
+        silenceLookbackSeconds=0.25,
+        silenceHoldSeconds=0.25,
+        activeSamplesInLookbackPct=0.1,
+        blankAudioMinDurationSeconds=0.5,
+        blankAudioMinActiveRatio=0.0,
+        blankAudioMinRms=0.0,
+        silenceHallucinationPhrases=["all right here we go"],
+    )
+
+    bundle = TranscriptionResultBundle(
+        "All right, here we go.", [], "en", no_speech_prob=0.2
+    )
+    transcriber = StubTranscriber([bundle])
+
+    stream = Stream(
+        id="stream-hallucination-all-right",
+        name="Hallucination",
+        url="http://example.com/audio",
+        status=StreamStatus.STOPPED,
+        createdAt=datetime.utcnow(),
+        transcriptions=[],
+        source=StreamSource.AUDIO,
+    )
+
+    db = StreamDatabase(tmp_path / "runtime.sqlite")
+    evaluator = TranscriptionAlertEvaluator(AlertsConfig(enabled=False, rules=[]))
+    captured: List[TranscriptionResult] = []
+
+    async def capture(transcription: TranscriptionResult) -> None:
+        captured.append(transcription)
+
+    async def noop_status(_stream: Stream, _status: StreamStatus) -> None:
+        return
+
+    worker = StreamWorker(
+        stream=stream,
+        transcriber=transcriber,
+        database=db,
+        alert_evaluator=evaluator,
+        on_transcription=capture,
+        on_status_change=noop_status,
+        config=config,
+    )
+
+    silence = np.zeros(16000, dtype=np.int16).tobytes()
+
+    await worker._ingest_pcm_bytes(silence)
+
+    assert len(captured) == 1
+    result = captured[0]
+    assert result.text == BLANK_AUDIO_TOKEN
+    assert result.segments is None
+    assert result.recordingUrl is None
+    assert len(transcriber.calls) == 1
+
+
+@pytest.mark.asyncio
 async def test_worker_discards_hallucination_with_low_logprob(tmp_path):
     config = WhisperConfig(
         sampleRate=16000,
