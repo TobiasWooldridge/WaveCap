@@ -2022,7 +2022,7 @@ a:hover {
   border: 1px solid rgba(var(--transcript-segment-surface-border-rgb), 0.65);
   cursor: pointer;
   transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
-  background-color: rgba(0, 0, 0, 0.1);
+  background-color: rgba(0, 0, 0, 0.05);
   color: rgb(var(--app-ink-rgb));
 }
 
@@ -2052,7 +2052,7 @@ a:hover {
 }
 
 .transcript-segment--unknown {
-  background-color: rgba(0, 0, 0, 0.1);
+  background-color: rgba(0, 0, 0, 0.05);
   border-color: transparent;
   color: rgb(var(--app-ink-muted-rgb));
 }
