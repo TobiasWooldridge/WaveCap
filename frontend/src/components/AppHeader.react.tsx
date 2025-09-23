@@ -1,6 +1,7 @@
 import { ChangeEvent, MutableRefObject } from "react";
 import { Activity, LogIn, LogOut, Menu, Settings } from "lucide-react";
 import Button from "./primitives/Button.react";
+import Flex from "./primitives/Flex.react";
 
 interface AppHeaderProps {
   isMobileViewport: boolean;
@@ -56,9 +57,19 @@ const AppHeader = ({
               <h1 className="h5 mb-0 text-white">WaveCap</h1>
             </div>
 
-            <div className="app-header__controls d-flex align-items-center justify-content-end flex-wrap gap-2 gap-sm-3">
+            <Flex
+              className="app-header__controls"
+              align="center"
+              justify="end"
+              wrap="wrap"
+              gap={{ base: 2, sm: 3 }}
+            >
               {!isReadOnly ? (
-                <div className="form-check form-check-inline m-0 ps-0 d-flex align-items-center gap-2 text-white">
+                <Flex
+                  className="form-check form-check-inline m-0 ps-0 text-white"
+                  align="center"
+                  gap={2}
+                >
                   <input
                     id="transcript-correction-mode"
                     type="checkbox"
@@ -66,13 +77,16 @@ const AppHeader = ({
                     checked={transcriptCorrectionEnabled}
                     onChange={onTranscriptCorrectionToggle}
                   />
-                  <label
+                  <Flex
+                    as="label"
                     htmlFor="transcript-correction-mode"
                     className="form-check-label fw-semibold small mb-0"
+                    align="center"
+                    gap={2}
                   >
                     Transcript correction mode
-                  </label>
-                </div>
+                  </Flex>
+                </Flex>
               ) : null}
 
               <Button
@@ -90,7 +104,7 @@ const AppHeader = ({
                 <span>Settings</span>
               </Button>
 
-              <div className="d-flex align-items-center gap-2">
+              <Flex align="center" gap={2}>
                 {isReadOnly ? (
                   <Button
                     type="button"
@@ -116,8 +130,8 @@ const AppHeader = ({
                     <span>Sign out</span>
                   </Button>
                 )}
-              </div>
-            </div>
+              </Flex>
+            </Flex>
           </div>
         </div>
       </div>

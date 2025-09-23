@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Mic, Radio, Play, Square } from "lucide-react";
 import Spinner from "./primitives/Spinner.react";
 import Button from "./primitives/Button.react";
+import Flex from "./primitives/Flex.react";
 
 interface ControlPanelProps {
   onStartTranscription: (device: string, streamUrl?: string) => void;
@@ -42,13 +43,13 @@ export const ControlPanel = ({
         <h2 className="h5 mb-0">Transcription controls</h2>
       </div>
 
-      <div className="card-body d-flex flex-column gap-4">
-        <div className="d-flex flex-column gap-2">
+      <Flex className="card-body" direction="column" gap={4}>
+        <Flex direction="column" gap={2}>
           <span className="text-uppercase text-body-secondary fw-semibold small">
             Input source
           </span>
-          <div className="d-flex flex-wrap gap-3">
-            <div className="form-check d-flex align-items-center gap-2 m-0">
+          <Flex wrap="wrap" gap={3}>
+            <Flex className="form-check m-0" align="center" gap={2}>
               <input
                 className="form-check-input"
                 type="radio"
@@ -60,16 +61,19 @@ export const ControlPanel = ({
                   setInputMode(event.target.value as "device" | "stream")
                 }
               />
-              <label
-                className="form-check-label d-flex align-items-center gap-2 mb-0"
+              <Flex
+                as="label"
+                className="form-check-label mb-0"
+                align="center"
+                gap={2}
                 htmlFor="input-device"
               >
                 <Mic size={16} className="text-primary" />
                 Microphone
-              </label>
-            </div>
+              </Flex>
+            </Flex>
 
-            <div className="form-check d-flex align-items-center gap-2 m-0">
+            <Flex className="form-check m-0" align="center" gap={2}>
               <input
                 className="form-check-input"
                 type="radio"
@@ -81,19 +85,22 @@ export const ControlPanel = ({
                   setInputMode(event.target.value as "device" | "stream")
                 }
               />
-              <label
-                className="form-check-label d-flex align-items-center gap-2 mb-0"
+              <Flex
+                as="label"
+                className="form-check-label mb-0"
+                align="center"
+                gap={2}
                 htmlFor="input-stream"
               >
                 <Radio size={16} className="text-primary" />
                 Web stream
-              </label>
-            </div>
-          </div>
-        </div>
+              </Flex>
+            </Flex>
+          </Flex>
+        </Flex>
 
         {inputMode === "device" && (
-          <div className="d-flex flex-column gap-2">
+          <Flex direction="column" gap={2}>
             <label
               htmlFor="device-id"
               className="form-label text-uppercase text-body-secondary fw-semibold small mb-0"
@@ -108,11 +115,11 @@ export const ControlPanel = ({
               placeholder="Device ID (e.g. 0, 1, 2)"
               className="form-control"
             />
-          </div>
+          </Flex>
         )}
 
         {inputMode === "stream" && (
-          <div className="d-flex flex-column gap-2">
+          <Flex direction="column" gap={2}>
             <label
               htmlFor="stream-url"
               className="form-label text-uppercase text-body-secondary fw-semibold small mb-0"
@@ -127,10 +134,10 @@ export const ControlPanel = ({
               placeholder="https://example.com/stream.mp3"
               className="form-control"
             />
-          </div>
+          </Flex>
         )}
 
-        <div className="d-flex flex-wrap gap-3">
+        <Flex wrap="wrap" gap={3}>
           {!isTranscribing ? (
             <Button
               type="button"
@@ -164,17 +171,17 @@ export const ControlPanel = ({
               <span>{isStopPending ? "Stopping…" : "Stop transcription"}</span>
             </Button>
           )}
-        </div>
+        </Flex>
 
-        <div className="d-flex align-items-center gap-2 small text-body-secondary">
+        <Flex align="center" gap={2} className="small text-body-secondary">
           <span
             className={`status-dot ${
               isTranscribing ? "status-dot--success" : "status-dot--neutral"
             }`}
           />
           <span>{isTranscribing ? "Transcribing…" : "Stopped"}</span>
-        </div>
-      </div>
+        </Flex>
+      </Flex>
     </section>
   );
 };

@@ -4,6 +4,7 @@ import type { Stream, ThemeMode, TranscriptionReviewStatus } from "@types";
 
 import KeywordAlertsSettingsSection from "./KeywordAlertsSettingsSection.react";
 import Button from "./primitives/Button.react";
+import Flex from "./primitives/Flex.react";
 type SettingsModalProps = {
   open: boolean;
   onClose: () => void;
@@ -106,7 +107,11 @@ const SettingsModal = ({
               </div>
             </dl>
 
-            <div className="app-header-info__connection d-flex align-items-center gap-2">
+            <Flex
+              className="app-header-info__connection"
+              align="center"
+              gap={2}
+            >
               {wsConnected ? (
                 <>
                   <Wifi className="text-success" size={18} />
@@ -118,15 +123,19 @@ const SettingsModal = ({
                   <span className="fw-semibold text-danger">Disconnected</span>
                 </>
               )}
-            </div>
+            </Flex>
           </section>
 
           <section className="app-header-info__section">
             <h3 className="app-header-info__section-title text-uppercase small fw-semibold text-body-secondary">
               Appearance
             </h3>
-            <div className="d-flex flex-column flex-sm-row gap-3 align-items-stretch align-items-sm-center">
-              <div className="d-flex align-items-center gap-3">
+            <Flex
+              direction={{ base: "column", sm: "row" }}
+              gap={3}
+              align={{ base: "stretch", sm: "center" }}
+            >
+              <Flex align="center" gap={3}>
                 <label htmlFor="theme-mode" className="fw-semibold mb-0">
                   Theme
                 </label>
@@ -140,9 +149,13 @@ const SettingsModal = ({
                   <option value="dark">Dark</option>
                   <option value="system">System</option>
                 </select>
-              </div>
+              </Flex>
 
-              <div className="form-check form-switch m-0 ps-0 d-flex align-items-center gap-2 small">
+              <Flex
+                className="form-check form-switch m-0 ps-0 small"
+                align="center"
+                gap={2}
+              >
                 <input
                   id="color-coding"
                   type="checkbox"
@@ -157,8 +170,8 @@ const SettingsModal = ({
                 >
                   Color-code transcripts
                 </label>
-              </div>
-            </div>
+              </Flex>
+            </Flex>
           </section>
 
           <KeywordAlertsSettingsSection />
@@ -169,8 +182,10 @@ const SettingsModal = ({
                 Reviewed transcript export
               </h3>
               {isReadOnly ? (
-                <div
-                  className="alert alert-info d-flex flex-column gap-2"
+                <Flex
+                  className="alert alert-info"
+                  direction="column"
+                  gap={2}
                   role="note"
                 >
                   <div className="small mb-0">
@@ -185,11 +200,11 @@ const SettingsModal = ({
                   >
                     <span>Sign in</span>
                   </Button>
-                </div>
+                </Flex>
               ) : (
                 <div className="app-header-info__export">
-                  <div className="d-flex flex-column gap-2">
-                    <div className="d-flex flex-wrap gap-2">
+                  <Flex direction="column" gap={2}>
+                    <Flex wrap="wrap" gap={2}>
                       {reviewStatusOptions.map((option) => {
                         const isChecked = exportStatuses.includes(option.value);
                         const disableUncheck =
@@ -220,12 +235,12 @@ const SettingsModal = ({
                           </div>
                         );
                       })}
-                    </div>
+                    </Flex>
                     <span className="text-body-secondary small">
                       Downloads a ZIP archive with JSONL transcripts and audio
                       clips.
                     </span>
-                  </div>
+                  </Flex>
 
                   <Button
                     onClick={onExportTranscriptions}

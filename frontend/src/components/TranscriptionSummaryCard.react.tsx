@@ -4,6 +4,7 @@ import { TranscriptionResult } from "@types";
 import { useUISettings } from "../contexts/UISettingsContext";
 import { getNotifiableAlerts, isBlankAudioText } from "../utils/transcriptions";
 import { Timestamp } from "./primitives/Timestamp.react";
+import Flex from "./primitives/Flex.react";
 
 interface TranscriptionSummaryCardProps {
   transcription: TranscriptionResult;
@@ -90,8 +91,8 @@ export const TranscriptionSummaryCard: React.FC<
       className={`timeline-entry${hasAlerts ? " timeline-entry--alert" : ""}`}
     >
       <Clock size={18} className="text-body-tertiary mt-1 flex-shrink-0" />
-      <div className="flex-grow-1 d-flex flex-column gap-1">
-        <div className="d-flex align-items-center flex-wrap gap-2">
+      <Flex className="flex-grow-1" direction="column" gap={1}>
+        <Flex align="center" wrap="wrap" gap={2}>
           {transcription.timestamp ? (
             <Timestamp
               value={transcription.timestamp}
@@ -125,9 +126,9 @@ export const TranscriptionSummaryCard: React.FC<
               {durationValue.toFixed(1)}s
             </span>
           )}
-        </div>
+        </Flex>
         {showReview && (
-          <div className="d-flex align-items-center gap-2 flex-wrap">
+          <Flex align="center" gap={2} wrap="wrap">
             <span className={`review-badge review-badge--${reviewStatus}`}>
               {reviewStatus === "verified" ? "Verified" : "Correction saved"}
             </span>
@@ -136,27 +137,27 @@ export const TranscriptionSummaryCard: React.FC<
                 by {transcription.reviewedBy}
               </span>
             ) : null}
-          </div>
+          </Flex>
         )}
         {hasAlerts && (
-          <div className="d-flex align-items-center gap-2 text-danger fw-semibold small">
+          <Flex align="center" gap={2} className="text-danger fw-semibold small">
             <AlertTriangle size={16} />
             <span>
               {alertTriggers
                 .map((trigger) => trigger.label || trigger.ruleId)
                 .join(", ")}
             </span>
-          </div>
+          </Flex>
         )}
         {isBlankAudio ? (
-          <div className="d-flex align-items-center gap-2 text-body-secondary small fst-italic">
+          <Flex align="center" gap={2} className="text-body-secondary small fst-italic">
             <VolumeX size={16} className="text-body-tertiary" />
             <span>No speech detected</span>
-          </div>
+          </Flex>
         ) : (
           <p className="timeline-entry__text mb-0">{finalText}</p>
         )}
-      </div>
+      </Flex>
     </div>
   );
 };
