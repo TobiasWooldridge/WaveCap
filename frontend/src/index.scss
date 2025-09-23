@@ -2041,6 +2041,11 @@ a:hover {
   opacity: 0.7;
 }
 
+.transcript-segment--static {
+  cursor: text;
+  user-select: text;
+}
+
 .transcript-segment:hover:not(:disabled) {
 }
 

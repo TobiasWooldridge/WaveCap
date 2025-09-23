@@ -1,4 +1,5 @@
 import { ReactNode, useMemo } from "react";
+import clsx from "clsx";
 import { useUISettings } from "../contexts/UISettingsContext";
 import Button from "./primitives/Button.react";
 
@@ -110,17 +111,33 @@ const TranscriptSegmentPlaybackButton = ({
   tooltip,
   confidenceClass,
   children,
-}: TranscriptSegmentPlaybackButtonProps) => (
-  <Button
-    use="unstyled"
-    onClick={onClick}
-    disabled={disabled}
-    tooltip={tooltip}
-    className={`transcript-segment ${confidenceClass}${isPlaying ? " transcript-segment--playing" : ""}`}
-  >
-    {children}
-  </Button>
-);
+}: TranscriptSegmentPlaybackButtonProps) => {
+  const segmentClassName = clsx(
+    "transcript-segment",
+    confidenceClass,
+    isPlaying && "transcript-segment--playing",
+    disabled && "transcript-segment--static",
+  );
+
+  if (disabled) {
+    return (
+      <div className={segmentClassName} aria-disabled="true" title={tooltip}>
+        {children}
+      </div>
+    );
+  }
+
+  return (
+    <Button
+      use="unstyled"
+      onClick={onClick}
+      tooltip={tooltip}
+      className={segmentClassName}
+    >
+      {children}
+    </Button>
+  );
+};
 
 interface TranscriptSegmentTimeRangeProps {
   startTime: number;
