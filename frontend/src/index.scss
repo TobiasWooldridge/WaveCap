@@ -762,10 +762,18 @@ a:hover {
 
 .stream-sidebar__item-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
   margin-bottom: 0.35rem;
+}
+
+.stream-sidebar__item-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1;
 }
 
 .stream-sidebar__item-title {
