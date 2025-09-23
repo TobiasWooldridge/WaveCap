@@ -347,14 +347,16 @@ const StreamSidebar = ({
               />
               <div className="stream-sidebar__item-main">
                 <div className="stream-sidebar__item-header">
-                  <span className="stream-sidebar__item-title">
-                    {item.title}
-                  </span>
-                  {item.isPager ? (
-                    <span className="badge rounded-pill text-bg-info-subtle text-info-emphasis ms-2">
-                      Pager
+                  <div className="stream-sidebar__item-heading">
+                    <span className="stream-sidebar__item-title">
+                      {item.title}
                     </span>
-                  ) : null}
+                    {item.isPager ? (
+                      <span className="badge rounded-pill text-bg-info-subtle text-info-emphasis">
+                        Pager
+                      </span>
+                    ) : null}
+                  </div>
                   <span className="stream-sidebar__item-time">
                     {item.previewTime}
                   </span>
