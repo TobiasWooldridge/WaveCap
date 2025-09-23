@@ -3,6 +3,7 @@ import {
   type ComponentPropsWithoutRef,
   type ComponentPropsWithRef,
   type ElementType,
+  type ForwardedRef,
   type ReactElement,
 } from "react";
 import clsx from "clsx";
@@ -41,6 +42,10 @@ type FlexOwnProps<C extends ElementType> = {
 
 type FlexProps<C extends ElementType> = FlexOwnProps<C> &
   Omit<ComponentPropsWithoutRef<C>, keyof FlexOwnProps<C> | "as">;
+
+type FlexComponent = (<C extends ElementType = "div">(
+  props: FlexProps<C> & { ref?: PolymorphicRef<C> },
+) => ReactElement | null) & { displayName?: string };
 
 const toArray = (value: string | string[] | undefined): string[] => {
   if (typeof value === "string") {
@@ -148,8 +153,9 @@ const Flex = forwardRef(
       className,
       ...rest
     }: FlexProps<C>,
-    ref: PolymorphicRef<C>,
+    forwardedRef: ForwardedRef<unknown>,
   ) => {
+    const ref = forwardedRef as PolymorphicRef<C>;
     const Component = (as ?? "div") as ElementType;
 
     const directionClasses = resolveResponsiveProp(direction, resolveDirectionClass);
@@ -176,9 +182,7 @@ const Flex = forwardRef(
       />
     );
   },
-) as <C extends ElementType = "div">(
-  props: FlexProps<C> & { ref?: PolymorphicRef<C> },
-) => ReactElement | null;
+) as FlexComponent;
 
 Flex.displayName = "Flex";
 
