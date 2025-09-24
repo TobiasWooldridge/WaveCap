@@ -2,6 +2,7 @@ import { ChangeEvent, MutableRefObject } from "react";
 import { Activity, LogIn, LogOut, Menu, Settings } from "lucide-react";
 import Button from "./primitives/Button.react";
 import Flex from "./primitives/Flex.react";
+import Spinner from "./primitives/Spinner.react";
 import "./AppHeader.scss";
 
 interface AppHeaderProps {
@@ -14,6 +15,7 @@ interface AppHeaderProps {
   settingsTriggerRef: MutableRefObject<HTMLButtonElement | null>;
   showSettings: boolean;
   isReadOnly: boolean;
+  streamsLoading: boolean;
   onRequestLogin: () => void;
   onLogout: () => Promise<void> | void;
 }
@@ -28,6 +30,7 @@ const AppHeader = ({
   settingsTriggerRef,
   showSettings,
   isReadOnly,
+  streamsLoading,
   onRequestLogin,
   onLogout,
 }: AppHeaderProps) => {
@@ -106,7 +109,13 @@ const AppHeader = ({
               </Button>
 
               <Flex align="center" gap={2}>
-                {isReadOnly ? (
+                {streamsLoading ? (
+                  <Spinner
+                    size="sm"
+                    variant="light"
+                    label="Loading streams"
+                  />
+                ) : isReadOnly ? (
                   <Button
                     type="button"
                     size="sm"
