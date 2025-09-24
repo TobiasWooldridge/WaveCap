@@ -41,8 +41,23 @@
   flex-direction: column;
   gap: 0.5rem;
   overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 0.25rem;
   min-height: 0;
+}
+
+.stream-sidebar__item-layout {
+  min-width: 0;
+}
+
+.stream-sidebar__item-content {
+  min-width: 0;
+}
+
+.stream-sidebar__item-title,
+.stream-sidebar__item-preview {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .stream-sidebar__status {
