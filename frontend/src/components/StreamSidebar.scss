@@ -43,6 +43,27 @@
   overflow-y: auto;
   padding-right: 0.25rem;
   min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.stream-sidebar__item-layout {
+  width: 100%;
+  min-width: 0;
+}
+
+.stream-sidebar__item-content {
+  min-width: 0;
+}
+
+.stream-sidebar__item-title,
+.stream-sidebar__item-preview {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.stream-sidebar__item-preview {
+  min-width: 0;
 }
 
 .stream-sidebar__status {
