@@ -69,6 +69,7 @@ import { StreamTranscriptList } from "./StreamTranscriptList.react";
 import { Timestamp } from "./primitives/Timestamp.react";
 import Button from "./primitives/Button.react";
 import ButtonGroup from "./primitives/ButtonGroup.react";
+import "./StreamTranscriptionPanel.scss";
 
 export interface StandaloneStreamControls {
   streamId: string;

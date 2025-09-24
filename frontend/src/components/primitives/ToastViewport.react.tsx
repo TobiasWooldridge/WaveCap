@@ -1,5 +1,6 @@
 import { CheckCircle2, Info, X, XCircle } from "lucide-react";
 import Button from "./Button.react";
+import "./ToastViewport.scss";
 
 export type ToastVariant = "success" | "error" | "info";
 

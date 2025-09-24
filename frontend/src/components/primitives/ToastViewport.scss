@@ -1,0 +1,101 @@
+.toast-viewport {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  z-index: 1080;
+  pointer-events: none;
+}
+
+.app-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  min-width: 240px;
+  max-width: min(360px, calc(100vw - 3rem));
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(var(--bs-border-color-rgb, 222, 226, 230), 0.7);
+  background-color: rgba(var(--app-surface-rgb), 0.96);
+  pointer-events: auto;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.app-toast__icon {
+  margin-top: 0.125rem;
+  color: rgb(var(--app-insight-strong-rgb));
+}
+
+.app-toast__content {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.app-toast__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.app-toast__title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  color: rgb(var(--bs-body-color-rgb, 33, 37, 41));
+}
+
+.app-toast__message {
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: rgba(var(--bs-body-color-rgb, 33, 37, 41), 0.85);
+}
+
+.app-toast__close {
+  border: none;
+  background: none;
+  padding: 0.125rem;
+  margin: -0.125rem -0.25rem 0 0;
+  color: rgba(var(--bs-body-color-rgb, 33, 37, 41), 0.6);
+  cursor: pointer;
+  line-height: 0;
+}
+
+.app-toast__close:hover {
+  color: rgba(var(--bs-body-color-rgb, 33, 37, 41), 0.9);
+}
+
+.app-toast--success {
+  border-color: rgba(var(--app-success-rgb), 0.35);
+  background-color: rgba(var(--app-success-rgb), 0.14);
+}
+
+.app-toast--success .app-toast__icon,
+.app-toast--success .app-toast__title {
+  color: rgb(var(--app-success-strong-rgb));
+}
+
+.app-toast--error {
+  border-color: rgba(var(--app-danger-rgb), 0.35);
+  background-color: rgba(var(--app-danger-rgb), 0.12);
+}
+
+.app-toast--error .app-toast__icon,
+.app-toast--error .app-toast__title {
+  color: rgb(var(--app-danger-strong-rgb));
+}
+
+.app-toast--info {
+  border-color: rgba(var(--app-insight-strong-rgb), 0.4);
+  background-color: rgba(var(--app-insight-rgb), 0.16);
+}
+
+.app-toast--info .app-toast__icon,
+.app-toast--info .app-toast__title {
+  color: rgb(var(--app-insight-strong-rgb));
+}
+

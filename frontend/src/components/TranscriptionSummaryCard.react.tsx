@@ -5,6 +5,7 @@ import { useUISettings } from "../contexts/UISettingsContext";
 import { getNotifiableAlerts, isBlankAudioText } from "../utils/transcriptions";
 import { Timestamp } from "./primitives/Timestamp.react";
 import Flex from "./primitives/Flex.react";
+import "./TranscriptionSummaryCard.scss";
 
 interface TranscriptionSummaryCardProps {
   transcription: TranscriptionResult;

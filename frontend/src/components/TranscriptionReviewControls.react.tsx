@@ -3,6 +3,7 @@ import { CheckCircle2, RotateCcw, Save } from "lucide-react";
 import type { TranscriptionResult, TranscriptionReviewStatus } from "@types";
 import { Timestamp } from "./primitives/Timestamp.react";
 import Button from "./primitives/Button.react";
+import "./TranscriptionReviewControls.scss";
 
 interface TranscriptionReviewControlsProps {
   transcription: TranscriptionResult;

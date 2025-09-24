@@ -2,6 +2,7 @@ import { ChangeEvent, MutableRefObject } from "react";
 import { Activity, LogIn, LogOut, Menu, Settings } from "lucide-react";
 import Button from "./primitives/Button.react";
 import Flex from "./primitives/Flex.react";
+import "./AppHeader.scss";
 
 interface AppHeaderProps {
   isMobileViewport: boolean;

@@ -4,6 +4,7 @@ import type { AlertsConfig } from "@types";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../hooks/useToast";
 import Button from "./primitives/Button.react";
+import "./SettingsModal.scss";
 
 type KeywordAlertsSettingsSectionProps = Record<string, never>;
 
