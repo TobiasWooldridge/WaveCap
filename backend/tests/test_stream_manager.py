@@ -8,6 +8,7 @@ from wavecap_backend.database import StreamDatabase
 from wavecap_backend.datetime_utils import utcnow
 from wavecap_backend.models import (
     AddStreamRequest,
+    PagerIncidentDetails,
     PagerWebhookRequest,
     Stream,
     StreamConfig,
@@ -486,6 +487,41 @@ async def test_pager_stream_webhook_flow(minimal_config, tmp_path):
     assert "Structure fire reported" in result.text
     stored = await manager.database.load_recent_transcriptions(stream.id)
     assert stored and stored[0].text == result.text
+
+
+@pytest.mark.asyncio
+async def test_pager_stream_structured_metadata(minimal_config, tmp_path):
+    db = StreamDatabase(tmp_path / "runtime.sqlite")
+    manager = StreamManager(
+        minimal_config, db, PassthroughTranscriber("noop"), worker_factory=DummyWorker
+    )
+    await manager.initialize()
+
+    stream = await manager.add_stream(
+        AddStreamRequest(name="Pager", source=StreamSource.PAGER)
+    )
+
+    request = PagerWebhookRequest(
+        message="INC1042 – TEST CALL",
+        incident=PagerIncidentDetails(
+            incidentId="INC1042",
+            callType="TEST CALL",
+            address="123 Example St",
+            alarmLevel="2",
+        ),
+        details=["Units: TST1"],
+    )
+
+    result = await manager.ingest_pager_message(stream.id, request)
+
+    assert result.pagerIncident is not None
+    assert result.pagerIncident.incidentId == "INC1042"
+    assert result.pagerIncident.callType == "TEST CALL"
+
+    stored = await manager.database.load_recent_transcriptions(stream.id)
+    assert stored
+    assert stored[0].pagerIncident is not None
+    assert stored[0].pagerIncident.address == "123 Example St"
 
 
 @pytest.mark.asyncio

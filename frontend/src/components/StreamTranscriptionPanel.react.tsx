@@ -1810,6 +1810,34 @@ export const StreamTranscriptionPanel = ({
     groups.map((group) => {
       const renderedRecordings = new Set<string>();
       const audioElements: JSX.Element[] = [];
+      const incidentSource = group.transcriptions.find(
+        (item) => item.pagerIncident?.incidentId,
+      );
+      const incidentDetails = incidentSource?.pagerIncident ?? null;
+      const incidentIdLabel = (() => {
+        const value =
+          incidentDetails?.incidentId ?? group.pagerIncidentId ?? null;
+        if (typeof value !== "string") {
+          return null;
+        }
+        const trimmed = value.trim();
+        return trimmed.length > 0 ? trimmed : null;
+      })();
+      const incidentCallType = incidentDetails?.callType ?? null;
+      const incidentMetaParts: string[] = [];
+      if (incidentDetails?.address) {
+        incidentMetaParts.push(incidentDetails.address);
+      }
+      if (incidentDetails?.alarmLevel) {
+        incidentMetaParts.push(`Alarm level ${incidentDetails.alarmLevel}`);
+      }
+      if (incidentDetails?.talkgroup) {
+        incidentMetaParts.push(`Talkgroup ${incidentDetails.talkgroup}`);
+      }
+      if (incidentDetails?.map) {
+        incidentMetaParts.push(`Map ${incidentDetails.map}`);
+      }
+      const incidentNarrative = incidentDetails?.narrative ?? null;
 
       const transcriptionItems = group.transcriptions.flatMap(
         (transcription) => {
@@ -2165,6 +2193,36 @@ export const StreamTranscriptionPanel = ({
                 </span>
               ) : null}
             </header>
+            {incidentIdLabel || incidentCallType || incidentMetaParts.length > 0 || incidentNarrative ? (
+              <div className="transcript-thread__incident-summary">
+                {incidentIdLabel || incidentCallType ? (
+                  <div className="transcript-thread__incident">
+                    {incidentIdLabel ? (
+                      <span className="transcript-thread__incident-id">
+                        {incidentIdLabel}
+                      </span>
+                    ) : null}
+                    {incidentCallType ? (
+                      <span className="transcript-thread__incident-type">
+                        {incidentCallType}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+                {incidentMetaParts.length > 0 ? (
+                  <div className="transcript-thread__incident-meta">
+                    {incidentMetaParts.map((part, index) => (
+                      <span key={`${group.id}-incident-meta-${index}`}>{part}</span>
+                    ))}
+                  </div>
+                ) : null}
+                {incidentNarrative ? (
+                  <div className="transcript-thread__incident-narrative">
+                    {incidentNarrative}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             <div className="transcript-thread__content">{groupContent}</div>
             {audioElements}
           </div>

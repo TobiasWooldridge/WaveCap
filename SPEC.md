@@ -33,6 +33,9 @@ transcribing multiple radio or pager feeds in real time.
 - Panels that may take time to populate display loading spinners until data arrives so operators understand the UI is still working.
 - Check aggregate counters for transcript volume, confidence, and recent activity.
 - Receive real-time transcript bursts; contiguous speech is grouped for readability.
+- Pager feed messages that share an incident number and arrive within roughly a minute
+  collapse into a single grouped thread, showing parsed incident details like the call
+  type, location, and alarm level alongside the individual updates.
 - When Whisper returns no text but audio passes silence thresholds, show a "Silence" entry with playback controls.
 - Load roughly the last three hours of transcripts per stream on initial view and fetch older history on demand (including auto-loading when needed) to keep the interface responsive. Loaded transcripts persist until refresh or reset; the toolbar no longer clears local history.
 - When a browser tab stays hidden for about fifteen minutes, the UI releases its WebSocket connection and reconnects automatically (refreshing stream data) as soon as the operator returns to the tab.
