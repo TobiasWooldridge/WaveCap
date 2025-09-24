@@ -1,0 +1,92 @@
+.transcript-segment {
+  display: inline-block;
+  text-align: left;
+  padding: 0.1875rem 0.3rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(var(--transcript-segment-surface-border-rgb), 0.65);
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  background-color: rgba(0, 0, 0, 0.05);
+  color: rgb(var(--app-ink-rgb));
+}
+
+.transcript-segment:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.transcript-segment--static {
+  cursor: text;
+  user-select: text;
+}
+
+.transcript-segment:hover:not(:disabled) {
+}
+
+.transcript-segment__time {
+  font-size: 0.75rem;
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: rgba(var(--transcript-segment-time-rgb), 0.8);
+  color: rgb(var(--app-ink-subtle-rgb));
+  border-radius: 0.5rem;
+  padding: 0.1rem 0.45rem;
+  margin-right: 0.4rem;
+  white-space: nowrap;
+}
+
+.transcript-segment__text {
+  font-size: 0.95rem;
+  line-height: 1.35;
+  transition: color 0.2s ease;
+}
+
+.transcript-segment--unknown {
+  background-color: rgba(0, 0, 0, 0.05);
+  border-color: transparent;
+  color: rgb(var(--app-ink-muted-rgb));
+}
+
+.transcript-segment--high {
+  background-color: rgba(var(--app-success-rgb), 0.15);
+  color: rgb(var(--app-success-strong-rgb));
+  border-color: rgba(var(--app-success-rgb), 0.35);
+}
+
+.transcript-segment--medium {
+  background-color: rgba(var(--app-caution-rgb), 0.24);
+  color: rgb(var(--app-caution-on-rgb));
+  border-color: rgba(var(--app-caution-rgb), 0.52);
+}
+
+.transcript-segment--low {
+  background-color: rgba(var(--app-danger-rgb), 0.2);
+  color: rgb(var(--app-danger-strong-rgb));
+  border-color: rgba(var(--app-danger-rgb), 0.4);
+}
+
+.transcript-segment--playing {
+  background-color: rgba(var(--app-accent-rgb), 0.2);
+  border-color: rgba(var(--app-accent-rgb), 0.45);
+  color: rgb(var(--app-accent-strong-rgb));
+}
+
+.transcript-boundary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgb(var(--app-ink-subtle-rgb));
+  background-color: rgb(var(--app-surface-subtle-rgb));
+  border: 1px dashed var(--bs-border-color);
+  border-radius: 0.75rem;
+  padding: 0.25rem 0.75rem;
+}
+
+.transcript-boundary__time {
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: rgba(var(--app-surface-muted-rgb), 0.7);
+  color: rgb(var(--app-ink-subtle-rgb));
+  padding: 0.125rem 0.4rem;
+  border-radius: 0.5rem;
+  }

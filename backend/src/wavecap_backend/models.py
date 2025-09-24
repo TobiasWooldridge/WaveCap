@@ -87,6 +87,40 @@ class TranscriptionAlertTrigger(APIModel):
     notify: Optional[bool] = None
 
 
+class PagerIncidentDetails(APIModel):
+    incidentId: Optional[str] = Field(default=None, alias="incidentId")
+    callType: Optional[str] = Field(default=None, alias="callType")
+    address: Optional[str] = None
+    alarmLevel: Optional[str] = Field(default=None, alias="alarmLevel")
+    map: Optional[str] = None
+    talkgroup: Optional[str] = None
+    narrative: Optional[str] = None
+    units: Optional[str] = None
+    rawMessage: Optional[str] = Field(default=None, alias="rawMessage")
+
+    @field_validator(
+        "incidentId",
+        "callType",
+        "address",
+        "alarmLevel",
+        "map",
+        "talkgroup",
+        "narrative",
+        "units",
+        "rawMessage",
+        mode="before",
+    )
+    @classmethod
+    def _normalise_optional_text(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            cleaned = value.strip()
+        else:
+            cleaned = str(value).strip()
+        return cleaned or None
+
+
 class TranscriptionResult(APIModel):
     id: str
     streamId: str = Field(alias="streamId")
@@ -109,6 +143,9 @@ class TranscriptionResult(APIModel):
     reviewedAt: Optional[datetime] = Field(default=None, alias="reviewedAt")
     reviewedBy: Optional[str] = Field(default=None, alias="reviewedBy")
     alerts: Optional[List[TranscriptionAlertTrigger]] = None
+    pagerIncident: Optional["PagerIncidentDetails"] = Field(
+        default=None, alias="pagerIncident"
+    )
 
     @field_validator("timestamp", mode="before")
     @classmethod
@@ -424,6 +461,7 @@ class PagerWebhookRequest(APIModel):
     priority: Optional[str] = None
     timestamp: Optional[datetime] = None
     details: Optional[List[str]] = None
+    incident: Optional["PagerIncidentDetails"] = None
 
     @field_validator("timestamp", mode="before")
     @classmethod

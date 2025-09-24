@@ -1,0 +1,113 @@
+.review-editor {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(var(--app-neutral-rgb), 0.22);
+  background-color: rgb(var(--app-surface-subtle-rgb));
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.review-editor__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.review-editor__meta {
+  font-size: 0.75rem;
+  color: rgb(var(--app-neutral-rgb));
+}
+
+.review-editor__body {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.review-editor__original {
+  background-color: rgba(var(--app-surface-muted-rgb), 0.6);
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+}
+
+.review-editor__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgb(var(--app-neutral-rgb));
+  margin-bottom: 0.3rem;
+  display: block;
+}
+
+.review-editor__text {
+  font-size: 0.9rem;
+  color: rgb(var(--app-ink-rgb));
+  margin: 0;
+  word-break: break-word;
+}
+
+.review-editor__text[data-variant='muted'] {
+  color: rgb(var(--app-ink-subtle-rgb));
+}
+
+.review-editor__textarea {
+  min-height: 5rem;
+  resize: vertical;
+}
+
+.review-editor__note {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.review-editor__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.review-editor__actions-left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.review-editor__error {
+  font-size: 0.75rem;
+  color: rgb(var(--app-danger-strong-rgb));
+  background-color: rgba(var(--app-danger-rgb), 0.12);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.review-editor__footer {
+  border-top: 1px solid rgba(var(--app-neutral-rgb), 0.18);
+  padding-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.review-editor__footer-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgb(var(--app-neutral-rgb));
+}
+
+.review-editor__footer-text {
+  margin: 0;
+  font-size: 0.95rem;
+  color: rgb(var(--app-ink-rgb));
+  word-break: break-word;
+}

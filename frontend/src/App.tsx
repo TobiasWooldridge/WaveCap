@@ -57,6 +57,7 @@ import { useResponsiveLayout } from "./hooks/useResponsiveLayout";
 import { useKeywordAlerts } from "./hooks/useKeywordAlerts";
 import { useStreamSelection } from "./hooks/useStreamSelection";
 import { useExportSettings } from "./hooks/useExportSettings";
+import "./App.scss";
 
 const REVIEW_STATUS_OPTIONS: Array<{
   value: TranscriptionReviewStatus;

@@ -2,6 +2,7 @@ import { ReactNode, useMemo } from "react";
 import clsx from "clsx";
 import { useUISettings } from "../contexts/UISettingsContext";
 import Button from "./primitives/Button.react";
+import "./TranscriptSegmentButton.scss";
 
 interface TranscriptSegmentListItemProps {
   segment: {

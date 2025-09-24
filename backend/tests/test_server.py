@@ -129,6 +129,7 @@ def test_pager_webhook_endpoint(patched_app: TestClient):
     body = response.json()
     assert body["status"] == "accepted"
     assert body["transcription"]["text"].startswith("Dispatch")
+    assert body["transcription"]["pagerIncident"] is None
 
     unauthorized = client.post(
         f"/api/pager-feeds/{stream_id}?token=wrong-token",
@@ -189,6 +190,13 @@ def test_pager_webhook_known_format(patched_app: TestClient):
     assert "Alarm level 1" in text
     assert "Map: ADL 178 B2" in text
     assert body["transcription"]["timestamp"] == "2025-09-01T10:35:54Z"
+    incident = body["transcription"]["pagerIncident"]
+    assert incident["incidentId"] == "INC0123"
+    assert incident["callType"] == "TRAINING/TEST ONLY"
+    assert incident["address"] == "CFS - HAPPY VALLEY 1 GLORY CT HAPPY VALLEY"
+    assert incident["alarmLevel"] == "1"
+    assert incident["map"] == "ADL 178 B2"
+    assert incident["talkgroup"] == "134"
 
 
 def test_export_reviewed_zip(patched_app: TestClient):

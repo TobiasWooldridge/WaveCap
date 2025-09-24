@@ -41,6 +41,18 @@ export type TranscriptionEventType =
   | "upstream_disconnected"
   | "upstream_reconnected";
 
+export interface PagerIncidentDetails {
+  incidentId?: string | null;
+  callType?: string | null;
+  address?: string | null;
+  alarmLevel?: string | null;
+  map?: string | null;
+  talkgroup?: string | null;
+  narrative?: string | null;
+  units?: string | null;
+  rawMessage?: string | null;
+}
+
 export interface TranscriptionResult {
   id: string;
   streamId: string;
@@ -57,6 +69,7 @@ export interface TranscriptionResult {
   reviewedAt?: IsoDateTimeString | null;
   reviewedBy?: string | null;
   alerts?: TranscriptionAlertTrigger[];
+  pagerIncident?: PagerIncidentDetails | null;
 }
 
 export interface TranscriptionQueryResponse {

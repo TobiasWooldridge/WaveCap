@@ -5,6 +5,7 @@ import type { Stream, ThemeMode, TranscriptionReviewStatus } from "@types";
 import KeywordAlertsSettingsSection from "./KeywordAlertsSettingsSection.react";
 import Button from "./primitives/Button.react";
 import Flex from "./primitives/Flex.react";
+import "./SettingsModal.scss";
 type SettingsModalProps = {
   open: boolean;
   onClose: () => void;

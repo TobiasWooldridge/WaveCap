@@ -1,0 +1,31 @@
+.timeline-entry--alert {
+  border-left: 0.25rem solid rgb(var(--app-danger-rgb));
+  padding-left: 0.75rem;
+  background-color: rgba(var(--app-danger-rgb), 0.06);
+  border-radius: 0.75rem;
+}
+
+.timeline-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  background-color: rgb(var(--app-surface-subtle-rgb));
+  transition: background-color 0.3s ease;
+}
+
+.timeline-entry__time {
+  font-size: 0.75rem;
+  color: rgb(var(--app-ink-subtle-rgb));
+}
+
+.timeline-entry__meta {
+  font-size: 0.75rem;
+  color: rgb(var(--app-neutral-rgb));
+}
+
+.timeline-entry__text {
+  font-size: 0.9rem;
+  color: rgb(var(--app-ink-rgb));
+}

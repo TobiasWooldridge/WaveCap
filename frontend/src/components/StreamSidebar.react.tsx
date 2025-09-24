@@ -5,6 +5,7 @@ import Spinner from "./primitives/Spinner.react";
 import Button from "./primitives/Button.react";
 import Badge from "./primitives/Badge.react";
 import Flex from "./primitives/Flex.react";
+import "./StreamSidebar.scss";
 
 export interface StreamSidebarItem {
   id: string;

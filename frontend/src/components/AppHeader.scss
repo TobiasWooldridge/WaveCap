@@ -1,0 +1,91 @@
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 1040;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease,
+    box-shadow 0.3s ease;
+  position: relative;
+  isolation: isolate;
+}
+
+.app-header__background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border-bottom: 1px solid rgba(var(--app-header-border-rgb), 0.45);
+  background:
+    radial-gradient(
+        circle at 15% -20%,
+        rgba(var(--app-header-highlight-rgb), 0.4) 0%,
+        rgba(var(--app-header-highlight-rgb), 0) 55%
+      ),
+    radial-gradient(
+        circle at 85% 0%,
+        rgba(var(--app-header-highlight-soft-rgb), 0.35) 0%,
+        rgba(var(--app-header-highlight-soft-rgb), 0) 55%
+      ),
+    linear-gradient(
+      135deg,
+      rgba(var(--app-header-surface-rgb), 0.96) 0%,
+      rgba(var(--app-header-surface-subtle-rgb), 0.98) 100%
+    );
+}
+
+.app-header__scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(var(--app-header-surface-subtle-rgb), 0.25) 0%,
+    rgba(var(--app-header-surface-subtle-rgb), 0.85) 100%
+  );
+  backdrop-filter: saturate(120%) blur(18px);
+  opacity: 0.95;
+}
+
+.app-header__content {
+  position: relative;
+  z-index: 1;
+}
+
+.app-header__container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: clamp(1rem, 2.5vw, 1.5rem);
+  padding-bottom: clamp(1rem, 2.5vw, 1.5rem);
+}
+
+.app-header__layout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(1rem, 3vw, 2.5rem);
+  width: 100%;
+}
+
+.app-header__branding {
+  display: flex;
+  align-items: center;
+  gap: clamp(0.65rem, 2vw, 1rem);
+}
+
+@media (max-width: 767.98px) {
+  .app-header__layout {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1.25rem;
+  }
+
+  .app-header__container {
+    padding-top: 0.85rem;
+    padding-bottom: 0.85rem;
+  }
+}
+
+.app-header__select {
+  width: auto;
+  min-width: 8rem;
+}
