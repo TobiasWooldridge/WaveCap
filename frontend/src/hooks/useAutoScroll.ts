@@ -111,11 +111,28 @@ export const useAutoScroll = () => {
     }
 
     let frameId: number | null = null;
+    let lastKnownScrollHeight = container.scrollHeight;
+
+    // React re-renders (for example while audio playback updates progress)
+    // can mutate lots of text nodes without actually adding new entries. When
+    // we eagerly schedule a scroll for every mutation, the browser keeps
+    // restarting smooth-scroll animations which shows up as flicker. Track the
+    // last measured scroll height so we only react when the content actually
+    // grows.
 
     const scheduleScroll = () => {
+      const nextScrollHeight = container.scrollHeight;
+
       if (!isAtBottomRef.current) {
+        lastKnownScrollHeight = nextScrollHeight;
         return;
       }
+
+      if (nextScrollHeight === lastKnownScrollHeight) {
+        return;
+      }
+
+      lastKnownScrollHeight = nextScrollHeight;
 
       if (
         typeof window === "undefined" ||
@@ -142,7 +159,6 @@ export const useAutoScroll = () => {
     observer.observe(container, {
       childList: true,
       subtree: true,
-      characterData: true,
     });
 
     return () => {
