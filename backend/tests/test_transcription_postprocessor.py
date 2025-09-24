@@ -35,3 +35,11 @@ def test_phrase_canonicalizer_skips_mid_sentence_prowords() -> None:
     result = canonicalizer.canonicalize(text)
     assert "flew over the" in result
     assert "lights out across" in result
+
+
+def test_phrase_canonicalizer_ignores_sitrap_variant() -> None:
+    canonicalizer = PhraseCanonicalizer.with_default_phrases()
+    text = "Command requesting sitrap for sector one"
+    result = canonicalizer.canonicalize(text)
+    assert "sitrap" in result.lower()
+    assert "SITREP" not in result

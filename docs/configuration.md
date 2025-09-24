@@ -251,7 +251,10 @@ toward consistent phrasing without forcing every token:
 - `initialPrompt`: Optional priming string injected at the start of each job.
   Use it to list frequently misheard locations or agency-specific jargon. The
   shipping configuration reminds Whisper about “Adelaide fire out”,
-  “Noarlunga”, and “SITREP”, improving the odds of seeing them verbatim.
+  “Noarlunga”, and “SITREP”, improving the odds of seeing them verbatim while
+  the post-processor only normalises “SITREP” when the decoded word is almost
+  an exact match, preventing the correction from firing repeatedly on similar
+  syllables.
 
 ### 8. Condition radio audio up front
 
