@@ -371,6 +371,31 @@ a:hover {
   color: rgb(var(--app-neutral-rgb));
 }
 
+.app-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1;
+  align-self: center;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.app-badge--accent {
+  background-color: rgb(var(--app-accent-rgb));
+  color: rgb(var(--app-on-accent-rgb));
+}
+
+.app-badge--neutral {
+  background-color: rgba(var(--app-neutral-rgb), 0.12);
+  color: rgb(var(--app-ink-rgb));
+}
+
 
 @media (max-width: 575.98px) {
   .toast-viewport {
