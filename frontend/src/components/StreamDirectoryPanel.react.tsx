@@ -12,6 +12,7 @@ import { Stream, type StreamCommandState } from "@types";
 import Spinner from "./primitives/Spinner.react";
 import Button from "./primitives/Button.react";
 import Flex from "./primitives/Flex.react";
+import "./StreamDirectoryPanel.scss";
 
 interface StreamDirectoryPanelProps {
   streams: Stream[];
@@ -99,7 +100,7 @@ export const StreamDirectoryPanel = ({
   };
 
   return (
-    <section className="card shadow-sm mb-4">
+    <section className="card shadow-sm mb-4 stream-directory">
       <Flex
         className="card-header bg-body-tertiary"
         align="center"
@@ -216,7 +217,7 @@ export const StreamDirectoryPanel = ({
             </p>
           </div>
         ) : (
-          <div className="list-group list-group-flush">
+          <div className="list-group list-group-flush stream-directory__list">
             {streams.map((stream) => {
               const variant = getStatusVariant(stream.status);
               const pendingAction = pendingCommands[stream.id];
@@ -230,22 +231,22 @@ export const StreamDirectoryPanel = ({
               return (
                 <Flex
                   key={stream.id}
-                  className="list-group-item"
+                  className="list-group-item stream-directory__item"
                   direction={{ base: "column", lg: "row" }}
                   align={{ lg: "center" }}
                   justify="between"
-                  gap={3}
+                  gap={2}
                 >
-                  <Flex align="start" gap={3} className="flex-grow-1">
+                  <Flex align="start" gap={2} className="flex-grow-1 stream-directory__item-main">
                     <Radio size={20} className="text-body-tertiary" />
                     <div className="flex-grow-1">
-                      <Flex align="center" gap={2} className="mb-1">
-                        <h3 className="h6 mb-0">{stream.name}</h3>
+                      <Flex align="center" gap={1} className="stream-directory__header">
+                        <h3 className="stream-directory__title">{stream.name}</h3>
                         <span
-                          className={`badge d-inline-flex align-items-center gap-2 ${getStatusBadgeClass(variant)}`}
+                          className={`badge d-inline-flex align-items-center gap-2 stream-directory__status ${getStatusBadgeClass(variant)}`}
                         >
                           {renderStatusIcon(variant)}
-                          <span className="text-capitalize">
+                          <span className="stream-directory__status-label text-capitalize">
                             {stream.status}
                           </span>
                         </span>
@@ -254,12 +255,12 @@ export const StreamDirectoryPanel = ({
                         href={stream.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="d-inline-flex align-items-center gap-1 small text-decoration-none link-primary"
+                        className="d-inline-flex align-items-center gap-1 text-decoration-none link-primary stream-directory__link"
                         title={stream.url}
                       >
                         {stream.url}
                       </a>
-                      <div className="small text-body-secondary">
+                      <div className="text-body-secondary stream-directory__meta">
                         {stream.transcriptions?.length || 0} transcriptions
                       </div>
                     </div>
