@@ -298,6 +298,7 @@ function App() {
     authFetch,
   } = useAuth();
   const isReadOnly = role !== "editor";
+  const showAuthLoading = loading && !streamsInitialized;
   const canViewWebhookDetails =
     !isReadOnly && (authenticated || !requiresPassword);
   const [loginPassword, setLoginPassword] = useState("");
@@ -1422,6 +1423,7 @@ function App() {
           settingsTriggerRef={settingsTriggerRef}
           showSettings={showSettings}
           isReadOnly={isReadOnly}
+          streamsLoading={showAuthLoading}
           onRequestLogin={requestLogin}
           onLogout={logout}
         />
