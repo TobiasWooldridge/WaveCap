@@ -55,6 +55,7 @@ export const StreamTranscriptList = ({
   });
   const previousFirstEntryRef = useRef<string | null>(null);
   const previousScrollHeightRef = useRef(0);
+  const initialScrollCompletedRef = useRef(false);
 
   const triggerLoadMore = useCallback(() => {
     const callback = loadMoreRef.current;
@@ -86,6 +87,9 @@ export const StreamTranscriptList = ({
       scrollerRef.current = node;
       attachRef(node);
       setScrollContainer(node);
+      if (!node) {
+        initialScrollCompletedRef.current = false;
+      }
     },
     [attachRef],
   );
@@ -100,7 +104,15 @@ export const StreamTranscriptList = ({
     if (!scroller) {
       previousScrollHeightRef.current = 0;
       previousFirstEntryRef.current = null;
+      initialScrollCompletedRef.current = false;
       return;
+    }
+
+    if (orderedTranscriptions.length === 0) {
+      initialScrollCompletedRef.current = false;
+    } else if (!initialScrollCompletedRef.current) {
+      scroller.scrollTop = scroller.scrollHeight;
+      initialScrollCompletedRef.current = true;
     }
 
     const prevFirstKey = previousFirstEntryRef.current;
