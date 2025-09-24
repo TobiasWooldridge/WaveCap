@@ -16,6 +16,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from .datetime_utils import ensure_utc, utcnow
 from .models import (
+    PagerIncidentDetails,
     Stream,
     StreamSource,
     StreamStatus,
@@ -114,6 +115,10 @@ class TranscriptionRecord(SQLModel, table=True):
             default=TranscriptionEventType.TRANSCRIPTION.value,
         ),
     )
+    pagerIncident: Optional[str] = Field(
+        default=None,
+        sa_column=Column("pagerIncident", Text, nullable=True),
+    )
 
 
 class StreamDatabase:
@@ -151,6 +156,7 @@ class StreamDatabase:
                     "ALTER TABLE streams ADD COLUMN lastActivityAt DATETIME",
                     "ALTER TABLE streams ADD COLUMN enabled BOOLEAN",
                     "ALTER TABLE transcriptions ADD COLUMN eventType TEXT DEFAULT 'transcription'",
+                    "ALTER TABLE transcriptions ADD COLUMN pagerIncident TEXT",
                     "CREATE INDEX IF NOT EXISTS ix_streams_last_activity ON streams (lastActivityAt)",
                     "CREATE INDEX IF NOT EXISTS ix_transcriptions_stream_timestamp ON transcriptions (streamId, timestamp)",
                     "CREATE INDEX IF NOT EXISTS ix_transcriptions_timestamp ON transcriptions (timestamp)",
@@ -266,6 +272,18 @@ class StreamDatabase:
             record.reviewedAt = transcription.reviewedAt
             record.reviewedBy = transcription.reviewedBy
             record.eventType = TranscriptionEventType(transcription.eventType)
+            if transcription.pagerIncident:
+                if hasattr(transcription.pagerIncident, "model_dump"):
+                    incident_json = json.dumps(
+                        transcription.pagerIncident.model_dump(
+                            by_alias=True, exclude_none=True
+                        )
+                    )
+                else:
+                    incident_json = json.dumps(transcription.pagerIncident)
+            else:
+                incident_json = None
+            record.pagerIncident = incident_json
             session.add(record)
 
     async def load_recent_transcriptions(
@@ -315,6 +333,14 @@ class StreamDatabase:
             ]
         else:
             segments = None
+        pager_incident_data = (
+            json.loads(record.pagerIncident) if record.pagerIncident else None
+        )
+        pager_incident: Optional[PagerIncidentDetails]
+        if pager_incident_data:
+            pager_incident = PagerIncidentDetails.model_validate(pager_incident_data)
+        else:
+            pager_incident = None
         return TranscriptionResult(
             id=record.id,
             streamId=record.streamId,
@@ -329,6 +355,7 @@ class StreamDatabase:
             reviewedAt=record.reviewedAt,
             reviewedBy=record.reviewedBy,
             eventType=TranscriptionEventType(record.eventType),
+            pagerIncident=pager_incident,
         )
 
     async def query_transcriptions(

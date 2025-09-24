@@ -5,7 +5,7 @@ from enum import Enum
 import re
 from typing import Any, Mapping, Optional
 
-from .models import PagerWebhookRequest
+from .models import PagerIncidentDetails, PagerWebhookRequest
 
 
 class PagerWebhookFormat(str, Enum):
@@ -118,12 +118,30 @@ def _parse_cfs_flex(payload: Mapping[str, Any]) -> PagerWebhookRequest:
     if raw_message and raw_message != summary:
         details.append(f"Raw message: {raw_message}")
 
+    incident_candidate = PagerIncidentDetails(
+        incidentId=_optional_string(inc),
+        callType=_optional_string(call_type),
+        address=_optional_string(address),
+        alarmLevel=_optional_string(alarm),
+        map=_optional_string(_extract_map_summary(map_detail)),
+        talkgroup=_optional_string(talkgroup),
+        narrative=_optional_string(narrative),
+        units=_optional_string(units),
+        rawMessage=_optional_string(raw_message),
+    )
+    incident = (
+        incident_candidate
+        if incident_candidate.model_dump(exclude_none=True)
+        else None
+    )
+
     return PagerWebhookRequest(
         message=summary,
         sender=None,
         priority=None,
         timestamp=timestamp,
         details=details or None,
+        incident=incident,
     )
 
 
@@ -133,6 +151,11 @@ def _stringify(value: Any) -> str:
     if isinstance(value, str):
         return value.strip()
     return str(value).strip()
+
+
+def _optional_string(value: Any) -> Optional[str]:
+    text = _stringify(value)
+    return text or None
 
 
 def _normalise_address(value: Any) -> str:
@@ -180,6 +203,15 @@ def _format_map_detail(map_value: Any) -> str:
     if not components:
         return ""
     return f"Map: {' '.join(components)}"
+
+
+def _extract_map_summary(map_detail: str) -> str:
+    text = _stringify(map_detail)
+    if not text:
+        return ""
+    if text.lower().startswith("map:"):
+        return text.split(":", 1)[1].strip()
+    return text
 
 
 def _coerce_alarm(value: Any) -> Any:

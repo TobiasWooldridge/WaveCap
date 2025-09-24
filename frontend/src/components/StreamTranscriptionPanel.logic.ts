@@ -7,6 +7,7 @@ export const MIN_SILENCE_MS = 1200;
 export const MAX_SILENCE_MS = 6000;
 export const GAP_MULTIPLIER = 1.6;
 export const DURATION_SILENCE_SCALE = 0.6;
+export const PAGER_INCIDENT_GROUP_WINDOW_MS = 90_000;
 
 export interface TranscriptionGroup {
   id: string;
@@ -18,6 +19,7 @@ export interface TranscriptionGroup {
   totalGapMs: number;
   gapSamples: number;
   transcriptions: TranscriptionResult[];
+  pagerIncidentId: string | null;
 }
 
 export interface PlaybackQueueState {
@@ -69,6 +71,14 @@ const hashString = (value: string): string => {
     hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
   }
   return hash.toString(36);
+};
+
+const normaliseIncidentId = (value: string | null | undefined): string | null => {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 };
 
 export const getRecordingElementId = (recordingUrl: string): string => {
@@ -194,6 +204,9 @@ export const groupTranscriptions = (
 
     const durationMs = getTranscriptionDurationMs(transcription);
     const endMs = durationMs > 0 ? timestampMs + durationMs : timestampMs;
+    const incidentId = normaliseIncidentId(
+      transcription.pagerIncident?.incidentId,
+    );
     const lastGroup = groups[groups.length - 1];
     const startNewGroup = () => {
       const initialAverage = calculateAverageConfidence([transcription]);
@@ -207,6 +220,7 @@ export const groupTranscriptions = (
         totalGapMs: 0,
         gapSamples: 0,
         transcriptions: [transcription],
+        pagerIncidentId: incidentId,
       });
     };
 
@@ -227,6 +241,10 @@ export const groupTranscriptions = (
     }
 
     const gapMs = Math.max(0, timestampMs - lastGroup.lastEndMs);
+    if (!lastGroup.pagerIncidentId && incidentId) {
+      lastGroup.pagerIncidentId = incidentId;
+    }
+    const lastIncidentId = normaliseIncidentId(lastGroup.pagerIncidentId);
     const averageGapMs =
       lastGroup.gapSamples > 0
         ? lastGroup.totalGapMs / lastGroup.gapSamples
@@ -239,10 +257,18 @@ export const groupTranscriptions = (
     );
     const dynamicGapThreshold =
       averageGapMs > 0 ? averageGapMs * GAP_MULTIPLIER : MIN_SILENCE_MS;
-    const silenceThresholdMs = Math.min(
+    const incidentGapThreshold =
+      incidentId && lastIncidentId && incidentId === lastIncidentId
+        ? PAGER_INCIDENT_GROUP_WINDOW_MS
+        : 0;
+    const baseSilenceThreshold = Math.min(
       MAX_SILENCE_MS,
       Math.max(MIN_SILENCE_MS, dynamicGapThreshold, durationMsThreshold),
     );
+    const silenceThresholdMs =
+      incidentGapThreshold > 0
+        ? Math.max(baseSilenceThreshold, incidentGapThreshold)
+        : baseSilenceThreshold;
 
     if (gapMs > silenceThresholdMs) {
       startNewGroup();

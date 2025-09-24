@@ -1711,6 +1711,44 @@ a:hover {
   color: rgb(var(--app-ink-subtle-rgb));
 }
 
+.transcript-thread__incident-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+}
+
+.transcript-thread__incident {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: rgb(var(--app-insight-strong-rgb));
+}
+
+.transcript-thread__incident-id {
+  letter-spacing: 0.02em;
+}
+
+.transcript-thread__incident-type {
+  color: rgb(var(--app-ink-rgb));
+  font-weight: 600;
+}
+
+.transcript-thread__incident-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  color: rgb(var(--app-ink-subtle-rgb));
+}
+
+.transcript-thread__incident-narrative {
+  color: rgb(var(--app-ink-rgb));
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
 .transcript-thread__time {
   font-weight: 600;
   color: rgb(var(--app-ink-muted-rgb));

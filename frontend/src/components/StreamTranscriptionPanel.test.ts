@@ -53,6 +53,7 @@ const createTranscription = (
   reviewedAt: overrides.reviewedAt,
   reviewedBy: overrides.reviewedBy,
   alerts: overrides.alerts,
+  pagerIncident: overrides.pagerIncident,
 });
 
 const assertApproximatelyEqual = (
@@ -271,6 +272,37 @@ test("groupTranscriptions isolates upstream connectivity events", () => {
     ),
     [["before"], ["disconnect"], ["after"], ["reconnect"]],
   );
+});
+
+test("groupTranscriptions keeps pager incident updates together", () => {
+  const initial = createTranscription("incident-1", 0, {
+    duration: 0,
+    pagerIncident: { incidentId: "INC-1" },
+  });
+  const followUp = createTranscription("incident-2", 70_000, {
+    duration: 0,
+    pagerIncident: { incidentId: "INC-1" },
+  });
+
+  const groups = groupTranscriptions([initial, followUp]);
+
+  assert.strictEqual(groups.length, 1);
+  assert.strictEqual(groups[0].transcriptions.length, 2);
+});
+
+test("groupTranscriptions separates pager incidents after the merge window", () => {
+  const initial = createTranscription("incident-1", 0, {
+    duration: 0,
+    pagerIncident: { incidentId: "INC-1" },
+  });
+  const muchLater = createTranscription("incident-2", 200_000, {
+    duration: 0,
+    pagerIncident: { incidentId: "INC-1" },
+  });
+
+  const groups = groupTranscriptions([initial, muchLater]);
+
+  assert.strictEqual(groups.length, 2);
 });
 
 test("prepareTranscriptions sorts data before grouping", () => {

@@ -823,6 +823,8 @@ class StreamManager:
             duration=None,
             segments=None,
         )
+        if request.incident:
+            transcription.pagerIncident = request.incident
         alerts = self.alert_evaluator.evaluate(text)
         if alerts:
             transcription.alerts = alerts
