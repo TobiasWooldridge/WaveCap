@@ -48,17 +48,38 @@ export const StreamTranscriptList = ({
     null,
   );
   const loadMoreRef = useRef<(() => void) | null>(null);
-  const loadStateRef = useRef({ hasMoreHistory, isLoadingHistory });
+  const loadStateRef = useRef({
+    hasMoreHistory,
+    isLoadingHistory,
+    pending: false,
+  });
   const previousFirstEntryRef = useRef<string | null>(null);
   const previousScrollHeightRef = useRef(0);
+
+  const triggerLoadMore = useCallback(() => {
+    const callback = loadMoreRef.current;
+    const state = loadStateRef.current;
+
+    if (!callback || state.pending || state.isLoadingHistory || !state.hasMoreHistory) {
+      return;
+    }
+
+    state.pending = true;
+    callback();
+  }, []);
 
   useEffect(() => {
     loadMoreRef.current = onLoadEarlier ?? null;
   }, [onLoadEarlier]);
 
   useEffect(() => {
-    loadStateRef.current = { hasMoreHistory, isLoadingHistory };
-  }, [hasMoreHistory, isLoadingHistory]);
+    loadStateRef.current.hasMoreHistory = hasMoreHistory;
+  }, [hasMoreHistory]);
+
+  useEffect(() => {
+    loadStateRef.current.isLoadingHistory = isLoadingHistory;
+    loadStateRef.current.pending = isLoadingHistory;
+  }, [isLoadingHistory]);
 
   const handleAttachRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -121,16 +142,16 @@ export const StreamTranscriptList = ({
             continue;
           }
 
-          const { hasMoreHistory: hasMore, isLoadingHistory: loading } =
-            loadStateRef.current;
-          if (!hasMore || loading) {
+          const {
+            hasMoreHistory: hasMore,
+            isLoadingHistory: loading,
+            pending,
+          } = loadStateRef.current;
+          if (!hasMore || loading || pending) {
             continue;
           }
 
-          const callback = loadMoreRef.current;
-          if (callback) {
-            callback();
-          }
+          triggerLoadMore();
         }
       },
       {
@@ -145,7 +166,7 @@ export const StreamTranscriptList = ({
     return () => {
       observer.disconnect();
     };
-  }, [scrollContainer, sentinelElement]);
+  }, [scrollContainer, sentinelElement, triggerLoadMore]);
 
   useEffect(() => {
     const scroller = scrollerRef.current;
@@ -167,8 +188,14 @@ export const StreamTranscriptList = ({
       return;
     }
 
-    loadMoreRef.current();
-  }, [orderedTranscriptions, hasMoreHistory, isLoadingHistory, onLoadEarlier]);
+    triggerLoadMore();
+  }, [
+    orderedTranscriptions,
+    hasMoreHistory,
+    isLoadingHistory,
+    onLoadEarlier,
+    triggerLoadMore,
+  ]);
 
   useEffect(() => {
     const nextCount = orderedTranscriptions.length;
