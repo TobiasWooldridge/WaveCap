@@ -97,7 +97,7 @@
 
 .stream-sidebar__item {
   border: 0;
-  background: transparent;
+  background-color: rgba(var(--app-ink-rgb), 0.04);
   color: inherit;
   padding: 0.75rem;
   border-radius: 0.85rem;
