@@ -351,37 +351,55 @@ const StreamSidebar = ({
               className={`stream-sidebar__item ${item.isActive ? "stream-sidebar__item--active" : ""}`}
               aria-current={item.isActive ? "page" : undefined}
             >
-              <div
-                className={`stream-status-dot ${item.statusClass}`}
-                aria-hidden="true"
-              />
-              <div className="stream-sidebar__item-main">
-                <div className="stream-sidebar__item-header">
-                  <div className="stream-sidebar__item-heading">
-                    <span className="stream-sidebar__item-title">
-                      {item.title}
-                    </span>
-                    {item.isPager ? (
-                      <span className="badge rounded-pill text-bg-info-subtle text-info-emphasis">
-                        Pager
-                      </span>
-                    ) : null}
-                  </div>
-                  <span className="stream-sidebar__item-time">
-                    {item.previewTime}
-                  </span>
-                </div>
-                <div className="stream-sidebar__item-preview text-body-secondary">
-                  {item.previewText}
-                </div>
-              </div>
-              {item.unreadCount > 0 ? (
-                <Badge
-                  aria-label={`${item.unreadCount} new messages`}
-                  value={item.unreadCount}
-                  max={99}
+              <Flex align="start" gap={3} className="stream-sidebar__item-layout">
+                <div
+                  className={`stream-status-dot ${item.statusClass}`}
+                  aria-hidden="true"
                 />
-              ) : null}
+                <Flex
+                  className="stream-sidebar__item-main"
+                  justify="between"
+                  align="start"
+                  gap={3}
+                >
+                  <Flex
+                    direction="column"
+                    gap={2}
+                    className="stream-sidebar__item-content"
+                  >
+                    <Flex align="center" gap={2} className="stream-sidebar__item-heading">
+                      <span className="stream-sidebar__item-title">
+                        {item.title}
+                      </span>
+                      {item.isPager ? (
+                        <span className="badge rounded-pill text-bg-info-subtle text-info-emphasis">
+                          Pager
+                        </span>
+                      ) : null}
+                    </Flex>
+                    <div className="stream-sidebar__item-preview text-body-secondary">
+                      {item.previewText}
+                    </div>
+                  </Flex>
+                  <Flex
+                    direction="column"
+                    align="end"
+                    gap={1}
+                    className="stream-sidebar__item-meta"
+                  >
+                    <span className="stream-sidebar__item-time">
+                      {item.previewTime}
+                    </span>
+                    {item.unreadCount > 0 ? (
+                      <Badge
+                        aria-label={`${item.unreadCount} new messages`}
+                        value={item.unreadCount}
+                        max={99}
+                      />
+                    ) : null}
+                  </Flex>
+                </Flex>
+              </Flex>
             </Button>
           ))}
         </div>
