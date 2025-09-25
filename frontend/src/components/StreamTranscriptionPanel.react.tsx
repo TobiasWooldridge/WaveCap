@@ -29,6 +29,7 @@ import {
   MicOff,
   Wifi,
   WifiOff,
+  Download,
 } from "lucide-react";
 import {
   Stream,
@@ -102,6 +103,9 @@ interface StreamTranscriptionPanelProps {
   onStandaloneControlsChange?: (
     controls: StandaloneStreamControls | null,
   ) => void;
+  onExportPagerFeed?: () => Promise<void> | void;
+  onSelectPagerExportStream?: (streamId: string) => void;
+  pagerExporting?: boolean;
 }
 
 const INITIAL_HISTORY_WINDOW_MINUTES = 180;
@@ -223,6 +227,9 @@ export const StreamTranscriptionPanel = ({
   onReviewTranscription,
   focusStreamId,
   onStandaloneControlsChange,
+  onExportPagerFeed,
+  onSelectPagerExportStream,
+  pagerExporting = false,
 }: StreamTranscriptionPanelProps) => {
   const { authFetch, role, authenticated, requiresPassword } = useAuth();
   const isReadOnly = role !== "editor";
@@ -1494,6 +1501,33 @@ export const StreamTranscriptionPanel = ({
       </Button>,
     ];
 
+    if (isPagerStream(focusedVisibleStream) && onExportPagerFeed) {
+      toolButtonItems.push(
+        <Button
+          key="export-pager"
+          size="sm"
+          use="secondary"
+          appearance="outline"
+          onClick={() => {
+            onSelectPagerExportStream?.(streamId);
+            void onExportPagerFeed();
+          }}
+          startContent={
+            pagerExporting ? (
+              <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
+            ) : (
+              <Download size={14} />
+            )
+          }
+          isCondensed
+          tooltip="Export pager feed"
+          disabled={pagerExporting}
+        >
+          {pagerExporting ? "Exporting…" : "Export feed"}
+        </Button>,
+      );
+    }
+
     const toolButtons =
       toolButtonItems.length > 0 ? (
         <ButtonGroup size="sm">{toolButtonItems}</ButtonGroup>
@@ -1783,6 +1817,9 @@ export const StreamTranscriptionPanel = ({
     setOpenStandaloneTool,
     openStandaloneTool,
     isReadOnly,
+    onExportPagerFeed,
+    onSelectPagerExportStream,
+    pagerExporting,
   ]);
 
   useEffect(() => {
