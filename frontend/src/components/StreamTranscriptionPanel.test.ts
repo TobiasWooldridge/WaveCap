@@ -4,6 +4,7 @@ import type { TranscriptionResult, TranscriptionSegment } from "@types";
 import {
   buildPlaybackQueue,
   advancePlaybackQueue,
+  condensePagerTranscriptions,
   getRecordingElementId,
   getBlankAudioSegmentBounds,
   getSegmentDisplayStart,
@@ -11,6 +12,7 @@ import {
   groupTranscriptions,
   prepareTranscriptions,
   selectVisibleTranscriptions,
+  PAGER_SIMULTANEOUS_WINDOW_MS,
   type PlaybackQueueState,
   type TranscriptionGroup,
 } from "./StreamTranscriptionPanel.logic.js";
@@ -303,6 +305,80 @@ test("groupTranscriptions separates pager incidents after the merge window", () 
   const groups = groupTranscriptions([initial, muchLater]);
 
   assert.strictEqual(groups.length, 2);
+});
+
+test("condensePagerTranscriptions merges fragments within the pager window", () => {
+  const baseIncident = {
+    incidentId: "INC0106",
+    callType: "RUBBISH OR WASTE",
+    map: "ADL 41 Q16",
+    talkgroup: "C163 T183",
+    rawMessage: "FLEX|2024-01-01 00:00:00|...",
+  } as const;
+
+  const first = createTranscription("pager-1", 0, {
+    text: [
+      "INC0106 – RUBBISH OR WASTE – 20A SEAVIEW DR HAPPY VALLEY – Alarm level 1",
+      "• Map: ADL 41 Q16",
+      "• Narrative: SMALL FIRE IN FRONT OF FOOD BANK (Part 1 of 2)",
+    ].join("\n"),
+    duration: 0,
+    pagerIncident: { ...baseIncident },
+  });
+
+  const second = createTranscription(
+    "pager-2",
+    PAGER_SIMULTANEOUS_WINDOW_MS - 500,
+    {
+      text: [
+        "INC0106 – RUBBISH OR WASTE – 20A SEAVIEW DR HAPPY VALLEY – Alarm level 1",
+        "• Units: AIRDESK5 ELZ331",
+        "• Raw message: FLEX|2024-01-01 00:00:00|...",
+      ].join("\n"),
+      duration: 0,
+      pagerIncident: { units: "AIRDESK5 ELZ331" },
+    },
+  );
+
+  const messages = condensePagerTranscriptions([first, second]);
+
+  assert.strictEqual(messages.length, 1);
+  const [message] = messages;
+  assert.strictEqual(message.fragments.length, 2);
+  assert.ok(message.summary && message.summary.includes("INC0106"));
+
+  const mapField = message.fields.find((field) => field.key === "map");
+  assert.deepStrictEqual(mapField?.values, ["ADL 41 Q16"]);
+
+  const narrativeField = message.fields.find((field) => field.key === "narrative");
+  assert.deepStrictEqual(narrativeField?.values, ["SMALL FIRE IN FRONT OF FOOD BANK"]);
+
+  const unitsField = message.fields.find((field) => field.key === "units");
+  assert.deepStrictEqual(unitsField?.values, ["AIRDESK5 ELZ331"]);
+
+  const rawField = message.fields.find((field) => field.key === "raw_message");
+  assert.ok(rawField);
+  assert.strictEqual(rawField?.format, "code");
+  assert.ok(rawField?.values[0].includes("FLEX|2024-01-01"));
+});
+
+test("condensePagerTranscriptions separates updates outside the pager window", () => {
+  const first = createTranscription("pager-a", 0, {
+    text: "INC0100 – STRUCTURE FIRE – Sample Address",
+    duration: 0,
+  });
+  const second = createTranscription(
+    "pager-b",
+    PAGER_SIMULTANEOUS_WINDOW_MS + 5_000,
+    {
+      text: "INC0100 – STRUCTURE FIRE – Follow up",
+      duration: 0,
+    },
+  );
+
+  const messages = condensePagerTranscriptions([first, second]);
+
+  assert.strictEqual(messages.length, 2);
 });
 
 test("prepareTranscriptions sorts data before grouping", () => {
