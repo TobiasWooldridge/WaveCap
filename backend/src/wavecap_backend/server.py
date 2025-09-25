@@ -630,6 +630,50 @@ def create_app() -> FastAPI:
         headers = {"Content-Disposition": f"attachment; filename={filename}"}
         return StreamingResponse(buffer, media_type="application/zip", headers=headers)
 
+    @app.get("/api/pager-feeds/{stream_id}/export")
+    async def export_pager_feed(
+        stream_id: str,
+        state: AppState = Depends(get_state),
+        _: AccessRole = Depends(require_editor_role),
+    ) -> StreamingResponse:
+        stream = state.stream_manager.streams.get(stream_id)
+        if not stream:
+            raise HTTPException(status_code=404, detail="Stream not found")
+        if stream.source != StreamSource.PAGER:
+            raise HTTPException(
+                status_code=400, detail="Stream does not accept pager webhooks"
+            )
+
+        results = await state.stream_manager.export_pager_messages(stream_id)
+
+        buffer = io.BytesIO()
+        with ZipFile(buffer, "w", ZIP_DEFLATED) as archive:
+            metadata = {
+                "exportedAt": isoformat_utc(utcnow()),
+                "streamId": stream.id,
+                "streamName": stream.name,
+                "count": len(results),
+            }
+            archive.writestr("metadata.json", json.dumps(metadata, indent=2))
+
+            lines: list[str] = []
+            for result in results:
+                payload = result.model_dump(by_alias=True, mode="json")
+                allowed_keys = {"id", "streamId", "timestamp", "text", "pagerIncident"}
+                record = {
+                    key: payload.get(key)
+                    for key in allowed_keys
+                    if key in payload
+                }
+                lines.append(json.dumps(record, ensure_ascii=False))
+
+            archive.writestr("messages.jsonl", "\n".join(lines))
+
+        buffer.seek(0)
+        filename = f"pager-feed-{stream.id}-{utcnow().strftime('%Y%m%d-%H%M%S')}.zip"
+        headers = {"Content-Disposition": f"attachment; filename={filename}"}
+        return StreamingResponse(buffer, media_type="application/zip", headers=headers)
+
     @app.get("/api/streams/{stream_id}/live")
     async def live_audio(
         stream_id: str, state: AppState = Depends(get_state)

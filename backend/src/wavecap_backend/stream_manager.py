@@ -695,6 +695,16 @@ class StreamManager:
         statuses = request.statuses if request.statuses else None
         return await self.database.export_transcriptions(statuses)
 
+    async def export_pager_messages(
+        self, stream_id: str
+    ) -> List[TranscriptionResult]:
+        stream = self.streams.get(stream_id)
+        if not stream:
+            raise ValueError("Stream not found")
+        if stream.source != StreamSource.PAGER:
+            raise ValueError("Stream does not accept pager messages")
+        return await self.database.export_pager_messages(stream_id)
+
     def _delete_recordings(self, stream_id: str) -> None:
         if not RECORDINGS_DIR.exists():
             return
