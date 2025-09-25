@@ -11,6 +11,7 @@ import {
 import {
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   Radio,
   Clock,
   Activity,
@@ -308,6 +309,9 @@ export const StreamTranscriptionPanel = ({
   const [liveAudioErrorByStream, setLiveAudioErrorByStream] = useState<
     Record<string, string | null>
   >({});
+  const [openPagerMessageIds, setOpenPagerMessageIds] = useState<
+    Record<string, boolean>
+  >({});
   const [activeSearchPanelStreamId, setActiveSearchPanelStreamId] = useState<
     string | null
   >(null);
@@ -315,6 +319,13 @@ export const StreamTranscriptionPanel = ({
     useState<StandaloneTool | null>(null);
   const liveAudioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
   const recordingAudioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
+
+  const togglePagerMessageFragments = useCallback((messageId: string) => {
+    setOpenPagerMessageIds((previous) => ({
+      ...previous,
+      [messageId]: !previous[messageId],
+    }));
+  }, []);
 
   const shouldAutoScrollFocusedView = Boolean(focusStreamId);
   const {
@@ -2272,6 +2283,12 @@ export const StreamTranscriptionPanel = ({
                     (message.fragments[0]?.text
                       ? message.fragments[0].text.split(/\r?\n/, 1)[0]
                       : "Pager update");
+                  const isFragmentsOpen = Boolean(
+                    openPagerMessageIds[message.id],
+                  );
+                  const fragmentCountLabel = `${message.fragments.length} ${
+                    message.fragments.length === 1 ? "fragment" : "fragments"
+                  }`;
 
                   return (
                     <div key={message.id} className="pager-transcript">
@@ -2321,14 +2338,44 @@ export const StreamTranscriptionPanel = ({
                         </ul>
                       ) : null}
                       {fragmentElements.length > 0 ? (
-                        <details className="pager-transcript__fragments">
-                          <summary>
-                            Show raw fragments ({message.fragments.length})
-                          </summary>
-                          <div className="pager-transcript__fragment-list">
-                            {fragmentElements}
-                          </div>
-                        </details>
+                        <div
+                          className={`pager-transcript__fragments${
+                            isFragmentsOpen
+                              ? " pager-transcript__fragments--open"
+                              : ""
+                          }`}
+                        >
+                          <Button
+                            use="secondary"
+                            appearance="outline"
+                            size="sm"
+                            className={`pager-transcript__fragments-toggle${
+                              isFragmentsOpen
+                                ? " pager-transcript__fragments-toggle--open"
+                                : ""
+                            }`}
+                            startContent={
+                              isFragmentsOpen ? (
+                                <ChevronUp size={14} />
+                              ) : (
+                                <ChevronDown size={14} />
+                              )
+                            }
+                            onClick={() => togglePagerMessageFragments(message.id)}
+                          >
+                            {isFragmentsOpen ? "Hide raw message" : "View raw message"}
+                            <span className="pager-transcript__fragment-count">
+                              {fragmentCountLabel}
+                            </span>
+                          </Button>
+                          {isFragmentsOpen ? (
+                            <div className="pager-transcript__fragment-panel">
+                              <div className="pager-transcript__fragment-list">
+                                {fragmentElements}
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
                       ) : null}
                     </div>
                   );

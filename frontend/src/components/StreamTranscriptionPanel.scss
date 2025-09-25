@@ -692,29 +692,69 @@
 }
 
 .pager-transcript__fragments {
-  font-size: 0.75rem;
-  color: rgb(var(--app-ink-subtle-rgb));
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.35rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid rgba(var(--bs-border-color-rgb, 222, 226, 230), 0.6);
 }
 
-.pager-transcript__fragments summary {
-  cursor: pointer;
+.pager-transcript__fragments--open {
+  border-top-color: rgba(var(--bs-border-color-rgb, 222, 226, 230), 0.8);
+}
+
+.pager-transcript__fragments-toggle {
+  font-size: 0.75rem;
   font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.35rem;
+  border-radius: 999px;
+  padding-inline: 0.75rem;
+  padding-block: 0.35rem;
+  border-color: rgba(var(--bs-border-color-rgb, 222, 226, 230), 0.75);
+  color: rgb(var(--app-ink-subtle-rgb));
+  background-color: rgba(var(--app-surface-rgb), 0.65);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
-.pager-transcript__fragments summary::marker,
-.pager-transcript__fragments summary::-webkit-details-marker {
-  display: none;
-}
-
-.pager-transcript__fragments[open] summary {
+.pager-transcript__fragments-toggle:hover,
+.pager-transcript__fragments-toggle:focus-visible {
   color: rgb(var(--app-ink-rgb));
+  border-color: rgba(var(--bs-border-color-rgb, 222, 226, 230), 0.9);
+  background-color: rgba(var(--app-surface-strong-rgb, 246, 249, 252), 0.8);
+}
+
+.pager-transcript__fragments-toggle--open {
+  color: rgb(var(--app-ink-rgb));
+  background-color: rgba(var(--app-surface-strong-rgb, 246, 249, 252), 0.95);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+.pager-transcript__fragment-count {
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  color: rgb(var(--app-ink-muted-rgb));
+}
+
+.pager-transcript__fragment-panel {
+  border-radius: 0.65rem;
+  border: 1px solid rgba(var(--bs-border-color-rgb, 222, 226, 230), 0.75);
+  background: linear-gradient(
+    135deg,
+    rgba(var(--app-surface-strong-rgb, 246, 249, 252), 0.95),
+    rgba(var(--app-surface-rgb), 0.9)
+  );
+  padding: 0.65rem 0.75rem;
+  box-shadow: 0 8px 16px -12px rgba(15, 23, 42, 0.65);
 }
 
 .pager-transcript__fragment-list {
-  margin-top: 0.5rem;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
