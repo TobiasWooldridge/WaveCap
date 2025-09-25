@@ -29,6 +29,7 @@ from wavecap_backend.stream_worker import (
     PreparedChunk,
     RECONNECT_BACKOFF_SECONDS,
     StreamWorker,
+    UNABLE_TO_TRANSCRIBE_TOKEN,
 )
 from wavecap_backend.transcription_executor import TranscriptionExecutor
 from wavecap_backend.whisper_transcriber import (
@@ -530,6 +531,77 @@ async def test_worker_emits_blank_audio_placeholder(tmp_path):
     await worker._ingest_pcm_bytes(silence)
 
     assert len(captured) == 1
+
+
+@pytest.mark.asyncio
+async def test_worker_preserves_untranscribed_audio(tmp_path, monkeypatch):
+    recordings_root = tmp_path / "recordings"
+    monkeypatch.setattr(stream_worker_module, "RECORDINGS_DIR", recordings_root)
+
+    config = WhisperConfig(
+        sampleRate=16000,
+        chunkLength=4,
+        minChunkDurationSeconds=1.0,
+        contextSeconds=0.0,
+        silenceThreshold=0.01,
+        silenceLookbackSeconds=0.25,
+        silenceHoldSeconds=0.25,
+        activeSamplesInLookbackPct=0.1,
+        blankAudioMinDurationSeconds=0.5,
+        blankAudioMinActiveRatio=0.5,
+        blankAudioMinRms=0.1,
+    )
+
+    bundle = TranscriptionResultBundle("", [], "en", no_speech_prob=0.9)
+    transcriber = StubTranscriber([bundle])
+
+    stream = Stream(
+        id="stream-untranscribed",
+        name="Noisy",
+        url="http://example.com/audio",
+        status=StreamStatus.STOPPED,
+        createdAt=datetime.utcnow(),
+        transcriptions=[],
+        source=StreamSource.AUDIO,
+    )
+
+    db = StreamDatabase(tmp_path / "runtime.sqlite")
+    evaluator = TranscriptionAlertEvaluator(AlertsConfig(enabled=False, rules=[]))
+    captured: List[TranscriptionResult] = []
+
+    async def capture(transcription: TranscriptionResult) -> None:
+        captured.append(transcription)
+
+    async def noop_status(_stream: Stream, _status: StreamStatus) -> None:
+        return
+
+    worker = StreamWorker(
+        stream=stream,
+        transcriber=transcriber,
+        database=db,
+        alert_evaluator=evaluator,
+        on_transcription=capture,
+        on_status_change=noop_status,
+        config=config,
+    )
+
+    rng = np.random.default_rng(12345)
+    noise = rng.integers(-4000, 4000, size=16000, dtype=np.int16).tobytes()
+    silence = np.zeros(16000, dtype=np.int16).tobytes()
+
+    await worker._ingest_pcm_bytes(noise)
+    await worker._ingest_pcm_bytes(silence)
+
+    assert len(captured) == 1
+    transcription = captured[0]
+    assert transcription.text == UNABLE_TO_TRANSCRIBE_TOKEN
+    assert not transcription.segments
+    assert transcription.recordingUrl is not None
+    assert transcription.recordingUrl.startswith("/recordings/")
+
+    file_name = transcription.recordingUrl.split("/")[-1]
+    recording_path = recordings_root / file_name
+    assert recording_path.exists()
 
 
 @pytest.mark.asyncio

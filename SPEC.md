@@ -36,7 +36,7 @@ transcribing multiple radio or pager feeds in real time.
 - Pager feed messages that share an incident number and arrive within roughly a minute
   collapse into a single grouped thread, showing parsed incident details like the call
   type, location, and alarm level alongside the individual updates.
-- When Whisper returns no text but audio passes silence thresholds, show a "Silence" entry with playback controls.
+- When Whisper returns no text but audio passes silence thresholds, show a "Silence" entry with playback controls. If the clip contains noisy speech Whisper cannot decode, surface it as `[unable to transcribe]` and keep the recording for operators to replay.
 - Load roughly the last three hours of transcripts per stream on initial view and fetch older history on demand (including auto-loading when needed) to keep the interface responsive. Loaded transcripts persist until refresh or reset; the toolbar no longer clears local history.
 - When a browser tab stays hidden for about fifteen minutes, the UI releases its WebSocket connection and reconnects automatically (refreshing stream data) as soon as the operator returns to the tab.
 - Get banners and chimes for configured keywords such as "Mayday" or "Pan-Pan."
@@ -48,7 +48,7 @@ transcribing multiple radio or pager feeds in real time.
 - Browse transcript history with timestamps and confidence indicators.
 - Click a transcript to play the related WAV clip or individual segments with highlighting.
 - Playback trims leading silence automatically.
-- Blank-audio placeholders still expose playback while filtering short, low-energy noise.
+- Blank-audio placeholders still expose playback while filtering short, low-energy noise. Clips Whisper could not decode remain available with `[unable to transcribe]` text so humans can retry the audio.
 - WAV clips load only when requested so browsing large transcript sets stays fast even with many recordings.
 - Edit transcripts in place, record reviewer details, and mark correction or verification status.
 - Reset a stream to clear transcripts and audio.

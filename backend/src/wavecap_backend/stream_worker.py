@@ -42,6 +42,7 @@ from .transcription_executor import TranscriptionExecutor
 from .whisper_transcriber import AbstractTranscriber, TranscriptionResultBundle
 
 BLANK_AUDIO_TOKEN = "[BLANK_AUDIO]"
+UNABLE_TO_TRANSCRIBE_TOKEN = "[unable to transcribe]"
 
 RECONNECT_BACKOFF_SECONDS = 600.0
 
@@ -888,9 +889,12 @@ class StreamWorker:
             if self._should_emit_blank_audio(effective_samples):
                 text = BLANK_AUDIO_TOKEN
                 segments = []
-            else:
+            elif self._is_mostly_silence(effective_samples, None):
                 LOGGER.debug("Stream %s skipping silent chunk", self.stream.id)
                 return
+            else:
+                text = UNABLE_TO_TRANSCRIBE_TOKEN
+                segments = []
 
         trimmed_samples, trimmed_count = self._trim_leading_silence(chunk.samples)
         if trimmed_count > 0:
