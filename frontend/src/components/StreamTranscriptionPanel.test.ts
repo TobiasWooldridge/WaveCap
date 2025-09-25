@@ -4,7 +4,6 @@ import type { TranscriptionResult, TranscriptionSegment } from "@types";
 import {
   buildPlaybackQueue,
   advancePlaybackQueue,
-  condensePagerTranscriptions,
   getRecordingElementId,
   getBlankAudioSegmentBounds,
   getSegmentDisplayStart,
@@ -12,10 +11,13 @@ import {
   groupTranscriptions,
   prepareTranscriptions,
   selectVisibleTranscriptions,
-  PAGER_SIMULTANEOUS_WINDOW_MS,
   type PlaybackQueueState,
   type TranscriptionGroup,
 } from "./StreamTranscriptionPanel.logic.js";
+import {
+  condensePagerTranscriptions,
+  PAGER_SIMULTANEOUS_WINDOW_MS,
+} from "../utils/pagerMessages.js";
 
 const baseTimestamp = Date.UTC(2024, 0, 1, 0, 0, 0);
 
