@@ -66,6 +66,9 @@ transcribing multiple radio or pager feeds in real time.
 - CFS Flex submissions extract incident numbers, call types, map grids,
   talkgroups, narratives, and responding units from the raw FLEX string while
   preserving the original pager line in the transcript details.
+- Pager streams condense fragments that arrive within a few seconds into a
+  single structured summary while keeping the original fragments available for
+  review on demand.
 - Export reviewed transcripts as a ZIP with audio via header controls, choosing corrected, verified, or pending items.
 - Export pager feeds as ZIP archives from the settings modal; downloads include JSONL pager messages and incident details.
 - `python -m wavecap_backend.tools.export_transcriptions --output-dir <path>` builds a fine-tuning dataset with JSONL metadata, optional audio copies, and notebook guidance.

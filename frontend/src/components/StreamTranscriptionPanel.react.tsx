@@ -48,6 +48,7 @@ import {
   buildPlaybackQueue,
   advancePlaybackQueue,
   dedupeAndSortTranscriptions,
+  condensePagerTranscriptions,
   getRecordingElementId,
   getBlankAudioSegmentBounds,
   getSegmentDisplayStart,
@@ -56,6 +57,7 @@ import {
   selectVisibleTranscriptions,
   type PlaybackQueueState,
   type TranscriptionGroup,
+  type CondensedPagerMessage,
 } from "./StreamTranscriptionPanel.logic";
 import { calculatePerformanceMetrics } from "../hooks/usePerformance";
 import { useUISettings } from "../contexts/UISettingsContext";
@@ -1844,6 +1846,7 @@ export const StreamTranscriptionPanel = ({
     streamId: string,
     groups: TranscriptionGroup[],
     orderedTranscriptions: TranscriptionResult[],
+    streamIsPager: boolean,
   ) =>
     groups.map((group) => {
       const renderedRecordings = new Set<string>();
@@ -1877,9 +1880,8 @@ export const StreamTranscriptionPanel = ({
       }
       const incidentNarrative = incidentDetails?.narrative ?? null;
 
-      const transcriptionItems = group.transcriptions.flatMap(
-        (transcription) => {
-          const items: JSX.Element[] = [];
+      const transcriptionElements = group.transcriptions.map((transcription) => {
+        const items: JSX.Element[] = [];
           const recordingUrl = transcription.recordingUrl;
           const recordingId = recordingUrl
             ? getRecordingElementId(recordingUrl)
@@ -1943,7 +1945,7 @@ export const StreamTranscriptionPanel = ({
                 </span>,
               );
             }
-            return items;
+            return { id: transcription.id, items };
           }
 
           const blankAudio = isBlankAudioText(transcription.text);
@@ -2155,8 +2157,10 @@ export const StreamTranscriptionPanel = ({
             );
           }
 
-          return items;
-        },
+          return { id: transcription.id, items };
+        });
+      const transcriptionItems = transcriptionElements.flatMap(
+        (entry) => entry.items,
       );
 
       const groupHasAlerts = group.transcriptions.some(
@@ -2178,31 +2182,165 @@ export const StreamTranscriptionPanel = ({
           playingTranscriptionId === transcription.id
         );
       });
-      const groupContent = [
-        ...(firstPlayableTranscription
+      const playButton = firstPlayableTranscription ? (
+        <Button
+          key={`${group.id}-play`}
+          use="unstyled"
+          onClick={() => {
+            if (isGroupPlaying) {
+              stopCurrentRecording();
+              return;
+            }
+            handlePlayAll(streamId, firstPlayableTranscription, orderedTranscriptions);
+          }}
+          className="chip-button chip-button--accent"
+        >
+          {isGroupPlaying ? <Pause size={14} /> : <Play size={14} />}
+          {isGroupPlaying ? "Stop" : "Play all"}
+        </Button>
+      ) : null;
+
+      const pagerMessages = streamIsPager
+        ? condensePagerTranscriptions(
+            group.transcriptions.filter((item) => !isSystemTranscription(item)),
+          )
+        : [];
+
+      const elementMap = new Map(
+        transcriptionElements.map((entry) => [entry.id, entry.items] as const),
+      );
+
+      const aggregatedIds =
+        pagerMessages.length > 0
+          ? new Set<string>(
+              pagerMessages.flatMap((message) =>
+                message.fragments.map((fragment) => fragment.id),
+              ),
+            )
+          : null;
+
+      const baseItems =
+        aggregatedIds !== null
+          ? transcriptionElements
+              .filter((entry) => !aggregatedIds.has(entry.id))
+              .flatMap((entry) => entry.items)
+          : transcriptionItems;
+
+      const pagerContent =
+        pagerMessages.length > 0
           ? [
-              <Button
-                key={`${group.id}-play`}
-                use="unstyled"
-                onClick={() => {
-                  if (isGroupPlaying) {
-                    stopCurrentRecording();
-                    return;
-                  }
-                  handlePlayAll(
-                    streamId,
-                    firstPlayableTranscription,
-                    orderedTranscriptions,
-                  );
-                }}
-                className="chip-button chip-button--accent"
+              <div
+                className="transcript-thread__pager-group"
+                key={`${group.id}-pager`}
               >
-                {isGroupPlaying ? <Pause size={14} /> : <Play size={14} />}
-                {isGroupPlaying ? "Stop" : "Play all"}
-              </Button>,
+                {pagerMessages.map((message: CondensedPagerMessage) => {
+                  const fragmentElements = message.fragments.flatMap(
+                    (fragment) => elementMap.get(fragment.id) ?? [],
+                  );
+                  const alertMap = new Map<
+                    string,
+                    ReturnType<typeof getNotifiableAlerts>[number]
+                  >();
+                  message.fragments.forEach((fragment) => {
+                    getNotifiableAlerts(fragment.alerts).forEach((trigger) => {
+                      if (!alertMap.has(trigger.ruleId)) {
+                        alertMap.set(trigger.ruleId, trigger);
+                      }
+                    });
+                  });
+                  const alertChips = Array.from(alertMap.values()).map((trigger) => (
+                    <span
+                      key={`${message.id}-alert-${trigger.ruleId}`}
+                      className="chip-button chip-button--danger pager-transcript__chip"
+                    >
+                      <AlertTriangle size={14} />
+                      {trigger.label ?? trigger.ruleId}
+                    </span>
+                  ));
+                  const fragmentChip =
+                    message.fragments.length > 1 ? (
+                      <span
+                        key={`${message.id}-fragments`}
+                        className="chip-button chip-button--surface pager-transcript__chip"
+                      >
+                        {message.fragments.length} fragments combined
+                      </span>
+                    ) : null;
+
+                  const summaryText =
+                    message.summary ||
+                    (message.fragments[0]?.text
+                      ? message.fragments[0].text.split(/\r?\n/, 1)[0]
+                      : "Pager update");
+
+                  return (
+                    <div key={message.id} className="pager-transcript">
+                      {summaryText ? (
+                        <div className="pager-transcript__summary">{summaryText}</div>
+                      ) : null}
+                      {fragmentChip || alertChips.length > 0 ? (
+                        <div className="pager-transcript__chips">
+                          {fragmentChip}
+                          {alertChips}
+                        </div>
+                      ) : null}
+                      {message.fields.length > 0 ? (
+                        <dl className="pager-transcript__details">
+                          {message.fields.map((field) => (
+                            <div
+                              key={`${message.id}-${field.key}`}
+                              className="pager-transcript__detail"
+                            >
+                              <dt>{field.label}</dt>
+                              <dd>
+                                {field.values.map((value, index) =>
+                                  field.format === "code" ? (
+                                    <code
+                                      key={`${message.id}-${field.key}-${index}`}
+                                    >
+                                      {value}
+                                    </code>
+                                  ) : (
+                                    <span
+                                      key={`${message.id}-${field.key}-${index}`}
+                                    >
+                                      {value}
+                                    </span>
+                                  ),
+                                )}
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
+                      ) : null}
+                      {message.notes.length > 0 ? (
+                        <ul className="pager-transcript__notes">
+                          {message.notes.map((note, index) => (
+                            <li key={`${message.id}-note-${index}`}>{note}</li>
+                          ))}
+                        </ul>
+                      ) : null}
+                      {fragmentElements.length > 0 ? (
+                        <details className="pager-transcript__fragments">
+                          <summary>
+                            Show raw fragments ({message.fragments.length})
+                          </summary>
+                          <div className="pager-transcript__fragment-list">
+                            {fragmentElements}
+                          </div>
+                        </details>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>,
             ]
-          : []),
-        ...transcriptionItems,
+          : [];
+
+      const groupContent = [
+        ...(playButton ? [playButton] : []),
+        ...pagerContent,
+        ...baseItems,
       ];
 
       return (
@@ -2302,6 +2440,7 @@ export const StreamTranscriptionPanel = ({
       >
         {visibleStreams.map((stream) => {
           const statusModifier = getStatusModifier(stream.status);
+          const streamIsPager = isPagerStream(stream);
           const isStandaloneStreamView =
             isStandaloneView && stream.id === focusedVisibleStreamId;
           const isExpanded = isStandaloneStreamView
@@ -2397,7 +2536,7 @@ export const StreamTranscriptionPanel = ({
                     </span>
                   ) : null}
                 </div>
-                {isPagerStream(stream) ? (
+                {streamIsPager ? (
                   <div className="small text-body-secondary d-flex flex-wrap align-items-center gap-2">
                     <span className="badge text-bg-info-subtle text-info-emphasis text-uppercase">
                       Pager feed
@@ -2699,6 +2838,7 @@ export const StreamTranscriptionPanel = ({
                               stream.id,
                               focusPrepared.groupedTranscriptions,
                               focusPrepared.sortedTranscriptions,
+                              streamIsPager,
                             )}
                         </div>
                       ) : (
@@ -2866,6 +3006,7 @@ export const StreamTranscriptionPanel = ({
                           stream.id,
                           groupedTranscriptions,
                           orderedTranscriptions,
+                          streamIsPager,
                         )}
                       </StreamTranscriptList>
                     </div>
