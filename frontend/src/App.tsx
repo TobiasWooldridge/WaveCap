@@ -57,6 +57,7 @@ import { useResponsiveLayout } from "./hooks/useResponsiveLayout";
 import { useKeywordAlerts } from "./hooks/useKeywordAlerts";
 import { useStreamSelection } from "./hooks/useStreamSelection";
 import { useExportSettings } from "./hooks/useExportSettings";
+import { usePagerExport } from "./hooks/usePagerExport";
 import "./App.scss";
 
 const REVIEW_STATUS_OPTIONS: Array<{
@@ -367,6 +368,19 @@ function App() {
   } = useExportSettings({
     defaultStatuses: defaultReviewExportStatuses,
     statusOrder: REVIEW_STATUS_ORDER,
+    requireEditor,
+    authFetch,
+  });
+
+  const {
+    pagerStreams,
+    selectedStreamId: selectedPagerStreamId,
+    exporting: exportingPagerFeed,
+    exportError: pagerExportError,
+    selectStream: selectPagerExportStream,
+    exportPagerFeed,
+  } = usePagerExport({
+    streams,
     requireEditor,
     authFetch,
   });
@@ -1446,6 +1460,12 @@ function App() {
           onExportStatusToggle={handleExportStatusToggle}
           exporting={exporting}
           onExportTranscriptions={handleExportTranscriptions}
+          pagerStreams={pagerStreams}
+          selectedPagerStreamId={selectedPagerStreamId}
+          onSelectPagerStream={selectPagerExportStream}
+          pagerExporting={exportingPagerFeed}
+          pagerExportError={pagerExportError}
+          onExportPagerFeed={exportPagerFeed}
           isReadOnly={isReadOnly}
           onRequestLogin={requestLogin}
         />
@@ -1743,6 +1763,13 @@ function App() {
                     <div className="alert alert-warning" role="alert">
                       <div className="fw-semibold mb-1">Export error</div>
                       <div>{exportError}</div>
+                    </div>
+                  )}
+
+                  {pagerExportError && (
+                    <div className="alert alert-warning" role="alert">
+                      <div className="fw-semibold mb-1">Pager export error</div>
+                      <div>{pagerExportError}</div>
                     </div>
                   )}
                 </div>

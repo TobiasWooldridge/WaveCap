@@ -7,13 +7,19 @@ from wavecap_backend.database import StreamDatabase
 from wavecap_backend.datetime_utils import utcnow
 from wavecap_backend.models import (
     Stream,
+    StreamSource,
     StreamStatus,
     TranscriptionResult,
     TranscriptionReviewStatus,
 )
 
 
-def _make_stream(stream_id: str = "stream-1", *, enabled: bool = False) -> Stream:
+def _make_stream(
+    stream_id: str = "stream-1",
+    *,
+    enabled: bool = False,
+    source: StreamSource = StreamSource.AUDIO,
+) -> Stream:
     return Stream(
         id=stream_id,
         name="Stream",
@@ -23,6 +29,7 @@ def _make_stream(stream_id: str = "stream-1", *, enabled: bool = False) -> Strea
         createdAt=utcnow(),
         transcriptions=[],
         ignoreFirstSeconds=0.0,
+        source=source,
     )
 
 
@@ -91,6 +98,30 @@ async def test_update_review_and_export(tmp_path):
 
     corrected_only = await db.export_transcriptions([TranscriptionReviewStatus.CORRECTED])
     assert [item.id for item in corrected_only] == [first.id]
+
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_export_pager_messages_requires_pager_stream(tmp_path):
+    db = StreamDatabase(tmp_path / "runtime.sqlite")
+    pager_stream = _make_stream("pager-1", source=StreamSource.PAGER)
+    audio_stream = _make_stream("audio-1")
+    await db.save_stream(pager_stream)
+    await db.save_stream(audio_stream)
+
+    base_time = utcnow()
+    pager_first = _make_transcription(
+        pager_stream.id, base_time - timedelta(seconds=5), "-first"
+    )
+    pager_second = _make_transcription(pager_stream.id, base_time, "-second")
+    audio_result = _make_transcription(audio_stream.id, base_time, "-other")
+
+    for result in (pager_first, pager_second, audio_result):
+        await db.append_transcription(result)
+
+    results = await db.export_pager_messages(pager_stream.id)
+    assert [item.id for item in results] == [pager_first.id, pager_second.id]
 
     await db.close()
 

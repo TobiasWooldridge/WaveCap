@@ -1,3 +1,4 @@
+import json
 from io import BytesIO
 from io import BytesIO
 from typing import Any
@@ -210,6 +211,43 @@ def test_export_reviewed_zip(patched_app: TestClient):
         assert "metadata.json" in archive.namelist()
         metadata = archive.read("metadata.json").decode("utf-8")
         assert "count" in metadata
+
+
+def test_export_pager_feed_zip(patched_app: TestClient):
+    client = patched_app
+
+    headers = login_headers(client)
+    create = client.post(
+        "/api/streams",
+        json={"name": "Pager", "source": "pager"},
+        headers=headers,
+    )
+    assert create.status_code == 200
+    stream = create.json()
+    stream_id = stream["id"]
+    webhook_token = stream["webhookToken"]
+
+    ingest = client.post(
+        f"/api/pager-feeds/{stream_id}?token={webhook_token}",
+        json={"message": "Structure fire", "sender": "Dispatch"},
+    )
+    assert ingest.status_code == 200
+
+    response = client.get(
+        f"/api/pager-feeds/{stream_id}/export", headers=headers
+    )
+    assert response.status_code == 200
+    assert response.headers["Content-Type"].startswith("application/zip")
+
+    buffer = BytesIO(response.content)
+    with ZipFile(buffer) as archive:
+        names = archive.namelist()
+        assert "metadata.json" in names
+        assert "messages.jsonl" in names
+        metadata = json.loads(archive.read("metadata.json").decode("utf-8"))
+        assert metadata["streamId"] == stream_id
+        records = archive.read("messages.jsonl").decode("utf-8").strip().splitlines()
+        assert len(records) == 1
 
 
 def test_websocket_command_ack(patched_app: TestClient):

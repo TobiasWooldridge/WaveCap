@@ -27,6 +27,12 @@ type SettingsModalProps = {
   onExportStatusToggle: (status: TranscriptionReviewStatus) => void;
   exporting: boolean;
   onExportTranscriptions: () => void;
+  pagerStreams: Stream[];
+  selectedPagerStreamId: string | null;
+  onSelectPagerStream: (streamId: string) => void;
+  pagerExporting: boolean;
+  pagerExportError: string | null;
+  onExportPagerFeed: () => void;
   isReadOnly: boolean;
   onRequestLogin: () => void;
 };
@@ -49,6 +55,12 @@ const SettingsModal = ({
   onExportStatusToggle,
   exporting,
   onExportTranscriptions,
+  pagerStreams,
+  selectedPagerStreamId,
+  onSelectPagerStream,
+  pagerExporting,
+  pagerExportError,
+  onExportPagerFeed,
   isReadOnly,
   onRequestLogin,
 }: SettingsModalProps) => {
@@ -257,6 +269,89 @@ const SettingsModal = ({
               )}
             </section>
           )}
+
+          <section className="app-header-info__section">
+            <h3 className="app-header-info__section-title text-uppercase small fw-semibold text-body-secondary">
+              Pager feed export
+            </h3>
+            {isReadOnly ? (
+              <Flex
+                className="alert alert-info"
+                direction="column"
+                gap={2}
+                role="note"
+              >
+                <div className="small mb-0">
+                  Sign in with editor access to export pager feeds.
+                </div>
+                <Button
+                  size="sm"
+                  use="primary"
+                  className="align-self-start"
+                  onClick={onRequestLogin}
+                  startContent={<LogIn size={16} />}
+                >
+                  <span>Sign in</span>
+                </Button>
+              </Flex>
+            ) : pagerStreams.length === 0 ? (
+              <div className="small text-body-secondary">
+                No pager feeds available to export.
+              </div>
+            ) : (
+              <div className="app-header-info__export">
+                <Flex direction="column" gap={2} className="w-100">
+                  <div>
+                    <label
+                      htmlFor="pager-export-stream"
+                      className="form-label small fw-semibold text-body-secondary text-uppercase"
+                    >
+                      Pager feed
+                    </label>
+                    <select
+                      id="pager-export-stream"
+                      className="form-select form-select-sm"
+                      value={selectedPagerStreamId ?? ""}
+                      onChange={(event) =>
+                        onSelectPagerStream(event.target.value)
+                      }
+                      disabled={pagerExporting}
+                    >
+                      {pagerStreams.map((stream) => (
+                        <option key={stream.id} value={stream.id}>
+                          {stream.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <span className="text-body-secondary small">
+                    Downloads a ZIP archive with JSONL pager messages and
+                    incident details.
+                  </span>
+                </Flex>
+
+                <div className="d-flex flex-column gap-2 align-items-start">
+                  <Button
+                    onClick={onExportPagerFeed}
+                    disabled={pagerExporting || !selectedPagerStreamId}
+                    className="fw-semibold"
+                    size="sm"
+                    use="primary"
+                    startContent={
+                      !pagerExporting ? <Download size={16} /> : undefined
+                    }
+                  >
+                    {pagerExporting ? "Exporting…" : "Export pager messages"}
+                  </Button>
+                  {pagerExportError ? (
+                    <div className="text-danger small" role="alert">
+                      {pagerExportError}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            )}
+          </section>
         </div>
       </div>
     </div>

@@ -435,6 +435,22 @@ class StreamDatabase:
             records = result.all()
             return [self._record_to_transcription(record) for record in records]
 
+    async def export_pager_messages(self, stream_id: str) -> List[TranscriptionResult]:
+        statement = (
+            select(TranscriptionRecord)
+            .join(StreamRecord, StreamRecord.id == TranscriptionRecord.streamId)
+            .where(
+                StreamRecord.source == StreamSource.PAGER,
+                TranscriptionRecord.streamId == stream_id,
+            )
+            .order_by(TranscriptionRecord.timestamp.asc())
+        )
+
+        async with self._session(commit=False) as session:
+            result = await session.exec(statement)
+            records = result.all()
+            return [self._record_to_transcription(record) for record in records]
+
     def _record_to_stream(self, record: StreamRecord) -> Stream:
         enabled = record.enabled
         if enabled is None:
