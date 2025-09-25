@@ -48,7 +48,6 @@ import {
   buildPlaybackQueue,
   advancePlaybackQueue,
   dedupeAndSortTranscriptions,
-  condensePagerTranscriptions,
   getRecordingElementId,
   getBlankAudioSegmentBounds,
   getSegmentDisplayStart,
@@ -57,8 +56,11 @@ import {
   selectVisibleTranscriptions,
   type PlaybackQueueState,
   type TranscriptionGroup,
-  type CondensedPagerMessage,
 } from "./StreamTranscriptionPanel.logic";
+import {
+  condensePagerTranscriptions,
+  type CondensedPagerMessage,
+} from "../utils/pagerMessages";
 import { calculatePerformanceMetrics } from "../hooks/usePerformance";
 import { useUISettings } from "../contexts/UISettingsContext";
 import { useAutoScroll } from "../hooks/useAutoScroll";
