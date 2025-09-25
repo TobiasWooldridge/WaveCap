@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import struct
 import uuid
 from collections import deque
@@ -353,7 +354,8 @@ class StreamWorker:
             else silence_threshold
         )
         self._hallucination_phrases = self._prepare_hallucination_phrases(
-            config.silenceHallucinationPhrases
+            config.silenceHallucinationPhrases,
+            config.initialPrompt,
         )
 
         deemphasis_seconds = (
@@ -973,12 +975,20 @@ class StreamWorker:
         return True
 
     @staticmethod
-    def _prepare_hallucination_phrases(phrases: Iterable[str]) -> Set[str]:
+    def _prepare_hallucination_phrases(
+        phrases: Iterable[str], initial_prompt: Optional[str] = None
+    ) -> Set[str]:
         prepared: Set[str] = set()
         for phrase in phrases:
             if not phrase:
                 continue
             normalized = StreamWorker._normalize_hallucination_phrase(phrase)
+            if normalized:
+                prepared.add(normalized)
+        for prompt_phrase in StreamWorker._extract_initial_prompt_phrases(
+            initial_prompt
+        ):
+            normalized = StreamWorker._normalize_hallucination_phrase(prompt_phrase)
             if normalized:
                 prepared.add(normalized)
         return prepared
@@ -998,6 +1008,23 @@ class StreamWorker:
             return ""
         normalized = "".join(normalized_chars)
         return " ".join(normalized.split())
+
+    @staticmethod
+    def _extract_initial_prompt_phrases(
+        initial_prompt: Optional[str],
+    ) -> Tuple[str, ...]:
+        if not initial_prompt:
+            return ()
+        collapsed = " ".join(initial_prompt.split())
+        if not collapsed:
+            return ()
+        phrases: List[str] = [collapsed]
+        for sentence in re.split(r"[.!?]+", collapsed):
+            trimmed = sentence.strip()
+            if trimmed:
+                phrases.append(trimmed)
+        unique_phrases = tuple(dict.fromkeys(phrases))
+        return unique_phrases
 
     def _should_discard_hallucination(
         self,
