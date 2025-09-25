@@ -353,6 +353,14 @@ class StreamWorker:
             if config.blankAudioMinRms is not None
             else silence_threshold
         )
+        self._low_energy_peak_threshold = min(
+            max(self._silence_threshold * 3.0, 0.04),
+            1.0,
+        )
+        self._low_energy_rms_threshold = min(
+            max(self._silence_threshold * 1.5, 0.01),
+            1.0,
+        )
         self._hallucination_phrases = self._prepare_hallucination_phrases(
             config.silenceHallucinationPhrases,
             config.initialPrompt,
@@ -868,6 +876,15 @@ class StreamWorker:
                         segment.text
                     )
 
+        if text and self._is_low_energy(effective_samples):
+            LOGGER.debug(
+                "Stream %s dropping low-energy transcription output: %s",
+                self.stream.id,
+                text,
+            )
+            text = ""
+            segments = []
+
         if text and self._is_punctuation_only(text):
             text = ""
             segments = []
@@ -1118,12 +1135,33 @@ class StreamWorker:
     ) -> bool:
         if samples.size == 0:
             return True
+        if self._is_low_energy(samples):
+            return True
         active_ratio = float(np.mean(np.abs(samples) > self._silence_threshold))
         if active_ratio < self._active_ratio_threshold:
             return True
         if confidence is not None and confidence < 0.4:
             return True
         return False
+
+    def _is_low_energy(self, samples: np.ndarray) -> bool:
+        if samples.size == 0:
+            return True
+        float_samples = samples.astype(np.float64, copy=False)
+        amplitudes = np.abs(float_samples)
+        if amplitudes.size == 0:
+            return True
+        peak = float(np.max(amplitudes))
+        if not np.isfinite(peak):
+            return True
+        if peak >= self._low_energy_peak_threshold:
+            return False
+        rms = float(np.sqrt(np.mean(np.square(float_samples))))
+        if not np.isfinite(rms):
+            return True
+        if rms >= self._low_energy_rms_threshold:
+            return False
+        return True
 
     @staticmethod
     def _is_low_quality_transcription(avg_logprob: Optional[float]) -> bool:

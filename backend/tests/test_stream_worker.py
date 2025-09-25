@@ -1001,6 +1001,73 @@ async def test_worker_discards_hallucinated_silence(tmp_path):
     assert len(transcriber.calls) == 1
 
 
+@pytest.mark.asyncio
+async def test_worker_drops_low_energy_transcription(tmp_path):
+    config = WhisperConfig(
+        sampleRate=16000,
+        chunkLength=4,
+        minChunkDurationSeconds=1.0,
+        contextSeconds=0.0,
+        silenceThreshold=0.01,
+        silenceLookbackSeconds=0.25,
+        silenceHoldSeconds=0.25,
+        activeSamplesInLookbackPct=0.1,
+        blankAudioMinDurationSeconds=0.5,
+        blankAudioMinActiveRatio=0.0,
+        blankAudioMinRms=0.02,
+        silenceHallucinationPhrases=[],
+    )
+
+    bundle = TranscriptionResultBundle(
+        "Noarlunga, Noarlunga, SITREP.",
+        [],
+        "en",
+        no_speech_prob=0.3,
+        avg_logprob=-1.2,
+    )
+    transcriber = StubTranscriber([bundle])
+
+    stream = Stream(
+        id="stream-low-energy-drop",
+        name="Low energy",
+        url="http://example.com/audio",
+        status=StreamStatus.STOPPED,
+        createdAt=datetime.utcnow(),
+        transcriptions=[],
+        source=StreamSource.AUDIO,
+    )
+
+    db = StreamDatabase(tmp_path / "runtime.sqlite")
+    evaluator = TranscriptionAlertEvaluator(AlertsConfig(enabled=False, rules=[]))
+    captured: List[TranscriptionResult] = []
+
+    async def capture(transcription: TranscriptionResult) -> None:
+        captured.append(transcription)
+
+    async def noop_status(_stream: Stream, _status: StreamStatus) -> None:
+        return
+
+    worker = StreamWorker(
+        stream=stream,
+        transcriber=transcriber,
+        database=db,
+        alert_evaluator=evaluator,
+        on_transcription=capture,
+        on_status_change=noop_status,
+        config=config,
+    )
+
+    rng = np.random.default_rng(12345)
+    noise = rng.normal(0.0, 0.002, 16000)
+    pcm = np.clip(noise, -1.0, 1.0)
+    samples = (np.round(pcm * 32767.0).astype(np.int16)).tobytes()
+
+    await worker._ingest_pcm_bytes(samples)
+
+    assert captured == []
+    assert len(transcriber.calls) == 1
+
+
 def test_prepare_hallucination_phrases_includes_initial_prompt() -> None:
     prompt = (
         "Priority callouts include Adelaide, Adelaide fire out, Noarlunga, and "
