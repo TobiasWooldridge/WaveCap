@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+mapfile -t STAGED_FILES < <(git diff --cached --name-only --diff-filter=ACM)
+
+run_ts=false
+run_py=false
+
+for file in "${STAGED_FILES[@]}"; do
+  case "$file" in
+    *.ts|*.tsx)
+      run_ts=true
+      ;;
+    *.py)
+      run_py=true
+      ;;
+  esac
+done
+
+if $run_ts; then
+  echo "Running TypeScript type check..."
+  npm --prefix frontend run type-check
+  echo "TypeScript type check completed."
+fi
+
+if $run_py; then
+  echo "Running Python type check..."
+  mapfile -t backend_py_files < <(printf '%s\n' "${STAGED_FILES[@]}" | sed -n 's/^backend\///p' | grep '\.py$' || true)
+  mapfile -t external_py_files < <(printf '%s\n' "${STAGED_FILES[@]}" | grep '\.py$' | grep -v '^backend/' || true)
+
+  if [ ${#backend_py_files[@]} -gt 0 ]; then
+    poetry -C backend run mypy "${backend_py_files[@]}"
+  fi
+
+  if [ ${#external_py_files[@]} -gt 0 ]; then
+    mapfile -t adjusted_external < <(printf '%s\n' "${external_py_files[@]}" | sed 's#^#../#')
+    poetry -C backend run mypy "${adjusted_external[@]}"
+  fi
+  echo "Python type check completed."
+fi
+
+exit 0
