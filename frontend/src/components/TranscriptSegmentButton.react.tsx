@@ -169,6 +169,7 @@ interface TranscriptSegmentContentProps {
   endTime: number;
   duration: number;
   text: string;
+  showTime: boolean;
 }
 
 const TranscriptSegmentContent = ({
@@ -176,14 +177,19 @@ const TranscriptSegmentContent = ({
   endTime,
   duration,
   text,
+  showTime,
 }: TranscriptSegmentContentProps) => (
   <TranscriptSegmentText>
-    <TranscriptSegmentTimeRange
-      startTime={startTime}
-      endTime={endTime}
-      duration={duration}
-    />
-    {" "}
+    {showTime ? (
+      <>
+        <TranscriptSegmentTimeRange
+          startTime={startTime}
+          endTime={endTime}
+          duration={duration}
+        />
+        {" "}
+      </>
+    ) : null}
     {text}
   </TranscriptSegmentText>
 );
@@ -217,9 +223,10 @@ export const TranscriptSegmentListItem = ({
 
   const segmentEnd = Math.max(segmentStart, segment.end ?? segment.start);
   const segmentDuration = Math.max(0, segmentEnd - segmentStart);
+  const hasRecording = Boolean(recordingUrl);
 
   const handleClick = () => {
-    if (recordingUrl) {
+    if (hasRecording && recordingUrl) {
       onPlay(recordingUrl, segment.start, segment.end, transcriptionId, {
         recordingStartOffset,
       });
@@ -230,15 +237,17 @@ export const TranscriptSegmentListItem = ({
   if (segmentConfidence !== null) {
     tooltipParts.push(`${Math.round(segmentConfidence * 100)}% confidence`);
   }
-  tooltipParts.push(`Starts at ${formatTime(segmentStart)}`);
-  if (segmentDuration > 0) {
-    tooltipParts.push(`Duration ${formatDuration(segmentDuration)}`);
+  if (hasRecording) {
+    tooltipParts.push(`Starts at ${formatTime(segmentStart)}`);
+    if (segmentDuration > 0) {
+      tooltipParts.push(`Duration ${formatDuration(segmentDuration)}`);
+    }
   }
 
   return (
     <TranscriptSegmentPlaybackButton
       onClick={handleClick}
-      disabled={!recordingUrl}
+      disabled={!hasRecording}
       tooltip={tooltipParts.join(" • ") || undefined}
       confidenceClass={confidenceClass}
       isPlaying={isPlaying}
@@ -248,6 +257,7 @@ export const TranscriptSegmentListItem = ({
         endTime={segmentEnd}
         duration={segmentDuration}
         text={segment.text}
+        showTime={hasRecording}
       />
     </TranscriptSegmentPlaybackButton>
   );
