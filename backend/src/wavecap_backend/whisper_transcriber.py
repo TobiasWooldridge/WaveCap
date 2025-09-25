@@ -11,6 +11,11 @@ from typing import Any, List, Optional, Tuple
 import numpy as np
 from faster_whisper import WhisperModel
 
+try:  # pragma: no cover - depends on optional CUDA runtime availability
+    import ctranslate2  # type: ignore
+except Exception:  # pragma: no cover - absence of CUDA/ctranslate2 is expected on CPU-only envs
+    ctranslate2 = None  # type: ignore[assignment]
+
 from .models import TranscriptionSegment, WhisperConfig
 
 LOGGER = logging.getLogger(__name__)
@@ -73,9 +78,52 @@ class WhisperTranscriber(AbstractTranscriber):
         )
         return any(marker in message for marker in gpu_markers)
 
+    def _load_cpu_model(self, model_name: str) -> WhisperModel:
+        return WhisperModel(
+            model_name,
+            device="cpu",
+            compute_type="float32",
+        )
+
+    def _gpu_runtime_available(self) -> bool:
+        if ctranslate2 is None:
+            LOGGER.info(
+                "ctranslate2 unavailable; forcing CPU inference for Whisper model %s",
+                self.config.model,
+            )
+            return False
+        try:
+            device_count = ctranslate2.get_cuda_device_count()
+        except Exception as exc:  # pragma: no cover - defensive fallback
+            LOGGER.warning(
+                "Unable to query CUDA devices via ctranslate2; forcing CPU inference.",
+                exc_info=exc,
+            )
+            return False
+        if device_count <= 0:
+            LOGGER.info(
+                "No CUDA devices detected; forcing CPU inference for Whisper model %s",
+                self.config.model,
+            )
+            return False
+        return True
+
     def _create_model(self) -> WhisperModel:
         try:
-            return WhisperModel(self.config.model)
+            if self._gpu_runtime_available():
+                return WhisperModel(self.config.model)
+            fallback_model = self.config.cpuFallbackModel or self.config.model
+            if fallback_model == self.config.model:
+                LOGGER.info(
+                    "Loading Whisper model %s on CPU.",
+                    fallback_model,
+                )
+            else:
+                LOGGER.info(
+                    "Loading Whisper CPU fallback model %s.",
+                    fallback_model,
+                )
+            return self._load_cpu_model(fallback_model)
         except (RuntimeError, OSError) as exc:
             if self._is_gpu_runtime_error(exc):
                 fallback_model = self.config.cpuFallbackModel or self.config.model
@@ -90,11 +138,7 @@ class WhisperTranscriber(AbstractTranscriber):
                     exc_info=exc,
                 )
                 try:
-                    return WhisperModel(
-                        fallback_model,
-                        device="cpu",
-                        compute_type="float32",
-                    )
+                    return self._load_cpu_model(fallback_model)
                 except Exception as cpu_exc:  # pragma: no cover - defensive re-raise
                     LOGGER.critical(
                         "Failed to initialize Whisper model '%s' even after CPU fallback.",

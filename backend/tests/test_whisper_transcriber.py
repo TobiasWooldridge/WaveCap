@@ -121,6 +121,11 @@ class _NoTemperatureIncrementModel:
 def test_preload_gpu_failure_falls_back_to_cpu(monkeypatch):
     _GpuThenCpuModel.reset()
     monkeypatch.setattr(module, "WhisperModel", _GpuThenCpuModel)
+    monkeypatch.setattr(
+        module.WhisperTranscriber,
+        "_gpu_runtime_available",
+        lambda self: True,
+    )
     config = WhisperConfig(model="large-v3-turbo", cpuFallbackModel="base")
 
     transcriber = module.WhisperTranscriber(config)
@@ -141,6 +146,11 @@ async def _run_transcribe(transcriber: module.WhisperTranscriber) -> None:
 def test_lazy_initialization_gpu_failure_recovers_with_cpu(monkeypatch):
     _GpuThenCpuModel.reset()
     monkeypatch.setattr(module, "WhisperModel", _GpuThenCpuModel)
+    monkeypatch.setattr(
+        module.WhisperTranscriber,
+        "_gpu_runtime_available",
+        lambda self: True,
+    )
     config = WhisperConfig(model="small", cpuFallbackModel=None)
     transcriber = module.WhisperTranscriber(config, preload_model=False)
 
