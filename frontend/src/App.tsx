@@ -961,6 +961,12 @@ function App() {
     () => isPagerStream(selectedStream),
     [selectedStream],
   );
+
+  useEffect(() => {
+    if (selectedStream && isPagerStream(selectedStream)) {
+      selectPagerExportStream(selectedStream.id);
+    }
+  }, [selectedStream, selectPagerExportStream]);
   const selectedStreamWebhookUrl = useMemo(() => {
     if (!selectedStream || !canViewWebhookDetails) {
       return null;
@@ -1782,6 +1788,9 @@ function App() {
                       onReviewTranscription={reviewTranscription}
                       focusStreamId={selectedStream.id}
                       onStandaloneControlsChange={setStandaloneControls}
+                      pagerExporting={exportingPagerFeed}
+                      onExportPagerFeed={exportPagerFeed}
+                      onSelectPagerExportStream={selectPagerExportStream}
                     />
                   ) : (
                     <div className="conversation-panel__placeholder text-body-secondary text-center">
