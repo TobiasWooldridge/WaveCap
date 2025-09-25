@@ -40,6 +40,18 @@ chmod +x start-app.sh
 The helper script creates a Python virtual environment for the backend, installs dependencies, builds the frontend, and then
 launches `uvicorn` on the configured port (defaults to `8000`).
 
+### Git Hooks
+
+The repository ships the pre-commit hook under `.githooks/pre-commit`. Install it once per clone so commits run TypeScript and
+Python type checking automatically:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+After configuring the custom hook path, the pre-commit hook invokes `npm --prefix frontend run type-check` when TypeScript files
+are staged and `poetry -C backend run mypy` for staged Python files.
+
 ### Manual Start
 
 ```bash
