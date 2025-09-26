@@ -11,7 +11,7 @@ import os
 from contextlib import asynccontextmanager, suppress
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import (
@@ -29,9 +29,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
+from .audio_regression import (
+    REGRESSION_AUDIO_SUBDIR,
+    REGRESSION_CASES_FILENAME,
+    RegressionCaseDefinition,
+    generate_case_name,
+)
+
 from .auth import AuthManager, AuthenticationError
 from .config import ensure_logging_directories, load_config
-from .datetime_utils import isoformat_utc, parse_iso8601, utcnow
+from .datetime_utils import isoformat_utc, optional_isoformat, parse_iso8601, utcnow
 from .database import StreamDatabase
 from .logging_utils import configure_logging, record_frontend_event
 from .models import (
@@ -577,6 +584,88 @@ def create_app() -> FastAPI:
             request.reviewer,
         )
 
+
+
+    def _normalise_review_text(result: TranscriptionResult) -> str:
+        if result.correctedText and result.correctedText.strip():
+            return result.correctedText.strip()
+        return result.text.strip()
+    
+    
+    def _prepare_regression_artifacts(
+        results: Sequence[TranscriptionResult],
+    ) -> tuple[list[tuple[Path, str]], list[str]]:
+        used_names: set[str] = set()
+        audio_entries: list[tuple[Path, str]] = []
+        case_lines: list[str] = []
+        for result in results:
+            text = _normalise_review_text(result)
+            if not text:
+                LOGGER.debug(
+                    "Skipping transcription %s because the text is empty", result.id
+                )
+                continue
+            if not result.recordingUrl:
+                LOGGER.debug(
+                    "Skipping transcription %s because no recording is associated", result.id
+                )
+                continue
+            source = RECORDINGS_DIR / Path(result.recordingUrl).name
+            if not source.exists():
+                LOGGER.warning(
+                    "Audio file missing for transcription %s: %s", result.id, source
+                )
+                continue
+            timestamp = isoformat_utc(result.timestamp)
+            name = generate_case_name(
+                stream_id=result.streamId,
+                timestamp=timestamp,
+                fallback=result.id,
+                used_names=used_names,
+            )
+            arcname = f"{REGRESSION_AUDIO_SUBDIR}/{source.name}"
+            audio_entries.append((source, arcname))
+            case = RegressionCaseDefinition(
+                name=name,
+                audio=arcname,
+                expected_transcript=text,
+                transcription_id=result.id,
+                stream_id=result.streamId,
+                timestamp=timestamp,
+                duration=result.duration,
+                review_status=result.reviewStatus.value,
+                source_text=result.text,
+                reviewed_at=optional_isoformat(result.reviewedAt),
+                reviewer=result.reviewedBy,
+            )
+            case_lines.append(case.to_json())
+        return audio_entries, case_lines
+    
+    
+    def _stream_regression_export(
+        results: Sequence[TranscriptionResult],
+        statuses: Sequence[TranscriptionReviewStatus],
+    ) -> StreamingResponse:
+        audio_entries, case_lines = _prepare_regression_artifacts(results)
+        buffer = io.BytesIO()
+        with ZipFile(buffer, "w", ZIP_DEFLATED) as archive:
+            metadata = {
+                "exportedAt": isoformat_utc(utcnow()),
+                "statuses": [status.value for status in statuses],
+                "count": len(results),
+                "cases": len(case_lines),
+                "format": "audio-regression",
+            }
+            archive.writestr("metadata.json", json.dumps(metadata, indent=2))
+            archive.writestr(REGRESSION_CASES_FILENAME, "\n".join(case_lines))
+            for source, arcname in audio_entries:
+                archive.write(source, arcname=arcname)
+        buffer.seek(0)
+        filename = f"reviewed-transcriptions-regression-{utcnow().strftime('%Y%m%d-%H%M%S')}.zip"
+        headers = {"Content-Disposition": f"attachment; filename={filename}"}
+        return StreamingResponse(buffer, media_type="application/zip", headers=headers)
+
+
     @app.get("/api/transcriptions/export")
     async def export_transcriptions(state: AppState = Depends(get_state)) -> list[dict]:
         results = await state.stream_manager.export_transcriptions(
@@ -603,9 +692,14 @@ def create_app() -> FastAPI:
                 TranscriptionReviewStatus.CORRECTED,
                 TranscriptionReviewStatus.VERIFIED,
             ]
+        export_format = request.query_params.get("format")
+        if export_format and export_format != "regression":
+            raise HTTPException(status_code=400, detail="Unsupported export format")
         results = await state.stream_manager.export_transcriptions(
             ExportTranscriptionsRequest(statuses=statuses)
         )
+        if export_format == "regression":
+            return _stream_regression_export(results, statuses)
         buffer = io.BytesIO()
         with ZipFile(buffer, "w", ZIP_DEFLATED) as archive:
             metadata = {
