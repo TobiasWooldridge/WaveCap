@@ -10,6 +10,7 @@ import uuid
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
+from functools import lru_cache
 from typing import (
     AsyncIterator,
     Awaitable,
@@ -17,6 +18,7 @@ from typing import (
     Deque,
     Iterable,
     List,
+    Pattern,
     Optional,
     Set,
     Tuple,
@@ -395,6 +397,20 @@ class StreamWorker:
             else max(self._silence_threshold * 2.0, 0.01)
         )
         self._phrase_canonicalizer = PhraseCanonicalizer.with_default_phrases()
+        repetition_min_chars = int(config.segmentRepetitionMinCharacters or 0)
+        repetition_max_allowed_repeats = int(
+            config.segmentRepetitionMaxAllowedConsecutiveRepeats or 0
+        )
+        self._segment_repetition_min_chars: Optional[int]
+        self._segment_repetition_max_allowed_repeats: Optional[int]
+        if repetition_min_chars > 0 and repetition_max_allowed_repeats > 0:
+            self._segment_repetition_min_chars = repetition_min_chars
+            self._segment_repetition_max_allowed_repeats = (
+                repetition_max_allowed_repeats
+            )
+        else:
+            self._segment_repetition_min_chars = None
+            self._segment_repetition_max_allowed_repeats = None
 
         self._live_audio_lock = asyncio.Lock()
         self._live_audio_listeners: Set[_LiveAudioListener] = set()
@@ -876,6 +892,20 @@ class StreamWorker:
                         segment.text
                     )
 
+        if (
+            text
+            and segments
+            and self._segment_repetition_min_chars is not None
+            and self._segment_repetition_max_allowed_repeats is not None
+            and self._contains_repetitive_segment_text(segments)
+        ):
+            LOGGER.debug(
+                "Stream %s marking chunk as untranscribable due to repeated segment text",
+                self.stream.id,
+            )
+            text = ""
+            segments = []
+
         if text and self._is_low_energy(effective_samples):
             LOGGER.debug(
                 "Stream %s dropping low-energy transcription output: %s",
@@ -1129,6 +1159,48 @@ class StreamWorker:
                 ):
                     return True
         return False
+
+    def _contains_repetitive_segment_text(
+        self, segments: Iterable[TranscriptionSegment]
+    ) -> bool:
+        min_chars = self._segment_repetition_min_chars
+        max_allowed_repeats = self._segment_repetition_max_allowed_repeats
+        if (
+            min_chars is None
+            or max_allowed_repeats is None
+            or max_allowed_repeats <= 0
+        ):
+            return False
+        for segment in segments:
+            if self._segment_has_excessive_repetition(
+                segment.text, min_chars, max_allowed_repeats
+            ):
+                return True
+        return False
+
+    @staticmethod
+    def _segment_has_excessive_repetition(
+        text: str, min_chars: int, max_allowed_repeats: int
+    ) -> bool:
+        if max_allowed_repeats <= 0:
+            return False
+        normalized = " ".join(text.split())
+        if len(normalized) < min_chars:
+            return False
+        searchable = normalized + " "
+        pattern = StreamWorker._build_repetition_pattern(
+            min_chars, max_allowed_repeats
+        )
+        return bool(pattern.search(searchable))
+
+    @staticmethod
+    @lru_cache(maxsize=256)
+    def _build_repetition_pattern(
+        min_chars: int, max_allowed_repeats: int
+    ) -> Pattern[str]:
+        return re.compile(
+            rf"(.{{{min_chars},}}?)" rf"\1{{{max_allowed_repeats},}}"
+        )
 
     def _is_mostly_silence(
         self, samples: np.ndarray, confidence: Optional[float]

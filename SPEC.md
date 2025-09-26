@@ -37,6 +37,7 @@ transcribing multiple radio or pager feeds in real time.
   collapse into a single grouped thread, showing parsed incident details like the call
   type, location, and alarm level alongside the individual updates.
 - When Whisper returns no text but audio passes silence thresholds, show a "Silence" entry with playback controls. If the clip contains noisy speech Whisper cannot decode, surface it as `[unable to transcribe]` and keep the recording for operators to replay.
+- Segments that loop the same long phrase beyond configured repetition limits are treated as `[unable to transcribe]` entries so the log highlights bursts Whisper could not confidently decode.
 - Suppress hallucinated phrases on barely audible bursts; if a chunk lacks meaningful energy the backend drops Whisper's text entirely so the transcript log stays empty instead of fabricating callouts.
 - Load roughly the last three hours of transcripts per stream on initial view and fetch older history on demand (including auto-loading when needed) to keep the interface responsive. Loaded transcripts persist until refresh or reset; the toolbar no longer clears local history.
 - When a browser tab stays hidden for about fifteen minutes, the UI releases its WebSocket connection and reconnects automatically (refreshing stream data) as soon as the operator returns to the tab.

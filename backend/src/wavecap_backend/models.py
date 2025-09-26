@@ -7,6 +7,7 @@ from enum import Enum
 from typing import List, Optional
 
 from pydantic import (
+    AliasChoices,
     BaseModel,
     ConfigDict,
     Field,
@@ -318,6 +319,35 @@ class WhisperConfig(APIModel):
         default=75.0, alias="deemphasisTimeConstantMicros"
     )
     agcTargetRms: Optional[float] = Field(default=None, alias="agcTargetRms")
+    segmentRepetitionMinCharacters: int = Field(
+        default=16, alias="segmentRepetitionMinCharacters"
+    )
+    segmentRepetitionMaxAllowedConsecutiveRepeats: int = Field(
+        default=4,
+        alias="segmentRepetitionMaxAllowedConsecutiveRepeats",
+        validation_alias=AliasChoices(
+            "segmentRepetitionMaxAllowedConsecutiveRepeats",
+            "segmentRepetitionMaxRepeats",
+        ),
+    )
+
+    @field_validator("segmentRepetitionMinCharacters")
+    @classmethod
+    def _validate_segment_repetition_min_characters(cls, value: int) -> int:
+        parsed = int(value)
+        if parsed < 0:
+            raise ValueError("segmentRepetitionMinCharacters must be non-negative")
+        return parsed
+
+    @field_validator("segmentRepetitionMaxAllowedConsecutiveRepeats")
+    @classmethod
+    def _validate_segment_repetition_max_allowed_repeats(cls, value: int) -> int:
+        parsed = int(value)
+        if parsed < 0:
+            raise ValueError(
+                "segmentRepetitionMaxAllowedConsecutiveRepeats must be non-negative"
+            )
+        return parsed
 
 
 class ThemeMode(str, Enum):

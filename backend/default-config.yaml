@@ -65,6 +65,10 @@ whisper:
     - "alright here we go"
     - "all right let's go"
     - "alright let's go"
+  # Treat segments that repeat the same phrase longer than this many characters
+  # more than the allowed count as untranscribable noise.
+  segmentRepetitionMinCharacters: 16
+  segmentRepetitionMaxAllowedConsecutiveRepeats: 4
 
 ui:
   themeMode: system
