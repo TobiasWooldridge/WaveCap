@@ -1623,6 +1623,126 @@ async def test_worker_retains_phrase_when_audio_active(tmp_path):
     assert len(transcriber.calls) == 1
 
 
+@pytest.mark.asyncio
+async def test_worker_marks_repetitive_segment_as_untranscribable(tmp_path):
+    config = WhisperConfig(
+        sampleRate=16000,
+        chunkLength=4,
+        minChunkDurationSeconds=0.5,
+        contextSeconds=0.0,
+        silenceThreshold=0.01,
+        silenceLookbackSeconds=0.25,
+        silenceHoldSeconds=0.25,
+        activeSamplesInLookbackPct=0.1,
+        segmentRepetitionMinCharacters=8,
+        segmentRepetitionMaxAllowedConsecutiveRepeats=2,
+    )
+
+    segment_text = "Alpha Bravo Alpha Bravo Alpha Bravo"
+    segment = TranscriptionSegment(
+        id=0,
+        text=segment_text,
+        no_speech_prob=0.1,
+        temperature=0.0,
+        avg_logprob=-0.1,
+        compression_ratio=1.0,
+        start=0.0,
+        end=1.5,
+        seek=0,
+    )
+    bundle = TranscriptionResultBundle(segment_text, [segment], "en", no_speech_prob=0.1)
+    transcriber = StubTranscriber([bundle])
+
+    stream = Stream(
+        id="stream-repetition",
+        name="Repetition",
+        url="http://example.com/audio",
+        status=StreamStatus.STOPPED,
+        createdAt=datetime.utcnow(),
+        transcriptions=[],
+        source=StreamSource.AUDIO,
+    )
+
+    db = StreamDatabase(tmp_path / "runtime.sqlite")
+    evaluator = TranscriptionAlertEvaluator(AlertsConfig(enabled=False, rules=[]))
+    captured: List[TranscriptionResult] = []
+
+    async def capture(transcription: TranscriptionResult) -> None:
+        captured.append(transcription)
+
+    async def noop_status(_stream: Stream, _status: StreamStatus) -> None:
+        return
+
+    worker = StreamWorker(
+        stream=stream,
+        transcriber=transcriber,
+        database=db,
+        alert_evaluator=evaluator,
+        on_transcription=capture,
+        on_status_change=noop_status,
+        config=config,
+    )
+
+    tone = np.full(int(0.5 * worker.sample_rate), 4000, dtype=np.float32) / 32768.0
+    prepared = PreparedChunk(samples=tone, prefix_samples=0)
+
+    await worker._transcribe_chunk(prepared)
+
+    assert len(captured) == 1
+    result = captured[0]
+    assert result.text == UNABLE_TO_TRANSCRIBE_TOKEN
+    assert result.segments is None
+    assert len(transcriber.calls) == 1
+
+
+# fmt: off
+THANK_YOU_ADELAIDE_LOOP = (
+    "Thank you, Adelaide. Thank you. Thank you. Thank you. Thank you. Thank you, Adelaide. "
+    "Thank you, Adelaide. Thank you, Adelaide. Thank you, Adelaide. Thank you, Adelaide. "
+    "Thank you, Adelaide. Thank you, Adelaide. Thank you, Adelaide. Thank you, Adelaide. "
+    "Thank you, Adelaide. Thank you, Adelaide. Thank you, Adelaide. Thank you, Adelaide. "
+    "Thank you, Adelaide. Thank you, Adelaide. Thank you, Adelaide. Thank you, Adelaide. "
+    "Thank you, Adelaide. Thank you, Adelaide. Thank you, Adelaide. Thank you, Adelaide. "
+    "Thank you, Adelaide. Thank you, Adelaide. Thank you, Adelaide. Thank you, Adelaide. "
+    "Thank you, Adelaide. Thank you, Adelaide."
+)
+
+YES_SIR_LOOP = (
+    "Yes, sir. Yes, sir. Yes, sir. Yes, sir. Yes, sir. Yes, sir. Yes, sir. Yes, sir. "
+    "Yes, sir. Yes, sir. Yes, sir. Yes, sir. Yes, sir. Yes, sir. Yes, sir. Yes, sir. "
+    "Yes, sir. Yes, sir. Yes, sir. Yes, sir. Yes, sir. Yes, sir. Yes, sir. Yes, sir. "
+    "Yes, sir. Yes, sir. Yes, sir. Yes, sir. Yes, sir. Yes, sir. Yes, sir. Yes, sir. "
+    "Yes, sir. Yes, sir. Yes, sir. Yes, sir. Yes, sir. Yes, sir. Yes, sir. Yes, sir. "
+    "Yes, sir. Yes, sir. Yes, sir. Yes, sir."
+)
+# fmt: on
+
+
+@pytest.mark.parametrize(
+    "text,min_chars,max_allowed_repeats,expected",
+    [
+        (
+            "Alpha Bravo Alpha Bravo Alpha Bravo",
+            8,
+            2,
+            True,
+        ),
+        ("Alpha Bravo", 8, 2, False),
+        ("abcabcabcabc", 3, 3, True),
+        ("abcabcabca", 3, 3, False),
+        (THANK_YOU_ADELAIDE_LOOP, 8, 2, True),
+        (YES_SIR_LOOP, 8, 2, True),
+    ],
+)
+def test_segment_repetition_detection(text, min_chars, max_allowed_repeats, expected):
+    assert (
+        stream_worker_module.StreamWorker._segment_has_excessive_repetition(
+            text, min_chars, max_allowed_repeats
+        )
+        is expected
+    )
+
+
 class ReconnectStubTranscriber:
     async def transcribe(self, _samples, _sample_rate, language):
         return SimpleNamespace(text="", segments=[], language=language)

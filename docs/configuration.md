@@ -199,7 +199,20 @@ Whisper works on buffered audio chunks. Shorter buffers return text faster; long
 
 `contextSeconds` determines how much previously transcribed audio is appended to the start of the next chunk. Think of it as an overlap between chunks: `0` repeats nothing, higher values replay a short tail to keep sentences flowing. Values between `2` and `6` seconds work well in practice—go higher if speakers pause mid-sentence or if punctuation keeps drifting. The defaults lean toward quick dispatch updates with `0.5` seconds of context; you can raise it if punctuation accuracy matters more than latency.
 
-### 4. Fine-tune silence detection
+### 4. Filter obvious repetition loops
+
+Whisper occasionally hallucinates by repeating the same long phrase over and over. When that happens the audio usually still contains energy, so silence heuristics do not catch the burst. Use the repetition guardrails to turn those loops into `[unable to transcribe]` entries instead of flooding the log with nonsense text.
+
+```yaml
+whisper:
+  segmentRepetitionMinCharacters: 16
+  segmentRepetitionMaxAllowedConsecutiveRepeats: 4
+```
+
+- `segmentRepetitionMinCharacters` controls the shortest phrase (in characters) that the repetition detector considers. Phrases shorter than the threshold are ignored so common fillers such as "yeah" or "uh" do not trigger the filter.
+- `segmentRepetitionMaxAllowedConsecutiveRepeats` limits how many times that phrase may appear consecutively inside a segment before the backend flags the burst as untranscribable. Set it to `0` to disable the check entirely when you prefer Whisper's raw output.
+
+### 5. Fine-tune silence detection
 
 These parameters decide when a chunk should finish:
 
@@ -213,7 +226,7 @@ These parameters decide when a chunk should finish:
 
 If background noise triggers false starts, raise `silenceThreshold` or `silenceHoldSeconds`. If transcripts lag behind, lower those values slightly.
 
-### 5. Handle brief noise bursts
+### 6. Handle brief noise bursts
 
 - `noSpeechThreshold`: Minimum seconds of audio required before Whisper decides the speaker is active. `2.0` helps ignore coughs or clicks; `3.0` is better for environments with intermittent noise. This value also acts as the baseline length for blank-audio placeholders when Whisper cannot produce text.
 - `blankAudioMinDurationSeconds`: Override the minimum audio length required before emitting a blank-audio entry. Defaults to the larger of `0.75` seconds or `minChunkDurationSeconds`.
@@ -222,7 +235,7 @@ If background noise triggers false starts, raise `silenceThreshold` or `silenceH
 
 When Whisper returns no text but these thresholds are met, the UI shows a "Silence" chip with playback controls so operators can review the captured audio manually. Short or low-energy bursts are filtered out.
 
-### 6. Manage concurrent transcription jobs
+### 7. Manage concurrent transcription jobs
 
 - `maxConcurrentProcesses`: Caps how many Whisper invocations can run at once while streams themselves continue recording. The
   value now sizes the dedicated transcription executor: it spawns that many long-lived worker threads and a queue four times as
@@ -230,7 +243,7 @@ When Whisper returns no text but these thresholds are met, the UI shows a "Silen
   latency on typical four-core systems. Set this to `1` on very small devices and raise it when you have more CPU threads
   available; values below `1` are treated as `1` to keep transcription moving.
 
-### 7. Optimise decoder heuristics
+### 8. Optimise decoder heuristics
 
 Beam search combined with lower decoding temperatures helps Whisper stay on
 message when similar calls repeat all day. The following options bias the model
@@ -256,7 +269,7 @@ toward consistent phrasing without forcing every token:
   an exact match, preventing the correction from firing repeatedly on similar
   syllables.
 
-### 8. Condition radio audio up front
+### 9. Condition radio audio up front
 
 Live radio links carry hiss, pre-emphasis curves, and bass rumble that mask key
 syllables. The backend now exposes a lightweight conditioning chain tuned for
@@ -278,7 +291,7 @@ scanner feeds:
 Set any of these fields to `null` (or `0` for the frequency cut-offs) to bypass
 the corresponding stage.
 
-### 9. Filter hallucinated silence
+### 10. Filter hallucinated silence
 
 Whisper occasionally emits stock phrases or punctuation during silent stretches. The backend now reads
 `whisper.silenceHallucinationPhrases` from your configuration files so you can maintain the block without
@@ -302,7 +315,7 @@ still match a configured `"thank you"` rule. The backend also treats strings mad
 of a configured phrase (for example, `"thank you thank you"`) as hallucinations so common duplications are
 filtered automatically.
 
-### 10. Example configurations
+### 11. Example configurations
 
 **Low-latency dispatch console** (`state/config.yaml`):
 
