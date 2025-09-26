@@ -1,10 +1,11 @@
 import { ChangeEvent, FormEvent, ReactNode } from "react";
 import { LogIn, Plus, Radio, X } from "lucide-react";
-import { StreamSource } from "@types";
+import { Stream, StreamSource } from "@types";
 import Spinner from "./primitives/Spinner.react";
 import Button from "./primitives/Button.react";
 import Badge from "./primitives/Badge.react";
 import Flex from "./primitives/Flex.react";
+import StreamStatusIndicator from "./StreamStatusIndicator.react";
 import "./StreamSidebar.scss";
 
 export interface StreamSidebarItem {
@@ -13,7 +14,7 @@ export interface StreamSidebarItem {
   previewText: string;
   previewTime: ReactNode;
   unreadCount: number;
-  statusClass: string;
+  stream: Stream;
   isPager: boolean;
   isActive: boolean;
 }
@@ -353,9 +354,9 @@ const StreamSidebar = ({
               aria-current={item.isActive ? "page" : undefined}
             >
               <Flex align="start" gap={3} className="stream-sidebar__item-layout">
-                <div
-                  className={`stream-status-dot ${item.statusClass}`}
-                  aria-hidden="true"
+                <StreamStatusIndicator
+                  stream={item.stream}
+                  className="d-inline-flex align-items-start"
                 />
                 <Flex
                   className="stream-sidebar__item-main"
