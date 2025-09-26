@@ -233,17 +233,50 @@ const buildPreviewText = (
   return trimmed;
 };
 
-const getStatusIndicatorClass = (status: Stream["status"]): string => {
-  switch (status) {
-    case "transcribing":
-      return "stream-status-dot--active";
-    case "queued":
-      return "stream-status-dot--queued";
-    case "error":
-      return "stream-status-dot--error";
-    default:
-      return "stream-status-dot--idle";
+const resolveUpstreamConnectivity = (stream: Stream): boolean | null => {
+  const candidate = (stream as { upstreamConnected?: unknown }).upstreamConnected;
+  if (typeof candidate === "boolean") {
+    return candidate;
   }
+
+  const transcriptions = Array.isArray(stream.transcriptions)
+    ? stream.transcriptions
+    : [];
+
+  for (let index = transcriptions.length - 1; index >= 0; index -= 1) {
+    const eventType = transcriptions[index]?.eventType;
+    if (eventType === "upstream_disconnected") {
+      return false;
+    }
+    if (eventType === "upstream_reconnected") {
+      return true;
+    }
+  }
+
+  return null;
+};
+
+const isStreamConnected = (stream: Stream): boolean => {
+  if (stream.status === "error") {
+    return false;
+  }
+
+  const connectivity = resolveUpstreamConnectivity(stream);
+  if (connectivity !== null) {
+    return connectivity;
+  }
+
+  return stream.status === "transcribing";
+};
+
+const getStatusIndicatorClass = (stream: Stream): string => {
+  if (!stream.enabled) {
+    return "stream-status-dot--idle";
+  }
+
+  return isStreamConnected(stream)
+    ? "stream-status-dot--active"
+    : "stream-status-dot--error";
 };
 
 const renderStandaloneStatusIcon = (
@@ -923,7 +956,7 @@ function App() {
           stream,
           lastViewedAtByConversation[stream.id] ?? 0,
         ),
-        statusClass: getStatusIndicatorClass(stream.status),
+        statusClass: getStatusIndicatorClass(stream),
         isPager: isPagerStream(stream),
         isActive: selectedStreamId === stream.id,
       };
@@ -1527,7 +1560,7 @@ function App() {
                           <h2 className="h5 mb-1">{selectedStreamTitle}</h2>
                           <div className="conversation-panel__meta small text-body-secondary">
                             <span
-                              className={`stream-status-dot ${getStatusIndicatorClass(selectedStream.status)}`}
+                              className={`stream-status-dot ${getStatusIndicatorClass(selectedStream)}`}
                               aria-hidden="true"
                             />
                             <span className="text-capitalize">
