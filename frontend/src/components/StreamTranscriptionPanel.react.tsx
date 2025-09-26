@@ -2292,6 +2292,10 @@ export const StreamTranscriptionPanel = ({
                     message.fragments.length === 1 ? "fragment" : "fragments"
                   }`;
 
+                  const detailFields = message.fields.filter(
+                    (field) => field.key !== "raw_message",
+                  );
+
                   return (
                     <div key={message.id} className="pager-transcript">
                       {summaryText ? (
@@ -2303,9 +2307,9 @@ export const StreamTranscriptionPanel = ({
                           {alertChips}
                         </div>
                       ) : null}
-                      {message.fields.length > 0 ? (
+                      {detailFields.length > 0 ? (
                         <dl className="pager-transcript__details">
-                          {message.fields.map((field) => (
+                          {detailFields.map((field) => (
                             <div
                               key={`${message.id}-${field.key}`}
                               className="pager-transcript__detail"
