@@ -60,3 +60,16 @@ Run the command from the repository root or inside `backend/` with `PYTHONPATH=s
 The backend expects the frontend build output under
 `../frontend/dist`. `start-app.sh` and `start-app.ps1` take care of building the frontend bundle and
 then launch the backend.
+
+
+### Audio regression suite
+
+Export the same reviewed transcriptions directly into the regression harness used for end-to-end smoke tests by pointing the exporter at the `backend/audio_regression` directory:
+
+```bash
+python -m wavecap_backend.tools.export_transcriptions \
+  --output-dir state/exports/whisper-dataset \
+  --regression-dir backend/audio_regression
+```
+
+Each regression entry stores a relative audio path plus the expected transcript. Run `python -m wavecap_backend.tools.run_audio_regression` after dropping new fixtures to evaluate the pipeline with the configured Whisper model. The `notebooks/audio_regression_benchmark.ipynb` notebook provides a reproducible workflow for tracking metrics across model tweaks.

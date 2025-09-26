@@ -1,17 +1,24 @@
-"""Export reviewed transcriptions into a dataset for Whisper fine-tuning."""
+"""Export reviewed transcriptions into datasets for Whisper fine-tuning."""
 
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import logging
-import asyncio
 import shutil
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Sequence, Tuple
 
+from wavecap_backend.audio_regression import (
+    REGRESSION_AUDIO_SUBDIR,
+    REGRESSION_CASES_FILENAME,
+    RegressionCaseDefinition,
+    dump_case_definitions,
+    generate_case_name,
+)
 from wavecap_backend.database import StreamDatabase
 from wavecap_backend.datetime_utils import (
     isoformat_utc,
@@ -133,12 +140,65 @@ def _build_records(
     return records
 
 
+def _resolve_exported_audio_path(record: ExportRecord, output_dir: Path) -> Optional[Path]:
+    if not record.audio_filepath:
+        return None
+    candidate = Path(record.audio_filepath)
+    if not candidate.is_absolute():
+        candidate = output_dir / candidate
+    if not candidate.exists():
+        LOGGER.warning(
+            "Audio file missing for export record %s: %s", record.id, candidate
+        )
+        return None
+    return candidate
+
+
+def _build_regression_cases(
+    records: Sequence[ExportRecord],
+    *,
+    export_dir: Path,
+    regression_dir: Path,
+) -> List[RegressionCaseDefinition]:
+    used_names: set[str] = set()
+    audio_dir = regression_dir / REGRESSION_AUDIO_SUBDIR
+    cases: List[RegressionCaseDefinition] = []
+    for record in records:
+        audio_source = _resolve_exported_audio_path(record, export_dir)
+        if audio_source is None:
+            continue
+        copied = _copy_audio_file(audio_source, audio_dir)
+        relative_audio = copied.relative_to(regression_dir)
+        name = generate_case_name(
+            stream_id=record.stream_id,
+            timestamp=record.timestamp,
+            fallback=record.id,
+            used_names=used_names,
+        )
+        case = RegressionCaseDefinition(
+            name=name,
+            audio=str(relative_audio),
+            expected_transcript=record.text,
+            transcription_id=record.id,
+            stream_id=record.stream_id,
+            timestamp=record.timestamp,
+            duration=record.duration,
+            review_status=record.review_status,
+            source_text=record.source_text,
+            reviewed_at=record.reviewed_at,
+            reviewer=record.reviewed_by,
+        )
+        cases.append(case)
+    return cases
+
+
 async def export_reviewed_transcriptions(
     db_path: Path,
     output_dir: Path,
     copy_audio: bool = True,
     statuses: Iterable[TranscriptionReviewStatus] = DEFAULT_STATUSES,
-) -> List[ExportRecord]:
+    regression_dir: Optional[Path] = None,
+) -> Tuple[List[ExportRecord], List[RegressionCaseDefinition]]:
     if not db_path.exists():
         raise FileNotFoundError(f"Database not found: {db_path}")
     database = StreamDatabase(db_path)
@@ -165,7 +225,19 @@ async def export_reviewed_transcriptions(
     metadata_path = output_dir / "metadata.json"
     with metadata_path.open("w", encoding="utf-8") as handle:
         json.dump(metadata, handle, indent=2)
-    return records
+
+    regression_cases: List[RegressionCaseDefinition] = []
+    if regression_dir is not None:
+        regression_dir.mkdir(parents=True, exist_ok=True)
+        regression_cases = _build_regression_cases(
+            records, export_dir=output_dir, regression_dir=regression_dir
+        )
+        cases_path = regression_dir / REGRESSION_CASES_FILENAME
+        dump_case_definitions(regression_cases, cases_path)
+        LOGGER.info(
+            "Wrote %s regression cases to %s", len(regression_cases), cases_path
+        )
+    return records, regression_cases
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -188,6 +260,16 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="If provided, referenced audio files will not be copied alongside the dataset",
     )
     parser.add_argument(
+        "--regression-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Optional directory where regression cases will be materialised. "
+            "Audio files are copied into an 'audio' subdirectory and a cases.jsonl "
+            "manifest is generated."
+        ),
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Enable debug logging",
@@ -201,12 +283,23 @@ def main(argv: Optional[List[str]] = None) -> None:
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
     LOGGER.info("Exporting reviewed transcriptions from %s", args.db)
     copy_audio = not args.no_copy_audio
-    records = asyncio.run(
+    records, regression_cases = asyncio.run(
         export_reviewed_transcriptions(
-            args.db, args.output_dir, copy_audio=copy_audio
+            args.db,
+            args.output_dir,
+            copy_audio=copy_audio,
+            regression_dir=args.regression_dir,
         )
     )
-    LOGGER.info("Wrote %s reviewed transcriptions to %s", len(records), args.output_dir)
+    LOGGER.info(
+        "Wrote %s reviewed transcriptions to %s", len(records), args.output_dir
+    )
+    if regression_cases:
+        LOGGER.info(
+            "Prepared %s regression cases in %s",
+            len(regression_cases),
+            args.regression_dir,
+        )
 
 
 if __name__ == "__main__":  # pragma: no cover - manual execution entry point
