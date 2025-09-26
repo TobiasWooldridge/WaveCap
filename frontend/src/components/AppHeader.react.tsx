@@ -43,20 +43,6 @@ const AppHeader = ({
         <div className="app-header__container app-container">
           <div className="app-header__layout">
             <div className="app-header__branding">
-              {isMobileViewport ? (
-                <Button
-                  size="sm"
-                  use="light"
-                  appearance="outline"
-                  onClick={onOpenMobileSidebar}
-                  aria-controls="app-stream-sidebar"
-                  aria-expanded={isMobileSidebarOpen}
-                  aria-label="Open stream menu"
-                  startContent={<Menu size={18} />}
-                >
-                  <span>Streams</span>
-                </Button>
-              ) : null}
               <Activity className="text-warning" size={32} />
               <h1 className="h5 mb-0 text-white">WaveCap</h1>
             </div>
@@ -91,6 +77,21 @@ const AppHeader = ({
                     Transcript correction mode
                   </Flex>
                 </Flex>
+              ) : null}
+
+              {isMobileViewport ? (
+                <Button
+                  size="sm"
+                  use="light"
+                  appearance="outline"
+                  onClick={onOpenMobileSidebar}
+                  aria-controls="app-stream-sidebar"
+                  aria-expanded={isMobileSidebarOpen}
+                  aria-label="Open stream menu"
+                  startContent={<Menu size={18} />}
+                >
+                  <span>Streams</span>
+                </Button>
               ) : null}
 
               <Button
