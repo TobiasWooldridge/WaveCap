@@ -48,8 +48,10 @@ whisper:
   temperatureIncrementOnFallback: 0.2
   conditionOnPreviousText: false
   initialPrompt: >-
-    Priority callouts include Adelaide, Adelaide fire out, Noarlunga, and
-    SITREP. Spell them exactly when they are heard on air.
+    These transcripts capture firefighter and other emergency services radio
+    traffic in South Australia. Priority callouts include Adelaide, Adelaide
+    fire out, Noarlunga, and SITREP. Spell them exactly when they are heard on
+    air.
   # Front-end filtering keeps speech crisp and level.
   highpassCutoffHz: 250
   lowpassCutoffHz: 3800
