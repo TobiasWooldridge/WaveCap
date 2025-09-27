@@ -41,6 +41,10 @@ class StreamRecord(SQLModel, table=True):
     enabled: Optional[bool] = Field(
         default=None, sa_column=Column("enabled", Boolean, nullable=True)
     )
+    pinned: bool = Field(
+        default=False,
+        sa_column=Column("pinned", Boolean, nullable=False, server_default="0"),
+    )
     createdAt: datetime = Field(
         sa_column=Column("createdAt", DateTime(timezone=True), nullable=False)
     )
@@ -155,6 +159,7 @@ class StreamDatabase:
                     "ALTER TABLE streams ADD COLUMN ignoreFirstSeconds REAL DEFAULT 0",
                     "ALTER TABLE streams ADD COLUMN lastActivityAt DATETIME",
                     "ALTER TABLE streams ADD COLUMN enabled BOOLEAN",
+                    "ALTER TABLE streams ADD COLUMN pinned BOOLEAN DEFAULT 0",
                     "ALTER TABLE transcriptions ADD COLUMN eventType TEXT DEFAULT 'transcription'",
                     "ALTER TABLE transcriptions ADD COLUMN pagerIncident TEXT",
                     "CREATE INDEX IF NOT EXISTS ix_streams_last_activity ON streams (lastActivityAt)",
@@ -206,6 +211,7 @@ class StreamDatabase:
             record.url = stream.url
             record.status = StreamStatus(stream.status)
             record.enabled = bool(stream.enabled)
+            record.pinned = bool(stream.pinned)
             record.createdAt = stream.createdAt
             record.language = stream.language
             record.error = stream.error
@@ -461,6 +467,7 @@ class StreamDatabase:
             url=record.url,
             status=StreamStatus(record.status),
             enabled=bool(enabled),
+            pinned=bool(record.pinned),
             createdAt=record.createdAt,
             language=record.language,
             error=record.error,

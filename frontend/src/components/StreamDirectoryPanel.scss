@@ -21,6 +21,18 @@
     gap: 0.4rem;
   }
 
+  .stream-directory__pin {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: rgb(var(--bs-warning-rgb, 255, 193, 7));
+  }
+
+  .stream-directory__pin svg {
+    width: 0.85rem;
+    height: 0.85rem;
+  }
+
   .stream-directory__title {
     margin: 0;
     font-size: 0.95rem;

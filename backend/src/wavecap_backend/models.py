@@ -183,6 +183,7 @@ class Stream(APIModel):
     url: str
     status: StreamStatus
     enabled: bool = False
+    pinned: bool = False
     createdAt: datetime = Field(alias="createdAt")
     language: Optional[str] = None
     error: Optional[str] = None
@@ -377,6 +378,7 @@ class StreamConfig(APIModel):
     source: StreamSource = StreamSource.AUDIO
     url: Optional[str] = None
     enabled: bool = True
+    pinned: bool = False
     language: Optional[str] = None
     webhookToken: Optional[str] = Field(default=None, alias="webhookToken")
     ignoreFirstSeconds: float = Field(default=0.0, alias="ignoreFirstSeconds")

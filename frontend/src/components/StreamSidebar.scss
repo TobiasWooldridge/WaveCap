@@ -148,6 +148,36 @@
   flex: 1;
 }
 
+.stream-sidebar__sort-control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  align-items: flex-end;
+}
+
+.stream-sidebar__sort-label {
+  margin: 0;
+}
+
+.stream-sidebar__sort-select {
+  min-width: 8rem;
+  max-width: 12rem;
+}
+
+.stream-sidebar__pin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgb(var(--bs-warning-rgb, 255, 193, 7));
+  margin-inline-end: 0.15rem;
+}
+
+.stream-sidebar__pin svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
 .stream-sidebar__item-title {
   margin: 0;
   font-weight: 600;

@@ -83,6 +83,7 @@ streams:
     name: SA SES Radio
     url: https://broadcastify.cdnstream1.com/2653
     enabled: true
+    pinned: true
     ignoreFirstSeconds: 30
   - id: broadcastify-34010
     name: NSW - Primary Emergency Services

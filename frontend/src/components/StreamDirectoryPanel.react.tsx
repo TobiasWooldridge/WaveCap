@@ -1,4 +1,4 @@
-import { Play, Square, Radio, AlertCircle, Clock } from "lucide-react";
+import { Play, Square, Radio, AlertCircle, Clock, Star } from "lucide-react";
 import { Stream, type StreamCommandState } from "@types";
 import Spinner from "./primitives/Spinner.react";
 import Button from "./primitives/Button.react";
@@ -112,6 +112,15 @@ export const StreamDirectoryPanel = ({
                     <Radio size={20} className="text-body-tertiary" />
                     <div className="flex-grow-1">
                       <Flex align="center" gap={1} className="stream-directory__header">
+                        {stream.pinned ? (
+                          <span
+                            className="stream-directory__pin"
+                            aria-label="Pinned stream"
+                            role="img"
+                          >
+                            <Star size={14} fill="currentColor" aria-hidden="true" />
+                          </span>
+                        ) : null}
                         <h3 className="stream-directory__title">{stream.name}</h3>
                         <span
                           className={`badge d-inline-flex align-items-center gap-2 stream-directory__status ${getStatusBadgeClass(variant)}`}

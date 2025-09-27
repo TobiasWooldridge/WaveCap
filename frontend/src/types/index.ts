@@ -83,6 +83,7 @@ export interface Stream {
   url: string;
   status: StreamStatus;
   enabled: boolean;
+  pinned?: boolean;
   createdAt: IsoDateTimeString;
   transcriptions: TranscriptionResult[];
   language?: string;
@@ -135,6 +136,7 @@ export interface StreamConfig {
   name: string;
   url: string;
   enabled?: boolean;
+  pinned?: boolean;
   language?: string;
   ignoreFirstSeconds?: number;
   source?: StreamSource;
