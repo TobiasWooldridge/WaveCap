@@ -2276,13 +2276,13 @@ export const StreamTranscriptionPanel = ({
                 className="transcript-thread__pager-group"
                 key={`${group.id}-pager`}
               >
-                  {pagerMessages.map((message: CondensedPagerMessage, index) => {
-                    const shouldShowIncidentMap = Boolean(
-                      incidentLocationUrls && index === 0,
-                    );
-                    const fragmentElements = message.fragments.flatMap(
-                      (fragment) => elementMap.get(fragment.id) ?? [],
-                    );
+                {pagerMessages.map((message: CondensedPagerMessage, index) => {
+                  const shouldShowIncidentMap = Boolean(
+                    incidentLocationUrls && index === 0,
+                  );
+                  const fragmentElements = message.fragments.flatMap((fragment) =>
+                    elementMap.get(fragment.id) ?? [],
+                  );
                   const alertMap = new Map<
                     string,
                     ReturnType<typeof getNotifiableAlerts>[number]
@@ -2304,14 +2304,16 @@ export const StreamTranscriptionPanel = ({
                     </span>
                   ));
                   const fragmentChip =
-                    message.fragments.length > 1 ? (
-                      <span
-                        key={`${message.id}-fragments`}
-                        className="chip-button chip-button--surface pager-transcript__chip"
-                      >
-                        {message.fragments.length} fragments combined
-                      </span>
-                    ) : null;
+                    message.fragments.length > 1
+                      ? (
+                          <span
+                            key={`${message.id}-fragments`}
+                            className="chip-button chip-button--surface pager-transcript__chip"
+                          >
+                            {message.fragments.length} fragments combined
+                          </span>
+                        )
+                      : null;
 
                   const summaryText =
                     message.summary ||
@@ -2329,75 +2331,117 @@ export const StreamTranscriptionPanel = ({
                     (field) => field.key !== "raw_message",
                   );
 
+                  const mapSection =
+                    shouldShowIncidentMap && incidentLocationUrls
+                      ? (
+                          <div className="pager-transcript__map" key="map">
+                            <iframe
+                              title={`Incident map for ${incidentLocationQuery}`}
+                              src={incidentLocationUrls.embed}
+                              loading="lazy"
+                              referrerPolicy="no-referrer-when-downgrade"
+                              allowFullScreen
+                              className="pager-transcript__map-frame"
+                            />
+                            {incidentLocationUrls.link ? (
+                              <a
+                                href={incidentLocationUrls.link}
+                                target="_blank"
+                                rel="noreferrer noopener"
+                                className="pager-transcript__map-link"
+                              >
+                                <MapPin size={14} />
+                                Open in Google Maps
+                              </a>
+                            ) : null}
+                          </div>
+                        )
+                      : null;
+
+                  const notesSection =
+                    message.notes.length > 0
+                      ? (
+                          <div className="pager-transcript__notes-card" key="notes">
+                            <div className="pager-transcript__notes-title">Notes</div>
+                            <ul className="pager-transcript__notes">
+                              {message.notes.map((note, index) => (
+                                <li key={`${message.id}-note-${index}`}>{note}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )
+                      : null;
+
+                  const sidebarSections = [
+                    ...(mapSection ? [mapSection] : []),
+                    ...(notesSection ? [notesSection] : []),
+                  ];
+
+                  const chipElements = [
+                    ...(fragmentChip ? [fragmentChip] : []),
+                    ...alertChips,
+                  ];
+
                   return (
-                    <div key={message.id} className="pager-transcript">
-                      {summaryText ? (
-                        <div className="pager-transcript__summary">{summaryText}</div>
-                      ) : null}
-                      {fragmentChip || alertChips.length > 0 ? (
-                        <div className="pager-transcript__chips">
-                          {fragmentChip}
-                          {alertChips}
-                        </div>
-                      ) : null}
-                      {detailFields.length > 0 ? (
-                        <dl className="pager-transcript__details">
-                          {detailFields.map((field) => (
-                            <div
-                              key={`${message.id}-${field.key}`}
-                              className="pager-transcript__detail"
-                            >
-                              <dt>{field.label}</dt>
-                              <dd>
-                                {field.values.map((value, index) =>
-                                  field.format === "code" ? (
-                                    <code
-                                      key={`${message.id}-${field.key}-${index}`}
-                                    >
-                                      {value}
-                                    </code>
-                                  ) : (
-                                    <span
-                                      key={`${message.id}-${field.key}-${index}`}
-                                    >
-                                      {value}
-                                    </span>
-                                  ),
-                                )}
-                              </dd>
+                    <div
+                      key={message.id}
+                      className={`pager-transcript${
+                        sidebarSections.length > 0
+                          ? " pager-transcript--with-sidebar"
+                          : ""
+                      }`}
+                    >
+                      {(summaryText || chipElements.length > 0) && (
+                        <div className="pager-transcript__header">
+                          {summaryText ? (
+                            <div className="pager-transcript__summary">
+                              {summaryText}
                             </div>
-                          ))}
-                        </dl>
-                      ) : null}
-                      {shouldShowIncidentMap && incidentLocationUrls ? (
-                        <div className="pager-transcript__map">
-                          <iframe
-                            title={`Incident map for ${incidentLocationQuery}`}
-                            src={incidentLocationUrls.embed}
-                            loading="lazy"
-                            referrerPolicy="no-referrer-when-downgrade"
-                            allowFullScreen
-                            className="pager-transcript__map-frame"
-                          />
-                          {incidentLocationUrls.link ? (
-                            <a
-                              href={incidentLocationUrls.link}
-                              target="_blank"
-                              rel="noreferrer noopener"
-                              className="pager-transcript__map-link"
-                            >
-                              <MapPin size={14} />
-                              Open in Google Maps
-                            </a>
+                          ) : null}
+                          {chipElements.length > 0 ? (
+                            <div className="pager-transcript__chips">{chipElements}</div>
                           ) : null}
                         </div>
-                      ) : null}
-                      {message.notes.length > 0 ? (
-                        <ul className="pager-transcript__notes">
-                          {message.notes.map((note, index) => (
-                            <li key={`${message.id}-note-${index}`}>{note}</li>
-                          ))}
-                        </ul>
+                      )}
+                      {detailFields.length > 0 || sidebarSections.length > 0 ? (
+                        <div className="pager-transcript__body">
+                          {detailFields.length > 0 ? (
+                            <div className="pager-transcript__main">
+                              <dl className="pager-transcript__details">
+                                {detailFields.map((field) => (
+                                  <div
+                                    key={`${message.id}-${field.key}`}
+                                    className="pager-transcript__detail"
+                                  >
+                                    <dt>{field.label}</dt>
+                                    <dd>
+                                      {field.values.map((value, index) =>
+                                        field.format === "code" ? (
+                                          <code
+                                            key={`${message.id}-${field.key}-${index}`}
+                                          >
+                                            {value}
+                                          </code>
+                                        ) : (
+                                          <span
+                                            key={`${message.id}-${field.key}-${index}`}
+                                          >
+                                            {value}
+                                          </span>
+                                        ),
+                                      )}
+                                    </dd>
+                                  </div>
+                                ))}
+                              </dl>
+                            </div>
+                          ) : null}
+                          {sidebarSections.length > 0 ? (
+                            <aside className="pager-transcript__sidebar">
+                              {sidebarSections}
+                            </aside>
+                          ) : null}
+                        </div>
                       ) : null}
                       {fragmentElements.length > 0 ? (
                         <div
@@ -2451,6 +2495,10 @@ export const StreamTranscriptionPanel = ({
         ...pagerContent,
         ...baseItems,
       ];
+
+      const transcriptContentClassName = streamIsPager
+        ? "transcript-thread__content transcript-thread__content--pager"
+        : "transcript-thread__content";
 
       return (
         <article
@@ -2508,7 +2556,7 @@ export const StreamTranscriptionPanel = ({
                 ) : null}
               </div>
             ) : null}
-            <div className="transcript-thread__content">{groupContent}</div>
+            <div className={transcriptContentClassName}>{groupContent}</div>
             {audioElements}
           </div>
         </article>
