@@ -31,6 +31,7 @@ import {
   Wifi,
   WifiOff,
   Download,
+  MapPin,
 } from "lucide-react";
 import {
   Stream,
@@ -1892,6 +1893,35 @@ export const StreamTranscriptionPanel = ({
         incidentMetaParts.push(`Map ${incidentDetails.map}`);
       }
       const incidentNarrative = incidentDetails?.narrative ?? null;
+      const incidentLocationQuery = (() => {
+        if (!incidentDetails) {
+          return null;
+        }
+        const parts: string[] = [];
+        if (incidentDetails.address) {
+          parts.push(incidentDetails.address);
+        }
+        if (incidentDetails.map && !parts.includes(incidentDetails.map)) {
+          parts.push(`Map ${incidentDetails.map}`);
+        }
+        return parts.length > 0 ? parts.join(", ") : null;
+      })();
+
+      const incidentLocationUrls = incidentLocationQuery
+        ? (() => {
+            const encodedQuery = encodeURIComponent(incidentLocationQuery);
+            // The iframe embed intentionally uses the public Google Maps Embed
+            // endpoint instead of a heavier npm integration. Dedicated Google
+            // Maps libraries require shipping an API key and latitude/longitude
+            // coordinates, but pager incidents only provide freeform address
+            // text. The embed URL lets Google handle geocoding while keeping
+            // secrets out of the frontend bundle.
+            return {
+              embed: `https://maps.google.com/maps?hl=en&q=${encodedQuery}&ie=UTF8&output=embed`,
+              link: `https://maps.google.com/maps?hl=en&q=${encodedQuery}&ie=UTF8&z=15`,
+            } as const;
+          })()
+        : null;
 
       const transcriptionElements = group.transcriptions.map((transcription) => {
         const items: JSX.Element[] = [];
@@ -2246,10 +2276,13 @@ export const StreamTranscriptionPanel = ({
                 className="transcript-thread__pager-group"
                 key={`${group.id}-pager`}
               >
-                {pagerMessages.map((message: CondensedPagerMessage) => {
-                  const fragmentElements = message.fragments.flatMap(
-                    (fragment) => elementMap.get(fragment.id) ?? [],
-                  );
+                  {pagerMessages.map((message: CondensedPagerMessage, index) => {
+                    const shouldShowIncidentMap = Boolean(
+                      incidentLocationUrls && index === 0,
+                    );
+                    const fragmentElements = message.fragments.flatMap(
+                      (fragment) => elementMap.get(fragment.id) ?? [],
+                    );
                   const alertMap = new Map<
                     string,
                     ReturnType<typeof getNotifiableAlerts>[number]
@@ -2335,6 +2368,29 @@ export const StreamTranscriptionPanel = ({
                             </div>
                           ))}
                         </dl>
+                      ) : null}
+                      {shouldShowIncidentMap && incidentLocationUrls ? (
+                        <div className="pager-transcript__map">
+                          <iframe
+                            title={`Incident map for ${incidentLocationQuery}`}
+                            src={incidentLocationUrls.embed}
+                            loading="lazy"
+                            referrerPolicy="no-referrer-when-downgrade"
+                            allowFullScreen
+                            className="pager-transcript__map-frame"
+                          />
+                          {incidentLocationUrls.link ? (
+                            <a
+                              href={incidentLocationUrls.link}
+                              target="_blank"
+                              rel="noreferrer noopener"
+                              className="pager-transcript__map-link"
+                            >
+                              <MapPin size={14} />
+                              Open in Google Maps
+                            </a>
+                          ) : null}
+                        </div>
                       ) : null}
                       {message.notes.length > 0 ? (
                         <ul className="pager-transcript__notes">
