@@ -1,6 +1,6 @@
 import React from "react";
 import { Pause, Play, Radio } from "lucide-react";
-import type { TranscriptionResult } from "@types";
+import type { Stream, TranscriptionResult } from "@types";
 import { getNotifiableAlerts, getReviewStatus, getTranscriptionDisplayText, isBlankAudioText, isSystemTranscription } from "../utils/transcriptions";
 import { getRecordingElementId } from "./StreamTranscriptionPanel.logic";
 import Button from "./primitives/Button.react";
@@ -8,6 +8,7 @@ import AudioElement from "./primitives/AudioElement.react";
 import { Timestamp } from "./primitives/Timestamp.react";
 import { TranscriptionSegmentChips } from "./TranscriptionSegmentChips.react";
 import { AlertChips } from "./chips/AlertChips.react";
+import StreamStatusIndicator from "./StreamStatusIndicator.react";
 import { SystemEventChip } from "./chips/SystemEventChip.react";
 
 type PlayAllHandler = (
@@ -27,6 +28,7 @@ type PlaySegmentHandler = (
 export interface TranscriptMessageRowProps {
   streamId: string;
   streamName: string;
+  stream?: Stream;
   transcription: TranscriptionResult;
   orderedTranscriptions: TranscriptionResult[];
   transcriptCorrectionEnabled: boolean;
@@ -46,6 +48,7 @@ export interface TranscriptMessageRowProps {
 export const TranscriptMessageRow: React.FC<TranscriptMessageRowProps> = ({
   streamId,
   streamName,
+  stream,
   transcription,
   orderedTranscriptions,
   transcriptCorrectionEnabled,
@@ -177,7 +180,11 @@ export const TranscriptMessageRow: React.FC<TranscriptMessageRowProps> = ({
       className={`transcript-message${hasAlerts ? " transcript-message--alert" : ""}`}
     >
       <div className="transcript-message__avatar" aria-hidden="true">
-        <Radio size={18} />
+        {stream ? (
+          <StreamStatusIndicator stream={stream} className="d-inline-flex align-items-center" />
+        ) : (
+          <Radio size={18} />
+        )}
       </div>
       <div className="transcript-message__content">
         <header className="transcript-message__header">

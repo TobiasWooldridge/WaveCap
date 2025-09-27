@@ -108,6 +108,11 @@ export const CombinedTranscriptionLog: React.FC<CombinedTranscriptionLogProps> =
 
     return map;
   }, [streams]);
+  const streamMap = useMemo(() => {
+    const map = new Map<string, Stream>();
+    streams.forEach((s) => map.set(s.id, s));
+    return map;
+  }, [streams]);
   const totalUniqueTranscriptions = useMemo(() => {
     if (!streams || streams.length === 0) {
       return 0;
@@ -232,6 +237,7 @@ export const CombinedTranscriptionLog: React.FC<CombinedTranscriptionLogProps> =
                 key={transcription.id}
                 streamId={streamId}
                 streamName={streamName}
+                stream={streamMap.get(streamId) ?? undefined}
                 transcription={transcription}
                 orderedTranscriptions={
                   transcriptionsByStream.get(streamId) ?? []
