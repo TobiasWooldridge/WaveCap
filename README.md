@@ -114,7 +114,7 @@ All of the commands above set the `WAVECAP_FIXTURES` environment variable to `sc
 
 ## Features
 
-- **Multiple Stream Support** – configure audio or pager streams via YAML and manage them with start/stop/reset controls during a session.
+- **Multiple Stream Support** – manage multiple audio streams defined in YAML; control Start/Stop/Reset in the UI.
 - **Real-time Transcription** – live transcription updates delivered over WebSocket.
 - **SQLite Persistence** – streams and transcripts survive restarts; recordings are saved as WAV files.
 - **Multi-user Awareness** – any number of browsers can monitor the same control plane.
@@ -146,21 +146,22 @@ wavecap/
 
 Configuration is layered across the backend and the `state/` directory:
 
-- `backend/default-config.yaml` – shipped defaults, now expressed in YAML with inline comments that describe every Whisper knob.
+- `backend/default-config.yaml` – shipped defaults, expressed in YAML with inline comments that describe every Whisper knob.
 - (Optional) `state/default-config.yaml` – deployment-wide defaults that load after the shipped file.
 - `state/config.yaml` – user overrides that take precedence when present. The backend auto-creates this file with helpful comments on first launch.
 
-Write actions are available without a login prompt so local and demo deployments stay frictionless. Override any setting in
-`state/config.yaml` to keep customisations separate from the shipped defaults.
+Override any setting in `state/config.yaml` to keep customisations separate from the shipped defaults.
 
-Streams are managed via the `streams` block in these configuration files so operators can pre-load known feeds (audio or pager) before sharing the app. Edit this list and restart the backend to add or remove sources.
+- Streams: define under `defaultStreams`. Add/remove streams by editing YAML; there is no UI or API to create or delete streams.
+- Pager feeds: define under `pagerWebhooks` to receive token-protected webhook posts from CAD systems.
+- Combined views: define under `combinedStreamViews` to merge activity from multiple streams into a single conversation.
 
 For detailed guidance on tuning transcription latency versus accuracy, see the
 [Configuration & Transcription Tuning Guide](docs/configuration.md).
 
 ## API Endpoints
 
-- `GET /api/streams` – list streams.
+- `GET /api/streams` – list streams and their statuses.
 - `POST /api/streams/:id/start` – start transcription.
 - `POST /api/streams/:id/stop` – stop transcription.
 - `POST /api/streams/:id/reset` – delete history and recordings.
@@ -168,6 +169,8 @@ For detailed guidance on tuning transcription latency versus accuracy, see the
 - `PATCH /api/transcriptions/:id/review` – update review metadata.
 - `GET /api/transcriptions/export-reviewed` – download a ZIP containing JSONL metadata and referenced audio clips.
 - `GET /api/health` – service heartbeat.
+
+Note: Stream add/remove is configuration-only via YAML, not exposed via UI or public API.
 
 ## WebSocket Events
 

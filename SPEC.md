@@ -4,22 +4,22 @@ WaveCap provides a browser-based control console for monitoring and
 transcribing multiple radio or pager feeds in real time.
 
 ## Purpose and Audience
-- Give volunteer radio operators a single tool to monitor streams, review transcripts, and share context.
+- Give volunteer radio operators a single tool to monitor multiple radio channels and pager feeds at once; providing replay functionality if they ever miss or need to go back to a message.
 - Stay simple enough for scanner hobbyists to run at home without custom scripts.
 
 ## Product Snapshot
 - Ships as one FastAPI service that serves the API and web app; install Python 3.10+, Node.js/npm, and ffmpeg, or use the provided Dockerfile/Compose setup.
 - Runs on one machine or small server; every browser session connects to the same state through HTTP and WebSocket endpoints.
 - Keeps Whisper inference off the FastAPI event loop by routing transcription jobs through a shared thread-based executor, which is the stepping stone toward hosting workers in a separate service.
-- Stores configuration in layered YAML files so admins can preload stream URLs, pager tokens, alert rules, and UI preferences before sharing the app.
+- Stores configuration in JSON so admins can preload stream URLs, names, language defaults, and UI preferences before sharing the app.
 
 ## Primary Workflows
 ### 1. Preparing Streams
-- Define audio and pager streams in the layered YAML configuration files. The backend syncs the database to match the configured list on startup and whenever state is reset.
-- Open the app to see each configured stream with its name, URL, and status badge.
-- Provide `webhookToken` values for pager feeds in the configuration to activate the built-in `/api/pager-feeds/{streamId}?token=...` webhook endpoints.
-- Remove or add streams by editing configuration files and restarting the backend so every browser stays aligned.
-- Rename streams or adjust language defaults from the UI when needed; changes take effect immediately for all operators, but long-term updates should also be recorded in configuration.
+- Open the app to see each stream with its name, URL, and status badge.
+- Add an audio stream with a URL, optional name, and optional language. The backend validates the entry, acknowledges it, and saves it for all users.
+- Create a pager feed when no audio exists; the UI issues a webhook URL and token so CAD systems can post messages directly.
+- Remove unused streams; the update syncs to every user and persists on disk.
+- Rename streams to keep labels accurate; updates propagate instantly to every operator.
 - Skip the first seconds of Broadcastify streams automatically (30 seconds by default, configurable per stream).
 - Define combined stream views in configuration files to surface virtual conversations that merge transcripts from multiple audio or pager sources.
 - Restart streams that stall or pause; status updates instantly for every connected browser. If a remote HTTP stream drops unexpectedly, the backend attempts to reconnect immediately once and then only every ten minutes to avoid hammering the source.
@@ -61,7 +61,7 @@ transcribing multiple radio or pager feeds in real time.
 - Operators get toast errors for failed commands and green confirmations once the server accepts a request.
 
 ### 5. Automating or Integrating
-- Scripts can call the same HTTP endpoints as the frontend to start, stop, reset, or retune streams. Stream definitions themselves are managed exclusively through configuration files.
+- Scripts can call the same HTTP endpoints as the frontend to add, start, stop, or reset streams.
 - Pager feeds expose token-protected webhook URLs (`POST /api/pager-feeds/{streamId}?token=...`) so CAD systems can push messages without audio.
 - Append `format` to the webhook query (for example `format=cfs-flex`) to submit
   structured CAD payloads that the backend will normalise into readable
@@ -103,7 +103,7 @@ transcribing multiple radio or pager feeds in real time.
 - Install prerequisites (Python 3.10+, Node.js, npm, ffmpeg). The `start-app.sh` or `.ps1` helpers create a virtual environment, install dependencies, build the frontend, and start the FastAPI server; manual steps remain available.
 - Tune defaults in `state/config.yaml`, including sample rate, Whisper model, allowed browser origins, and initial UI settings (theme, transcript tools, export defaults). Configuration is YAML-only.
 - Define default keyword alerts in `state/config.yaml`. Operators can tweak rules during a session, but those tweaks persist only in memory until the backend restarts.
-- Unauthenticated visitors browse in read-only mode. Use the header sign-in button and shared editor password to unlock stream management, transcript controls, and exports.
+- Unauthenticated visitors browse in read-only mode. Use the header sign-in button and shared editor password to unlock transport controls (Start/Stop/Reset), transcript editing, and exports.
 - Stopping the server keeps saved streams and transcripts. Restarting reloads them; operators can still clear history via stream reset.
 - Recording flags persist across restarts; streams that were recording resume automatically.
 - Whisper model downloads are cached. The default uses `large-v3-turbo` on GPU and falls back to `base` on CPU. Expect a large first download and plan for capable hardware.
