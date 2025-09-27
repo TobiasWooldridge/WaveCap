@@ -524,7 +524,7 @@
 .transcript-thread {
   display: flex;
   gap: 0.85rem;
-  padding: 0.85rem 1rem;
+  padding: 0.425rem 0.5rem; /* halved from 0.85rem 1rem */
   background-color: rgba(var(--app-surface-subtle-rgb), 0.85);
   border: 1px solid rgba(var(--bs-border-color-rgb, 222, 226, 230), 0.7);
   border-radius: 0.9rem;
@@ -939,7 +939,7 @@
 .transcript-scroll-area__content {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 0.5rem; /* reduced spacing between transcript-thread items */
 }
 
 .transcript-scroll-area__sentinel {
