@@ -190,15 +190,33 @@ const StreamSidebar = ({
                       <span className="stream-sidebar__item-title">
                         {item.title}
                       </span>
-                      {item.type === "combined" ? (
-                        <span className="badge rounded-pill text-bg-primary-subtle text-primary-emphasis">
-                          Combined
-                        </span>
-                      ) : item.isPager ? (
-                        <span className="badge rounded-pill text-bg-info-subtle text-info-emphasis">
-                          Pager
-                        </span>
-                      ) : null}
+                      {(() => {
+                        if (item.type === "combined") {
+                          return (
+                            <span className="badge rounded-pill text-bg-primary-subtle text-primary-emphasis">
+                              Combined
+                            </span>
+                          );
+                        }
+                        if (item.isPager) {
+                          return (
+                            <span className="badge rounded-pill text-bg-info-subtle text-info-emphasis">
+                              Pager
+                            </span>
+                          );
+                        }
+                        const url = String(item.stream?.url || "");
+                        const isWeb = /^https?:\/\//i.test(url);
+                        return (
+                          <span className={`badge rounded-pill ${
+                            isWeb
+                              ? "text-bg-secondary-subtle text-secondary-emphasis"
+                              : "text-bg-warning-subtle text-warning-emphasis"
+                          }`}>
+                            {isWeb ? "Web" : "SDR"}
+                          </span>
+                        );
+                      })()}
                     </Flex>
                     <div className="stream-sidebar__item-preview text-body-secondary">
                       {item.previewText}

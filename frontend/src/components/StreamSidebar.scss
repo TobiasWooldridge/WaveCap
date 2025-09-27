@@ -220,6 +220,28 @@
   background-color: rgba(var(--app-neutral-rgb), 0.55);
 }
 
+/* Icon variant that inherits status colors */
+.stream-status-icon {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
+.stream-status-icon--active {
+  color: rgb(var(--app-success-rgb));
+}
+
+.stream-status-icon--queued {
+  color: rgb(var(--bs-info-rgb, 13, 202, 240));
+}
+
+.stream-status-icon--error {
+  color: rgb(var(--app-danger-rgb));
+}
+
+.stream-status-icon--idle {
+  color: rgba(var(--app-neutral-rgb), 0.65);
+}
+
 @media (max-width: 1199.98px) {
   .stream-sidebar-drawer {
     flex-basis: clamp(300px, 34vw, 360px);

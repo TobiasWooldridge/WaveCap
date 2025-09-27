@@ -1,4 +1,5 @@
 import clsx from "clsx";
+import { Bell, Globe, Layers, Radio } from "lucide-react";
 import type { Stream, TranscriptionResult } from "@types";
 
 type StreamStatusVariant = "active" | "queued" | "error" | "idle";
@@ -85,17 +86,31 @@ export const resolveStreamStatus = (
   return { variant: "idle", label: "Awaiting audio" };
 };
 
-const getStatusIndicatorClass = (variant: StreamStatusVariant): string => {
+// Legacy class mapping kept for compatibility; icon variant uses getIconStatusClass
+
+const getIconStatusClass = (variant: StreamStatusVariant): string => {
   switch (variant) {
     case "active":
-      return "stream-status-dot--active";
+      return "stream-status-icon--active";
     case "queued":
-      return "stream-status-dot--queued";
+      return "stream-status-icon--queued";
     case "error":
-      return "stream-status-dot--error";
+      return "stream-status-icon--error";
     default:
-      return "stream-status-dot--idle";
+      return "stream-status-icon--idle";
   }
+};
+
+const resolveStreamKind = (
+  stream: Stream,
+): "pager" | "combined" | "web" | "sdr" | "audio" => {
+  const source = stream.source ?? "audio";
+  if (source === "pager") return "pager";
+  if (source === "combined") return "combined";
+  const url = String(stream.url || "");
+  if (/^https?:\/\//i.test(url)) return "web";
+  if (source === "audio") return "sdr";
+  return "audio";
 };
 
 const StreamStatusIndicator = ({
@@ -107,12 +122,13 @@ const StreamStatusIndicator = ({
   textClassName,
 }: StreamStatusIndicatorProps) => {
   const { variant, label: defaultLabel } = resolveStreamStatus(stream);
-  const indicatorClass = getStatusIndicatorClass(variant);
+  const iconStatusClass = getIconStatusClass(variant);
   const resolvedLabel = label
     ? formatLabel(label)
     : formatLabel(defaultLabel);
   const tooltip = resolvedLabel ? toTitleCase(resolvedLabel) : undefined;
   const ariaLabel = showText ? undefined : tooltip;
+  const kind = resolveStreamKind(stream);
 
   return (
     <span
@@ -120,10 +136,32 @@ const StreamStatusIndicator = ({
       title={tooltip}
       aria-label={ariaLabel}
     >
-      <span
-        className={clsx("stream-status-dot", indicatorClass, dotClassName)}
-        aria-hidden="true"
-      />
+      {/* Icon colored by status, representing stream kind */}
+      {kind === "pager" ? (
+        <Bell
+          size={16}
+          className={clsx("stream-status-icon", iconStatusClass, dotClassName)}
+          aria-hidden="true"
+        />
+      ) : kind === "combined" ? (
+        <Layers
+          size={16}
+          className={clsx("stream-status-icon", iconStatusClass, dotClassName)}
+          aria-hidden="true"
+        />
+      ) : kind === "web" ? (
+        <Globe
+          size={16}
+          className={clsx("stream-status-icon", iconStatusClass, dotClassName)}
+          aria-hidden="true"
+        />
+      ) : (
+        <Radio
+          size={16}
+          className={clsx("stream-status-icon", iconStatusClass, dotClassName)}
+          aria-hidden="true"
+        />
+      )}
       {showText && resolvedLabel ? (
         <span className={clsx("stream-status-indicator__label", textClassName)}>
           {resolvedLabel}
