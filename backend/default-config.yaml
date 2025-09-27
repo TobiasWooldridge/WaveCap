@@ -80,24 +80,28 @@ ui:
 
 streams:
   - id: broadcastify-2653
-    name: South Australian State Emergency Service
+    name: SA SES Radio
     url: https://broadcastify.cdnstream1.com/2653
     enabled: true
     pinned: true
     ignoreFirstSeconds: 30
   - id: broadcastify-34010
-    name: Primary Emergency Services - Statewide NSW
+    name: NSW - Primary Emergency Services
     url: https://broadcastify.cdnstream1.com/34010
     enabled: true
     ignoreFirstSeconds: 30
+  - id: 4bb38cec-4662-4a3a-b83f-59685e81045d
+    name: SA SES Pager Gateway
+    source: pager
+    webhookToken: replace-me
 
 combinedStreamViews:
   - id: aus-emergency-overview
-    name: Australian emergency dispatch overview
-    description: Combined view of the bundled Broadcastify demo feeds.
+    name: SA SES Radio+pager
+    description: Adelaide SES radio and pager combined view
     streamIds:
       - broadcastify-2653
-      - broadcastify-34010
+      - 4bb38cec-4662-4a3a-b83f-59685e81045d
 
 alerts:
   enabled: true

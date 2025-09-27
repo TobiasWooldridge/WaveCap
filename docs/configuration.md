@@ -4,9 +4,9 @@ This project keeps runtime settings alongside the backend code and in the `state
 
 - `backend/default-config.yaml` – shipping defaults that should be kept under version control. The YAML file includes inline comments that explain each Whisper tuning knob right next to the value.
 - (Optional) `state/default-config.yaml` – a deployment-specific defaults file. If present, it loads after `backend/default-config.yaml` but before `state/config.yaml`.
-- `state/config.yaml` – optional overrides for your environment. The backend auto-creates this file with helpful comments on first launch.
+- `state/config.yaml` – optional overrides for your environment. When the file is missing, the backend copies `backend/default-config.yaml`, preserves the inline notes, and rotates any placeholder secrets (pager webhook tokens, shared passwords) before writing it to disk.
 
-YAML supports inline comments, so feel free to document why a value was chosen directly inside the file.
+YAML supports inline comments, so feel free to document why a value was chosen directly inside the file. On first launch, the generated `state/config.yaml` is a verbatim copy of the shipped defaults with fresh secrets already substituted, so operators can tweak the file immediately without exposing repository placeholders in production.
 
 Preload audio feeds by editing the shared `streams` list inside any of the configuration files above. Overrides replace the previously defined list, so set it to an empty array when you want a deployment to start without predefined streams.
 
@@ -74,6 +74,9 @@ streams:
 ```
 
 Pager streams always run in real time, so `enabled` and `ignoreFirstSeconds` are ignored. Provide a `url` only when you need to serve the webhook from a custom path instead of the default `/api/pager-feeds/<streamId>` route.
+
+When the backend scaffolds `state/config.yaml` it copies the shipped pager examples and swaps any `webhookToken: replace-me`
+placeholders with unique, random tokens so you can use the webhook immediately without editing secrets by hand.
 
 When the CAD system emits a known structured payload, add `&format=<name>` to the webhook URL so the backend can normalise it automatically. For example, South Australia CFS Flex dispatch posts can be delivered with `&format=cfs-flex`, allowing the backend to extract the incident number, address, alarm level, talkgroup, and supporting details without requiring a separate middleware script.
 
@@ -147,7 +150,8 @@ access:
 - `tokenTtlMinutes`: Optional session duration in minutes. Set it to `null` (or remove the field) for non-expiring tokens.
 - `credentials`: List of shared passwords. Each entry accepts an optional `identifier` for deployments that integrate with a
   custom sign-in form. The bundled frontend only prompts for the password, so leave `identifier` unset unless you handle the
-  extra field yourself. Update `change-me` before exposing the app to real operators.
+  extra field yourself. When the backend scaffold copies `backend/default-config.yaml` into `state/config.yaml`, any `change-me`
+  placeholders are replaced with a random password so every deployment starts with a unique shared secret.
 
 ## UI defaults
 

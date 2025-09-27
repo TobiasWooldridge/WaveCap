@@ -5,7 +5,7 @@ from pathlib import Path
 import wavecap_backend.config as config_module
 from wavecap_backend.auth import AuthManager
 from wavecap_backend.config import load_config
-from wavecap_backend.models import AccessRole, TranscriptionReviewStatus
+from wavecap_backend.models import AccessRole, StreamSource, TranscriptionReviewStatus
 from wavecap_backend.state_paths import PROJECT_ROOT
 
 
@@ -59,7 +59,30 @@ def test_default_config_supports_password_only_login() -> None:
 
     assert config.access.credentials
     assert config.access.credentials[0].identifier is None
+    password = config.access.credentials[0].password
+    assert password != "change-me"
 
-    session = auth.authenticate("change-me")
+    session = auth.authenticate(password)
 
     assert session.role == AccessRole.EDITOR
+
+
+def test_config_scaffold_rotates_secrets(tmp_path: Path) -> None:
+    """Creating state/config.yaml injects fresh secrets instead of placeholders."""
+
+    config_path = config_module.resolve_state_path("config.yaml")
+    assert not config_path.exists()
+
+    config = load_config()
+
+    assert config_path.exists()
+    contents = config_path.read_text()
+    assert "replace-me" not in contents
+    assert "change-me" not in contents
+
+    pager = next(stream for stream in config.streams if stream.source == StreamSource.PAGER)
+    assert pager.webhookToken is not None
+    assert len(pager.webhookToken) >= 20
+
+    credential = config.access.credentials[0]
+    assert credential.password != "change-me"
