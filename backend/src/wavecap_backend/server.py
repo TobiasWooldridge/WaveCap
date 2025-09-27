@@ -61,6 +61,7 @@ from .models import (
 )
 from .pager_formats import parse_pager_webhook_payload
 from .state_paths import PROJECT_ROOT, RECORDINGS_DIR, resolve_state_path
+from .request_utils import describe_remote_client
 from .stream_manager import StreamManager
 from .whisper_transcriber import (
     AbstractTranscriber,
@@ -124,8 +125,7 @@ async def stream_events(
     token: Optional[str],
     initial_role: AccessRole,
 ) -> None:
-    client = websocket.client
-    client_label = f"{client.host}:{client.port}" if client else "unknown-client"
+    client_label = describe_remote_client(websocket.headers, websocket.client)
     current_role = initial_role
     LOGGER.info(
         "WebSocket connection established from %s with role %s",
