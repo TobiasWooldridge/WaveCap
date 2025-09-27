@@ -1,10 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { ArrowDownCircle, List, Pause, Play, Radio } from "lucide-react";
 import { Stream, TranscriptionResult } from "@types";
 import { useUISettings } from "../contexts/UISettingsContext";
@@ -16,13 +10,11 @@ import {
   isBlankAudioText,
   isSystemTranscription,
 } from "../utils/transcriptions";
-import { setAudioElementSource } from "../utils/audio";
+import { useTranscriptionAudioPlayback } from "../hooks/useTranscriptionAudioPlayback";
 import {
-  advancePlaybackQueue,
   buildPlaybackQueue,
   dedupeAndSortTranscriptions,
   getRecordingElementId,
-  type PlaybackQueueState,
 } from "./StreamTranscriptionPanel.logic";
 import { Timestamp } from "./primitives/Timestamp.react";
 import Button from "./primitives/Button.react";
@@ -89,9 +81,11 @@ const useCombinedEntries = (
     return sorted;
   }, [streams, limit]);
 
-export const CombinedTranscriptionLog: React.FC<
-  CombinedTranscriptionLogProps
-> = ({ streams, loading = false, limit = 400 }) => {
+export const CombinedTranscriptionLog: React.FC<CombinedTranscriptionLogProps> = ({
+  streams,
+  loading = false,
+  limit = 400,
+}) => {
   const { transcriptCorrectionEnabled } = useUISettings();
   const {
     attachRef,
@@ -102,29 +96,15 @@ export const CombinedTranscriptionLog: React.FC<
   } = useAutoScroll();
   const latestEntryKeyRef = useRef<string | null>(null);
   const previousCountRef = useRef(0);
-  const [playingRecording, setPlayingRecording] = useState<string | null>(null);
-  const [playingTranscriptionId, setPlayingTranscriptionId] = useState<
-    string | null
-  >(null);
-  const [playingSegment, setPlayingSegment] = useState<string | null>(null);
-  const [currentPlayTime, setCurrentPlayTime] = useState<number>(0);
-  const [playbackQueue, setPlaybackQueue] = useState<PlaybackQueueState | null>(
-    null,
-  );
-  const playbackQueueRef = useRef<PlaybackQueueState | null>(null);
-  const recordingAudioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
-
-  useEffect(() => {
-    playbackQueueRef.current = playbackQueue;
-  }, [playbackQueue]);
-
-  const updatePlaybackQueue = useCallback(
-    (queue: PlaybackQueueState | null) => {
-      playbackQueueRef.current = queue;
-      setPlaybackQueue(queue);
-    },
-    [],
-  );
+  const {
+    recordingAudioRefs,
+    playingRecording,
+    playingTranscriptionId,
+    playingSegment,
+    playRecording,
+    playSegment,
+    isSegmentCurrentlyPlaying,
+  } = useTranscriptionAudioPlayback();
 
   const combinedEntries = useCombinedEntries(streams, limit);
   const transcriptionsByStream = useMemo(() => {
@@ -197,306 +177,11 @@ export const CombinedTranscriptionLog: React.FC<
     latestEntryKeyRef.current = latestKey;
   }, [combinedEntries, notifyContentChanged]);
 
-  const resetAudioPlaybackState = useCallback(
-    (audio: HTMLAudioElement | null, options?: { clearQueue?: boolean }) => {
-      if (audio) {
-        audio.loop = false;
-        audio.ontimeupdate = null;
-        audio.onended = null;
-        audio.onerror = null;
-      }
+  // audio playback details are handled by useTranscriptionAudioPlayback
 
-      setPlayingRecording(null);
-      setPlayingTranscriptionId(null);
-      setPlayingSegment(null);
-      setCurrentPlayTime(0);
+  // stopCurrentRecording handled by hook cleanup
 
-      if (options?.clearQueue ?? true) {
-        updatePlaybackQueue(null);
-      }
-    },
-    [updatePlaybackQueue],
-  );
-
-  const stopCurrentRecording = useCallback(() => {
-    if (!playingRecording) {
-      return;
-    }
-
-    const currentAudio = recordingAudioRefs.current[playingRecording] ?? null;
-    if (currentAudio) {
-      try {
-        currentAudio.pause();
-      } catch {
-        // Ignore pause errors
-      }
-    }
-
-    resetAudioPlaybackState(currentAudio, { clearQueue: true });
-  }, [playingRecording, resetAudioPlaybackState]);
-
-  useEffect(
-    () => () => {
-      stopCurrentRecording();
-    },
-    [stopCurrentRecording],
-  );
-
-  const isSegmentCurrentlyPlaying = useCallback(
-    (recordingUrl: string | undefined, startTime: number, endTime: number) => {
-      if (!recordingUrl || !playingRecording) {
-        return false;
-      }
-
-      const recordingId = getRecordingElementId(recordingUrl);
-      if (playingRecording !== recordingId) {
-        return false;
-      }
-
-      return currentPlayTime >= startTime && currentPlayTime <= endTime;
-    },
-    [playingRecording, currentPlayTime],
-  );
-
-  const playRecording = useCallback(
-    (
-      transcription: TranscriptionResult,
-      options?: { queue?: PlaybackQueueState },
-    ) => {
-      if (!transcription.recordingUrl) {
-        console.warn("⚠️ No recording available for this transcription");
-      return;
-    }
-
-    const recordingId = getRecordingElementId(transcription.recordingUrl);
-    const audio = recordingAudioRefs.current[recordingId] ?? null;
-
-    if (!audio) {
-      console.error(`❌ Audio element not found: ${recordingId}`);
-      return;
-    }
-
-      setAudioElementSource(audio, transcription.recordingUrl);
-
-      const startOffset = Math.max(0, transcription.recordingStartOffset ?? 0);
-
-      if (
-        playingRecording === recordingId &&
-        playingTranscriptionId === transcription.id
-      ) {
-        stopCurrentRecording();
-        audio.currentTime = startOffset;
-        return;
-      }
-
-      if (playingRecording && playingRecording !== recordingId) {
-        stopCurrentRecording();
-      }
-
-      if (options?.queue) {
-        updatePlaybackQueue(options.queue);
-      } else {
-        updatePlaybackQueue(null);
-      }
-
-      setPlayingRecording(recordingId);
-      setPlayingTranscriptionId(transcription.id);
-      setPlayingSegment(null);
-
-      const handleEnded = () => {
-        const advance = advancePlaybackQueue(
-          playbackQueueRef.current,
-          transcription,
-        );
-        if (advance) {
-          resetAudioPlaybackState(audio, { clearQueue: false });
-          updatePlaybackQueue(advance.nextQueue);
-          setTimeout(() => {
-            playRecording(advance.nextTranscription, {
-              queue: advance.nextQueue,
-            });
-          }, 0);
-          return;
-        }
-
-        resetAudioPlaybackState(audio);
-      };
-
-      const handleError = (error: Event | string) => {
-        console.error("❌ Error playing audio:", error);
-        resetAudioPlaybackState(audio);
-      };
-
-      const updateTime = () => {
-        setCurrentPlayTime(audio.currentTime);
-      };
-
-      const startPlayback = () => {
-        audio.loop = false;
-        audio.currentTime = startOffset;
-        setCurrentPlayTime(startOffset);
-        audio.ontimeupdate = updateTime;
-        audio.onended = handleEnded;
-        audio.onerror = handleError;
-
-        audio.play().catch((error) => {
-          console.error("❌ Error starting audio playback:", error);
-          resetAudioPlaybackState(audio);
-        });
-      };
-
-      if (audio.readyState >= 2) {
-        startPlayback();
-      } else {
-        const onReady = () => {
-          audio.removeEventListener("loadeddata", onReady);
-          audio.removeEventListener("canplay", onReady);
-          startPlayback();
-        };
-
-        audio.addEventListener("loadeddata", onReady, { once: true });
-        audio.addEventListener("canplay", onReady, { once: true });
-        if (audio.readyState === 0) {
-          audio.load();
-        }
-      }
-    },
-    [
-      playingRecording,
-      playingTranscriptionId,
-      resetAudioPlaybackState,
-      stopCurrentRecording,
-      updatePlaybackQueue,
-    ],
-  );
-
-  const playSegment = useCallback(
-    (
-      recordingUrl: string,
-      startTime: number | undefined,
-      endTime: number | undefined,
-      transcriptionId: string,
-      options?: { recordingStartOffset?: number },
-    ) => {
-      const recordingId = getRecordingElementId(recordingUrl);
-      const audio = recordingAudioRefs.current[recordingId] ?? null;
-
-      if (!audio) {
-        console.error(`❌ Audio element not found: ${recordingId}`);
-        return;
-      }
-
-      setAudioElementSource(audio, recordingUrl);
-
-      if (playingRecording && playingRecording !== recordingId) {
-        stopCurrentRecording();
-      }
-
-      const safeStart =
-        typeof startTime === "number" && Number.isFinite(startTime)
-          ? startTime
-          : null;
-      const safeEnd =
-        typeof endTime === "number" && Number.isFinite(endTime)
-          ? endTime
-          : null;
-      const recordingOffset =
-        typeof options?.recordingStartOffset === "number" &&
-        Number.isFinite(options.recordingStartOffset)
-          ? Math.max(0, options.recordingStartOffset)
-          : null;
-
-      const playbackStart =
-        safeStart !== null && safeStart > 0
-          ? safeStart
-          : (recordingOffset ??
-            (safeStart !== null ? Math.max(0, safeStart) : 0));
-      const segmentDuration =
-        safeEnd !== null && safeStart !== null
-          ? Math.max(0, safeEnd - safeStart)
-          : null;
-
-      let playbackEnd =
-        segmentDuration !== null
-          ? playbackStart + segmentDuration
-          : safeEnd !== null && safeEnd > playbackStart
-            ? safeEnd
-            : playbackStart;
-
-      if (!Number.isFinite(playbackEnd)) {
-        playbackEnd = playbackStart;
-      }
-
-      if (playbackEnd <= playbackStart) {
-        playbackEnd = playbackStart + 0.25;
-      }
-
-      const segmentKey = `${recordingId}-${startTime ?? playbackStart}-${endTime ?? playbackEnd}`;
-
-      updatePlaybackQueue(null);
-      setPlayingRecording(recordingId);
-      setPlayingTranscriptionId(transcriptionId);
-      setPlayingSegment(segmentKey);
-
-      const handleError = (error: Event | string) => {
-        console.error("❌ Error playing audio:", error);
-        resetAudioPlaybackState(audio);
-      };
-
-      const handleSegmentTimeUpdate = () => {
-        const nextTime = audio.currentTime;
-        setCurrentPlayTime(nextTime);
-
-        const completionThreshold = Math.max(playbackStart, playbackEnd - 0.05);
-
-        if (nextTime >= completionThreshold) {
-          setPlayingSegment((current) =>
-            current === segmentKey ? null : current,
-          );
-        }
-      };
-
-      const handleEnded = () => {
-        resetAudioPlaybackState(audio);
-      };
-
-      const startPlayback = () => {
-        audio.loop = false;
-        audio.currentTime = Math.max(0, playbackStart);
-        setCurrentPlayTime(Math.max(0, playbackStart));
-        audio.ontimeupdate = handleSegmentTimeUpdate;
-        audio.onended = handleEnded;
-        audio.onerror = handleError;
-
-        audio.play().catch((error) => {
-          console.error("❌ Error starting audio playback:", error);
-          resetAudioPlaybackState(audio);
-        });
-      };
-
-      if (audio.readyState >= 2) {
-        startPlayback();
-      } else {
-        const onReady = () => {
-          audio.removeEventListener("loadeddata", onReady);
-          audio.removeEventListener("canplay", onReady);
-          startPlayback();
-        };
-
-        audio.addEventListener("loadeddata", onReady, { once: true });
-        audio.addEventListener("canplay", onReady, { once: true });
-        if (audio.readyState === 0) {
-          audio.load();
-        }
-      }
-    },
-    [
-      playingRecording,
-      resetAudioPlaybackState,
-      stopCurrentRecording,
-      updatePlaybackQueue,
-    ],
-  );
+  // isSegmentCurrentlyPlaying provided by hook
 
   const handlePlayAll = useCallback(
     (
@@ -504,16 +189,11 @@ export const CombinedTranscriptionLog: React.FC<
       transcription: TranscriptionResult,
       orderedTranscriptions: TranscriptionResult[],
     ) => {
-      const queue = buildPlaybackQueue(
-        streamId,
-        orderedTranscriptions,
-        transcription.id,
-      );
+      const queue = buildPlaybackQueue(streamId, orderedTranscriptions, transcription.id);
       if (queue) {
         playRecording(transcription, { queue });
         return;
       }
-
       playRecording(transcription);
     },
     [playRecording],
