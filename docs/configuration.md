@@ -8,7 +8,7 @@ This project keeps runtime settings alongside the backend code and in the `state
 
 YAML supports inline comments, so feel free to document why a value was chosen directly inside the file.
 
-Preload audio feeds by editing the shared `defaultStreams` list inside any of the configuration files above. Overrides replace the previously defined list, so set it to an empty array when you want a deployment to start without predefined streams.
+Preload audio feeds by editing the shared `streams` list inside any of the configuration files above. Overrides replace the previously defined list, so set it to an empty array when you want a deployment to start without predefined streams.
 
 ## Combined stream views
 
@@ -63,16 +63,26 @@ server:
 
 ## Pager feeds
 
-Some agencies publish pager updates without a backing audio stream. Add these sources as *pager* streams in your configuration files or via the `/api/streams` endpoint by sending `{ "source": "pager" }`. The backend returns a token-protected webhook at `/api/pager-feeds/<streamId>?token=<token>`; POST JSON with at least a `message` field (plus optional `sender`, `details`, or `priority`) and the text appears instantly in the UI alongside audio transcripts. Tokens persist in `state/runtime.sqlite`; delete and recreate the stream if you ever need to rotate the token.
+Some agencies publish pager updates without a backing audio stream. Add these sources as *pager* streams in your configuration files by setting `source: pager` and providing a `webhookToken` under the `streams` list. The backend exposes a token-protected webhook at `/api/pager-feeds/<streamId>?token=<token>`; POST JSON with at least a `message` field (plus optional `sender`, `details`, or `priority`) and the text appears instantly in the UI alongside audio transcripts. Tokens persist in `state/runtime.sqlite`; delete and recreate the stream entry if you ever need to rotate the token.
+
+```yaml
+streams:
+  - id: city-pager
+    name: City pager feed
+    source: pager
+    webhookToken: super-secret-token
+```
+
+Pager streams always run in real time, so `enabled` and `ignoreFirstSeconds` are ignored. Provide a `url` only when you need to serve the webhook from a custom path instead of the default `/api/pager-feeds/<streamId>` route.
 
 When the CAD system emits a known structured payload, add `&format=<name>` to the webhook URL so the backend can normalise it automatically. For example, South Australia CFS Flex dispatch posts can be delivered with `&format=cfs-flex`, allowing the backend to extract the incident number, address, alarm level, talkgroup, and supporting details without requiring a separate middleware script.
 
 ## Audio stream pre-roll trimming
 
-Dispatch providers such as Broadcastify play an advertisement or dial tone before the feed goes live. The backend automatically skips the first 30 seconds for Broadcastify feeds when no override is provided so operators are never greeted by the ad. Set `ignoreFirstSeconds` on any audio stream to customise the pre-roll trimming window. Configure the value in `defaultStreams` or via `state/config.yaml`. A value of `30` skips the first half-minute, which matches the Broadcastify ad length.
+Dispatch providers such as Broadcastify play an advertisement or dial tone before the feed goes live. The backend automatically skips the first 30 seconds for Broadcastify feeds when no override is provided so operators are never greeted by the ad. Set `ignoreFirstSeconds` on any audio stream to customise the pre-roll trimming window. Configure the value in `streams` or via `state/config.yaml`. A value of `30` skips the first half-minute, which matches the Broadcastify ad length.
 
 ```yaml
-defaultStreams:
+streams:
   - id: broadcastify-2653
     name: Broadcastify Stream 2653
     url: https://broadcastify.cdnstream1.com/2653

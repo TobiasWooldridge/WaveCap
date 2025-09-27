@@ -78,7 +78,7 @@ ui:
     - corrected
     - verified
 
-defaultStreams:
+streams:
   - id: broadcastify-2653
     name: South Australian State Emergency Service
     url: https://broadcastify.cdnstream1.com/2653

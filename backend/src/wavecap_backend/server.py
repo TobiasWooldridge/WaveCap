@@ -44,7 +44,6 @@ from .logging_utils import configure_logging, record_frontend_event
 from .models import (
     AccessDescriptor,
     AccessRole,
-    AddStreamRequest,
     AppConfig,
     ExportTranscriptionsRequest,
     LoginRequest,
@@ -193,8 +192,6 @@ async def stream_events(
             request_id,
         )
         editor_actions = {
-            "add_stream",
-            "remove_stream",
             "start_transcription",
             "stop_transcription",
             "reset_stream",
@@ -204,27 +201,7 @@ async def stream_events(
             if not await ensure_editor(request_id):
                 return
         try:
-            if action == "add_stream":
-                payload = {
-                    key: message.get(key)
-                    for key in (
-                        "id",
-                        "url",
-                        "name",
-                        "language",
-                        "source",
-                        "ignoreFirstSeconds",
-                    )
-                    if key in message
-                }
-                request = AddStreamRequest.model_validate(payload)
-                await manager.add_stream(request)
-            elif action == "remove_stream":
-                stream_id = message.get("streamId")
-                if not isinstance(stream_id, str) or not stream_id:
-                    raise ValueError("streamId is required")
-                await manager.remove_stream(stream_id)
-            elif action == "start_transcription":
+            if action == "start_transcription":
                 stream_id = message.get("streamId")
                 if not isinstance(stream_id, str) or not stream_id:
                     raise ValueError("streamId is required")
@@ -490,17 +467,6 @@ def create_app() -> FastAPI:
 
         return streams
 
-    @app.post("/api/streams", response_model=Stream)
-    async def create_stream(
-        request: AddStreamRequest,
-        state: AppState = Depends(get_state),
-        _: AccessRole = Depends(require_editor_role),
-    ) -> Stream:
-        try:
-            return await state.stream_manager.add_stream(request)
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-
     @app.patch("/api/streams/{stream_id}", response_model=Stream)
     async def update_stream(
         stream_id: str,
@@ -513,15 +479,6 @@ def create_app() -> FastAPI:
         except ValueError as exc:
             status_code = 404 if str(exc) == "Stream not found" else 400
             raise HTTPException(status_code=status_code, detail=str(exc)) from exc
-
-    @app.delete("/api/streams/{stream_id}")
-    async def delete_stream(
-        stream_id: str,
-        state: AppState = Depends(get_state),
-        _: AccessRole = Depends(require_editor_role),
-    ) -> Response:
-        await state.stream_manager.remove_stream(stream_id)
-        return Response(status_code=204)
 
     @app.post("/api/streams/{stream_id}/start")
     async def start_stream(

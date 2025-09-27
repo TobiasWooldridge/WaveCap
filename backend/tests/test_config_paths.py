@@ -23,9 +23,9 @@ def test_load_config_uses_repository_defaults() -> None:
     config = load_config()
     assert config_module.resolve_state_path("config.yaml").exists()
     assert config.server.corsOrigin == "*"
-    assert any(stream.id == "broadcastify-2653" for stream in config.defaultStreams)
+    assert any(stream.id == "broadcastify-2653" for stream in config.streams)
     target = next(
-        stream for stream in config.defaultStreams if stream.id == "broadcastify-2653"
+        stream for stream in config.streams if stream.id == "broadcastify-2653"
     )
     assert target.ignoreFirstSeconds == 30
     assert config.ui.themeMode.value == "system"
@@ -43,11 +43,11 @@ def test_state_config_can_clear_default_streams(tmp_path: Path) -> None:
     """Users can override the shipped streams by setting an empty list."""
 
     override_path = tmp_path / "config.yaml"
-    override_path.write_text("defaultStreams: []\ncombinedStreamViews: []\n")
+    override_path.write_text("streams: []\ncombinedStreamViews: []\n")
 
     config = load_config()
 
-    assert config.defaultStreams == []
+    assert config.streams == []
     assert config.combinedStreamViews == []
 
 

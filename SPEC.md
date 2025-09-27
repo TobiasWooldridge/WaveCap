@@ -11,15 +11,15 @@ transcribing multiple radio or pager feeds in real time.
 - Ships as one FastAPI service that serves the API and web app; install Python 3.10+, Node.js/npm, and ffmpeg, or use the provided Dockerfile/Compose setup.
 - Runs on one machine or small server; every browser session connects to the same state through HTTP and WebSocket endpoints.
 - Keeps Whisper inference off the FastAPI event loop by routing transcription jobs through a shared thread-based executor, which is the stepping stone toward hosting workers in a separate service.
-- Stores configuration in JSON so admins can preload stream URLs, names, language defaults, and UI preferences before sharing the app.
+- Stores configuration in layered YAML files so admins can preload stream URLs, pager tokens, alert rules, and UI preferences before sharing the app.
 
 ## Primary Workflows
 ### 1. Preparing Streams
-- Open the app to see each stream with its name, URL, and status badge.
-- Add an audio stream with a URL, optional name, and optional language. The backend validates the entry, acknowledges it, and saves it for all users.
-- Create a pager feed when no audio exists; the UI issues a webhook URL and token so CAD systems can post messages directly.
-- Remove unused streams; the update syncs to every user and persists on disk.
-- Rename streams to keep labels accurate; updates propagate instantly to every operator.
+- Define audio and pager streams in the layered YAML configuration files. The backend syncs the database to match the configured list on startup and whenever state is reset.
+- Open the app to see each configured stream with its name, URL, and status badge.
+- Provide `webhookToken` values for pager feeds in the configuration to activate the built-in `/api/pager-feeds/{streamId}?token=...` webhook endpoints.
+- Remove or add streams by editing configuration files and restarting the backend so every browser stays aligned.
+- Rename streams or adjust language defaults from the UI when needed; changes take effect immediately for all operators, but long-term updates should also be recorded in configuration.
 - Skip the first seconds of Broadcastify streams automatically (30 seconds by default, configurable per stream).
 - Define combined stream views in configuration files to surface virtual conversations that merge transcripts from multiple audio or pager sources.
 - Restart streams that stall or pause; status updates instantly for every connected browser. If a remote HTTP stream drops unexpectedly, the backend attempts to reconnect immediately once and then only every ten minutes to avoid hammering the source.
@@ -61,7 +61,7 @@ transcribing multiple radio or pager feeds in real time.
 - Operators get toast errors for failed commands and green confirmations once the server accepts a request.
 
 ### 5. Automating or Integrating
-- Scripts can call the same HTTP endpoints as the frontend to add, start, stop, or reset streams.
+- Scripts can call the same HTTP endpoints as the frontend to start, stop, reset, or retune streams. Stream definitions themselves are managed exclusively through configuration files.
 - Pager feeds expose token-protected webhook URLs (`POST /api/pager-feeds/{streamId}?token=...`) so CAD systems can push messages without audio.
 - Append `format` to the webhook query (for example `format=cfs-flex`) to submit
   structured CAD payloads that the backend will normalise into readable

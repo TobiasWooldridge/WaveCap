@@ -114,7 +114,7 @@ All of the commands above set the `WAVECAP_FIXTURES` environment variable to `sc
 
 ## Features
 
-- **Multiple Stream Support** – add, remove, and manage multiple audio streams simultaneously.
+- **Multiple Stream Support** – configure audio or pager streams via YAML and manage them with start/stop/reset controls during a session.
 - **Real-time Transcription** – live transcription updates delivered over WebSocket.
 - **SQLite Persistence** – streams and transcripts survive restarts; recordings are saved as WAV files.
 - **Multi-user Awareness** – any number of browsers can monitor the same control plane.
@@ -153,7 +153,7 @@ Configuration is layered across the backend and the `state/` directory:
 Write actions are available without a login prompt so local and demo deployments stay frictionless. Override any setting in
 `state/config.yaml` to keep customisations separate from the shipped defaults.
 
-Default streams are managed via the `defaultStreams` block in these configuration files so operators can pre-load known feeds before sharing the app.
+Streams are managed via the `streams` block in these configuration files so operators can pre-load known feeds (audio or pager) before sharing the app. Edit this list and restart the backend to add or remove sources.
 
 For detailed guidance on tuning transcription latency versus accuracy, see the
 [Configuration & Transcription Tuning Guide](docs/configuration.md).
@@ -161,8 +161,6 @@ For detailed guidance on tuning transcription latency versus accuracy, see the
 ## API Endpoints
 
 - `GET /api/streams` – list streams.
-- `POST /api/streams` – add a stream.
-- `DELETE /api/streams/:id` – remove a stream.
 - `POST /api/streams/:id/start` – start transcription.
 - `POST /api/streams/:id/stop` – stop transcription.
 - `POST /api/streams/:id/reset` – delete history and recordings.
