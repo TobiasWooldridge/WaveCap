@@ -5,15 +5,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import {
-  Activity,
-  AlertTriangle,
-  ArrowDownCircle,
-  List,
-  Pause,
-  Play,
-  Radio,
-} from "lucide-react";
+import { ArrowDownCircle, List, Pause, Play, Radio } from "lucide-react";
 import { Stream, TranscriptionResult } from "@types";
 import { useUISettings } from "../contexts/UISettingsContext";
 import { useAutoScroll } from "../hooks/useAutoScroll";
@@ -35,6 +27,8 @@ import {
 import { Timestamp } from "./primitives/Timestamp.react";
 import Button from "./primitives/Button.react";
 import { TranscriptionSegmentChips } from "./TranscriptionSegmentChips.react";
+import { AlertChips } from "./chips/AlertChips.react";
+import { SystemEventChip } from "./chips/SystemEventChip.react";
 
 interface CombinedTranscriptionLogProps {
   streams: Stream[];
@@ -531,12 +525,7 @@ export const CombinedTranscriptionLog: React.FC<
     const alertTriggers = getNotifiableAlerts(transcription.alerts);
     if (alertTriggers.length > 0) {
       parts.push(
-        <span key="alerts" className="chip-button chip-button--danger">
-          <AlertTriangle size={14} />
-          {alertTriggers
-            .map((trigger) => trigger.label || trigger.ruleId)
-            .join(", ")}
-        </span>,
+        <AlertChips key="alerts" triggers={alertTriggers} mode="collapsed" />,
       );
     }
 
@@ -650,17 +639,14 @@ export const CombinedTranscriptionLog: React.FC<
               const chipElements: React.ReactNode[] = [];
 
               if (isSystemEvent) {
-                const label =
-                  displayText ?? transcription.text ?? "System event";
+                const label = displayText ?? transcription.text ?? "System event";
                 if (label) {
                   chipElements.push(
-                    <span
+                    <SystemEventChip
                       key={`${transcription.id}-system`}
-                      className="chip-button chip-button--surface transcript-system-event"
-                    >
-                      <Activity size={14} />
-                      {label}
-                    </span>,
+                      label={label}
+                      eventType={transcription.eventType}
+                    />,
                   );
                 }
               } else if (recordingUrl && recordingId) {
