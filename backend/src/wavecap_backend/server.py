@@ -431,6 +431,15 @@ def create_app() -> FastAPI:
     async def ui_config(state: AppState = Depends(get_state)) -> dict:
         return state.config.ui.model_dump(by_alias=True)
 
+    @app.get("/api/combined-stream-views")
+    async def combined_stream_views(
+        state: AppState = Depends(get_state),
+    ) -> list[dict[str, Any]]:
+        return [
+            view.model_dump(by_alias=True)
+            for view in state.config.combinedStreamViews
+        ]
+
     @app.post("/api/logs/frontend")
     async def frontend_log(
         payload: dict, state: AppState = Depends(get_state)

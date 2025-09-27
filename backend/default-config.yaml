@@ -90,6 +90,14 @@ defaultStreams:
     enabled: true
     ignoreFirstSeconds: 30
 
+combinedStreamViews:
+  - id: aus-emergency-overview
+    name: Australian emergency dispatch overview
+    description: Combined view of the bundled Broadcastify demo feeds.
+    streamIds:
+      - broadcastify-2653
+      - broadcastify-34010
+
 alerts:
   enabled: true
   rules:

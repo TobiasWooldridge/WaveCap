@@ -58,6 +58,16 @@ def login_headers(client: TestClient) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def test_combined_stream_views_endpoint(patched_app: TestClient):
+    client = patched_app
+
+    response = client.get("/api/combined-stream-views")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert isinstance(body, list)
+
+
 def test_stream_management_api(patched_app: TestClient):
     client = patched_app
 

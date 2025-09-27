@@ -21,6 +21,7 @@ transcribing multiple radio or pager feeds in real time.
 - Remove unused streams; the update syncs to every user and persists on disk.
 - Rename streams to keep labels accurate; updates propagate instantly to every operator.
 - Skip the first seconds of Broadcastify streams automatically (30 seconds by default, configurable per stream).
+- Define combined stream views in configuration files to surface virtual conversations that merge transcripts from multiple audio or pager sources.
 - Restart streams that stall or pause; status updates instantly for every connected browser. If a remote HTTP stream drops unexpectedly, the backend attempts to reconnect immediately once and then only every ten minutes to avoid hammering the source.
 - Each stream tracks two state fields: an **enabled** flag that records the operator's intent, and a **status** flag that reflects the backend's actual progress (stopped, queued, transcribing, or error). Start/Stop actions flip the enabled flag; the backend keeps trying to make the status match.
 
@@ -86,6 +87,7 @@ transcribing multiple radio or pager feeds in real time.
 - **Conversation Workspace**: Messenger-style layout with a sidebar that sorts streams by activity and shows unread indicators. When no streams exist, the pane reminds operators to define them in the configuration files.
 - **Metrics Cards**: Show active stream counts, transcript totals, average confidence, and processed audio time.
 - **Stream Sidebar**: Lists configured streams, highlights status at a glance, and surfaces Start/Stop controls inside each conversation header with Reset tucked behind a "More actions" overflow button. Streams themselves are defined in YAML configuration files.
+- **Combined Views**: Virtual sidebar entries configured in YAML that merge the activity of multiple streams into a single conversation. They show aggregated status indicators but omit transport controls so operators manage the underlying sources directly.
 - **Transcript Panel**: Fills the conversation pane with grouped bursts, timestamps (in the viewer's timezone), confidence colours, and inline playback. Segments keep their width while playing so text does not shift. Conversations stay anchored to the latest entries, auto-scroll at the live edge, and reveal a "Go to latest" pill when the user scrolls up.
 - **Global Controls**: Surface red error toasts and green confirmations after actions.
 - **Transcript Correction Toggle**: Header checkbox (editors only) that hides or shows review badges, editing tools, and exports.

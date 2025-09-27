@@ -10,6 +10,27 @@ YAML supports inline comments, so feel free to document why a value was chosen d
 
 Preload audio feeds by editing the shared `defaultStreams` list inside any of the configuration files above. Overrides replace the previously defined list, so set it to an empty array when you want a deployment to start without predefined streams.
 
+## Combined stream views
+
+The `combinedStreamViews` list defines virtual streams that merge transcripts from two or more existing pager or audio feeds. These views appear in the UI alongside the physical streams, allowing operators to monitor busy channels from a single conversation pane.
+
+```yaml
+combinedStreamViews:
+  - id: metro-dispatch
+    name: Metro dispatch summary
+    description: Aggregates the primary city and statewide Broadcastify feeds.
+    streamIds:
+      - broadcastify-2653
+      - broadcastify-34010
+```
+
+- `id`: Unique identifier for the virtual view.
+- `name`: Label shown in the sidebar and conversation header.
+- `description` *(optional)*: Extra context rendered beneath the header when the view is selected.
+- `streamIds`: Array of existing stream IDs to merge. Provide at least one ID; invalid or missing IDs are highlighted in the UI so you can correct the configuration.
+
+Combined views are read-only in the interface—start/stop, rename, and reset actions remain reserved for the underlying streams.
+
 ## How configuration is merged
 
 1. Built-in defaults compiled into the backend provide a safe baseline if no files are present.

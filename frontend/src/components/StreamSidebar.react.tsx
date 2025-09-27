@@ -10,6 +10,7 @@ import "./StreamSidebar.scss";
 
 export interface StreamSidebarItem {
   id: string;
+  type: "stream" | "combined";
   title: string;
   previewText: string;
   previewTime: ReactNode;
@@ -148,7 +149,11 @@ const StreamSidebar = ({
                       <span className="stream-sidebar__item-title">
                         {item.title}
                       </span>
-                      {item.isPager ? (
+                      {item.type === "combined" ? (
+                        <span className="badge rounded-pill text-bg-primary-subtle text-primary-emphasis">
+                          Combined
+                        </span>
+                      ) : item.isPager ? (
                         <span className="badge rounded-pill text-bg-info-subtle text-info-emphasis">
                           Pager
                         </span>

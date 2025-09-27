@@ -387,6 +387,29 @@ class StreamConfig(APIModel):
         return float(value)
 
 
+class CombinedStreamViewConfig(APIModel):
+    id: str
+    name: str
+    streamIds: List[str] = Field(alias="streamIds")
+    description: Optional[str] = None
+
+    @field_validator("streamIds")
+    @classmethod
+    def _validate_stream_ids(cls, value: List[str]) -> List[str]:
+        if not value:
+            raise ValueError("combined stream views must include at least one stream ID")
+
+        cleaned: List[str] = []
+        for candidate in value:
+            if not isinstance(candidate, str):
+                raise TypeError("streamIds must contain only strings")
+            trimmed = candidate.strip()
+            if not trimmed:
+                raise ValueError("streamIds must not include empty values")
+            cleaned.append(trimmed)
+        return cleaned
+
+
 class AccessCredential(APIModel):
     identifier: Optional[str] = None
     password: str
@@ -425,6 +448,9 @@ class AppConfig(APIModel):
     alerts: AlertsConfig = AlertsConfig()
     defaultStreams: List[StreamConfig] = Field(
         default_factory=list, alias="defaultStreams"
+    )
+    combinedStreamViews: List[CombinedStreamViewConfig] = Field(
+        default_factory=list, alias="combinedStreamViews"
     )
     ui: UISettingsConfig = UISettingsConfig()
     access: AccessControlConfig = AccessControlConfig()
