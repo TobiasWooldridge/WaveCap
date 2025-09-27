@@ -91,6 +91,25 @@ streams:
 
 Leave the field at `0` (or omit it) to ingest audio from the very beginning.
 
+## Pinned streams
+
+Highlight critical feeds by marking them as pinned. Pinned streams always
+appear at the top of the sidebar and management lists, ahead of any other
+sorting rules. Set `pinned: true` on any entry in `streams` (or in
+`state/config.yaml`) to keep it at the top:
+
+```yaml
+streams:
+  - id: dispatch-primary
+    name: Primary dispatch
+    url: https://radio.example.net/live
+    enabled: true
+    pinned: true
+```
+
+Leave the field out or set it to `false` for feeds that should follow the
+selected sort order.
+
 ## Logging
 
 The `logging` block controls whether backend console output and forwarded frontend messages are written to disk. By default both

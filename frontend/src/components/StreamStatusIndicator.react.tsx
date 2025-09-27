@@ -29,6 +29,7 @@ const toTitleCase = (label: string): string => {
     .join(" ");
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const resolveUpstreamConnectivity = (
   stream: Stream,
 ): boolean | null => {
@@ -56,6 +57,7 @@ export const resolveUpstreamConnectivity = (
   return null;
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const resolveStreamStatus = (
   stream: Stream,
 ): StreamStatusResolution => {

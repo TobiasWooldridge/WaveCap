@@ -49,6 +49,7 @@ import { useAuth } from "./contexts/AuthContext";
 import AppHeader from "./components/AppHeader.react";
 import StreamSidebar, {
   type StreamSidebarItem,
+  type StreamSortMode,
 } from "./components/StreamSidebar.react";
 import StreamStatusIndicator from "./components/StreamStatusIndicator.react";
 import Spinner from "./components/primitives/Spinner.react";
@@ -91,6 +92,13 @@ const DEFAULT_ERROR_MESSAGES: Record<ClientCommandType, string> = {
 const DEFAULT_DOCUMENT_TITLE = "WaveCap Transcription";
 const MOBILE_ACTIONS_PANEL_ID = "conversation-mobile-actions-panel";
 
+const STREAM_SORT_STORAGE_KEY = "wavecap-stream-sort-mode";
+const STREAM_SORT_DEFAULT: StreamSortMode = "activity";
+const STREAM_TITLE_COLLATOR = new Intl.Collator(undefined, {
+  numeric: true,
+  sensitivity: "base",
+});
+
 const resolveCommandMessage = (
   action: ClientCommandType,
   message: string | undefined,
@@ -101,6 +109,22 @@ const resolveCommandMessage = (
     return trimmed;
   }
   return fallbacks[action];
+};
+
+const parseStreamSortMode = (value: unknown): StreamSortMode | null => {
+  if (value === "activity" || value === "name") {
+    return value;
+  }
+  return null;
+};
+
+const getStoredStreamSortMode = (): StreamSortMode => {
+  if (typeof window === "undefined") {
+    return STREAM_SORT_DEFAULT;
+  }
+
+  const stored = window.localStorage.getItem(STREAM_SORT_STORAGE_KEY);
+  return parseStreamSortMode(stored) ?? STREAM_SORT_DEFAULT;
 };
 
 const safeTimestamp = (timestamp?: string | null): number => {
@@ -141,17 +165,33 @@ const getLatestTranscription = (
   );
 };
 
+const getStreamTitle = (stream: Stream): string => {
+  const trimmedName = stream.name?.trim();
+  if (trimmedName) {
+    return trimmedName;
+  }
+
+  const trimmedUrl = stream.url?.trim();
+  if (trimmedUrl) {
+    return trimmedUrl;
+  }
+
+  return "Untitled stream";
+};
+
 const getLatestActivityTimestamp = (stream?: Stream | null): number => {
   if (!stream) {
     return 0;
   }
 
   const latestTranscription = getLatestTranscription(stream);
-  if (latestTranscription) {
-    return safeTimestamp(latestTranscription.timestamp);
-  }
+  const transcriptionTimestamp = latestTranscription
+    ? safeTimestamp(latestTranscription.timestamp)
+    : 0;
+  const lastActivityTimestamp = safeTimestamp(stream.lastActivityAt);
+  const createdTimestamp = safeTimestamp(stream.createdAt);
 
-  return safeTimestamp(stream.createdAt);
+  return Math.max(transcriptionTimestamp, lastActivityTimestamp, createdTimestamp);
 };
 
 const countUnreadTranscriptions = (
@@ -755,7 +795,10 @@ function App() {
     setLoginVisible(false);
   }, [setLoginVisible]);
 
-  const normalizedStreams = Array.isArray(streams) ? streams : [];
+  const normalizedStreams = useMemo(
+    () => (Array.isArray(streams) ? streams : []),
+    [streams],
+  );
   const combinedViewData = useMemo(() => {
     const map = new Map<string, CombinedViewInstance>();
     const virtualStreams: Stream[] = [];
@@ -844,6 +887,7 @@ function App() {
         url: `combined:${view.id}`,
         status,
         enabled,
+        pinned: false,
         createdAt,
         transcriptions: trimmedTranscriptions,
         source: "combined",
@@ -886,15 +930,69 @@ function App() {
   const [lastViewedAtByConversation, setLastViewedAtByConversation] = useState<
     Record<string, number>
   >(() => ({}));
+  const [streamSortMode, setStreamSortMode] = useState<StreamSortMode>(() =>
+    getStoredStreamSortMode(),
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    window.localStorage.setItem(STREAM_SORT_STORAGE_KEY, streamSortMode);
+  }, [streamSortMode]);
+
   const sortedConversations = useMemo(() => {
     if (displayStreams.length === 0) {
       return [] as Stream[];
     }
 
-    return [...displayStreams].sort(
-      (a, b) => getLatestActivityTimestamp(b) - getLatestActivityTimestamp(a),
-    );
-  }, [displayStreams]);
+    return [...displayStreams].sort((a, b) => {
+      const aPinned = Boolean(a.pinned);
+      const bPinned = Boolean(b.pinned);
+      if (aPinned !== bPinned) {
+        return aPinned ? -1 : 1;
+      }
+
+      if (streamSortMode === "name") {
+        const nameComparison = STREAM_TITLE_COLLATOR.compare(
+          getStreamTitle(a),
+          getStreamTitle(b),
+        );
+        if (nameComparison !== 0) {
+          return nameComparison;
+        }
+        const activityDifference =
+          getLatestActivityTimestamp(b) - getLatestActivityTimestamp(a);
+        if (activityDifference !== 0) {
+          return activityDifference;
+        }
+        return a.id.localeCompare(b.id);
+      }
+
+      const activityDifference =
+        getLatestActivityTimestamp(b) - getLatestActivityTimestamp(a);
+      if (activityDifference !== 0) {
+        return activityDifference;
+      }
+
+      const nameComparison = STREAM_TITLE_COLLATOR.compare(
+        getStreamTitle(a),
+        getStreamTitle(b),
+      );
+      if (nameComparison !== 0) {
+        return nameComparison;
+      }
+
+      return a.id.localeCompare(b.id);
+    });
+  }, [displayStreams, streamSortMode]);
+
+  const handleStreamSortModeChange = useCallback(
+    (mode: StreamSortMode) => {
+      setStreamSortMode((previous) => (previous === mode ? previous : mode));
+    },
+    [],
+  );
 
   const selectionInitialized = streamsInitialized && combinedViewsFetched;
   const { selectedStreamId, selectStream } = useStreamSelection(
@@ -910,8 +1008,7 @@ function App() {
   const streamSidebarItems = useMemo<StreamSidebarItem[]>(() => {
     const items: StreamSidebarItem[] = sortedConversations.map((stream) => {
       const latestTranscription = getLatestTranscription(stream);
-      const title =
-        stream.name?.trim() || stream.url?.trim() || "Untitled stream";
+      const title = getStreamTitle(stream);
       const latestTimestamp = getLatestActivityTimestamp(stream);
 
       return {
@@ -937,6 +1034,7 @@ function App() {
         stream,
         isPager: isPagerStream(stream),
         isActive: selectedStreamId === stream.id,
+        isPinned: Boolean(stream.pinned),
       };
     });
 
@@ -968,7 +1066,9 @@ function App() {
     () => (selectedStream ? getLatestActivityTimestamp(selectedStream) : 0),
     [selectedStream],
   );
-  const selectedStreamTitle = selectedStream?.name || selectedStream?.url || "";
+  const selectedStreamTitle = selectedStream
+    ? getStreamTitle(selectedStream)
+    : "";
   const selectedStreamIsPager = useMemo(
     () => (selectedStream?.source ?? "audio") === "pager",
     [selectedStream],
@@ -980,7 +1080,10 @@ function App() {
   const selectedCombinedMetadata = selectedStream
     ? combinedViewMap.get(selectedStream.id) ?? null
     : null;
-  const selectedCombinedMembers = selectedCombinedMetadata?.members ?? [];
+  const selectedCombinedMembers = useMemo(
+    () => selectedCombinedMetadata?.members ?? [],
+    [selectedCombinedMetadata],
+  );
   const selectedCombinedMissing =
     selectedCombinedMetadata?.missingStreamIds ?? [];
   const selectedCombinedView = selectedCombinedMetadata?.view ?? null;
@@ -1444,6 +1547,8 @@ function App() {
               isMobileViewport={isMobileViewport}
               isMobileSidebarOpen={isMobileSidebarOpen}
               onCloseMobileSidebar={closeMobileSidebar}
+              sortMode={streamSortMode}
+              onSortModeChange={handleStreamSortModeChange}
             />
 
             {isMobileViewport && isMobileSidebarOpen ? (

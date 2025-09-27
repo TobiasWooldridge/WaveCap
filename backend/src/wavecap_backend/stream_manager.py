@@ -351,6 +351,7 @@ class StreamManager:
     def _build_stream_from_config(
         self, stream_config: StreamConfig, existing: Optional[Stream]
     ) -> Stream:
+        pinned = bool(stream_config.pinned)
         if stream_config.source == StreamSource.PAGER:
             url = (stream_config.url or f"/api/pager-feeds/{stream_config.id}").strip()
             base = existing or Stream(
@@ -359,6 +360,7 @@ class StreamManager:
                 url=url,
                 status=StreamStatus.TRANSCRIBING,
                 enabled=True,
+                pinned=pinned,
                 createdAt=utcnow(),
                 language=None,
                 transcriptions=[],
@@ -375,6 +377,7 @@ class StreamManager:
                     "ignoreFirstSeconds": 0.0,
                     "language": None,
                     "enabled": True,
+                    "pinned": pinned,
                     "status": StreamStatus.TRANSCRIBING,
                     "error": None,
                 }
@@ -394,6 +397,7 @@ class StreamManager:
                 url=url,
                 status=status,
                 enabled=enabled,
+                pinned=pinned,
                 createdAt=utcnow(),
                 language=language,
                 transcriptions=[],
@@ -408,6 +412,7 @@ class StreamManager:
             "source": StreamSource.AUDIO,
             "ignoreFirstSeconds": ignore_seconds,
             "webhookToken": None,
+            "pinned": pinned,
         }
         return existing.model_copy(update=updates)
 

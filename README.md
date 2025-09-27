@@ -152,7 +152,7 @@ Configuration is layered across the backend and the `state/` directory:
 
 Override any setting in `state/config.yaml` to keep customisations separate from the shipped defaults.
 
-- Streams: define under `defaultStreams`. Add/remove streams by editing YAML; there is no UI or API to create or delete streams.
+- Streams: define under `defaultStreams`. Add/remove streams by editing YAML; there is no UI or API to create or delete streams. Mark critical entries with `pinned: true` to keep them anchored at the top of the UI.
 - Pager feeds: define under `pagerWebhooks` to receive token-protected webhook posts from CAD systems.
 - Combined views: define under `combinedStreamViews` to merge activity from multiple streams into a single conversation.
 

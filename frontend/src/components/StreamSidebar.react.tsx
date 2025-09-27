@@ -1,5 +1,5 @@
-import { ReactNode } from "react";
-import { LogIn, Radio, X } from "lucide-react";
+import { ChangeEvent, ReactNode } from "react";
+import { LogIn, Radio, Star, X } from "lucide-react";
 import { Stream } from "@types";
 import Button from "./primitives/Button.react";
 import Badge from "./primitives/Badge.react";
@@ -7,6 +7,8 @@ import Flex from "./primitives/Flex.react";
 import Spinner from "./primitives/Spinner.react";
 import StreamStatusIndicator from "./StreamStatusIndicator.react";
 import "./StreamSidebar.scss";
+
+export type StreamSortMode = "activity" | "name";
 
 export interface StreamSidebarItem {
   id: string;
@@ -18,6 +20,7 @@ export interface StreamSidebarItem {
   stream: Stream;
   isPager: boolean;
   isActive: boolean;
+  isPinned: boolean;
 }
 
 interface StreamSidebarProps {
@@ -29,6 +32,8 @@ interface StreamSidebarProps {
   isMobileViewport: boolean;
   isMobileSidebarOpen: boolean;
   onCloseMobileSidebar: () => void;
+  sortMode: StreamSortMode;
+  onSortModeChange: (mode: StreamSortMode) => void;
 }
 
 const StreamSidebar = ({
@@ -40,6 +45,8 @@ const StreamSidebar = ({
   isMobileViewport,
   isMobileSidebarOpen,
   onCloseMobileSidebar,
+  sortMode,
+  onSortModeChange,
 }: StreamSidebarProps) => {
   const renderEmptyState = () => {
     if (loading) {
@@ -73,6 +80,13 @@ const StreamSidebar = ({
     return null;
   };
 
+  const handleSortChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    const nextValue = event.target.value as StreamSortMode;
+    onSortModeChange(nextValue);
+  };
+
+  const sortLabel = sortMode === "name" ? "Name (A–Z)" : "Latest activity";
+
   return (
     <div
       className={`stream-sidebar-drawer ${isMobileSidebarOpen ? "stream-sidebar-drawer--open" : ""}`}
@@ -90,10 +104,28 @@ const StreamSidebar = ({
               Streams
             </p>
             <p className="mb-0 small text-body-secondary">
-              Ordered by latest activity
+              Sorted by {sortLabel}
             </p>
           </div>
-          <Flex align="center" gap={2}>
+          <Flex align="center" gap={2} wrap="wrap">
+            <div className="stream-sidebar__sort-control">
+              <label
+                htmlFor="stream-sidebar-sort"
+                className="stream-sidebar__sort-label small text-body-secondary"
+              >
+                Sort
+              </label>
+              <select
+                id="stream-sidebar-sort"
+                className="form-select form-select-sm stream-sidebar__sort-select"
+                value={sortMode}
+                onChange={handleSortChange}
+                aria-label="Sort streams"
+              >
+                <option value="activity">Latest activity</option>
+                <option value="name">Name (A–Z)</option>
+              </select>
+            </div>
             <Button
               size="sm"
               use="secondary"
@@ -146,6 +178,15 @@ const StreamSidebar = ({
                     className="stream-sidebar__item-content"
                   >
                     <Flex align="center" gap={2} className="stream-sidebar__item-heading">
+                      {item.isPinned ? (
+                        <span
+                          className="stream-sidebar__pin"
+                          aria-label="Pinned stream"
+                          role="img"
+                        >
+                          <Star size={14} fill="currentColor" aria-hidden="true" />
+                        </span>
+                      ) : null}
                       <span className="stream-sidebar__item-title">
                         {item.title}
                       </span>

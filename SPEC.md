@@ -27,6 +27,7 @@ transcribing multiple radio or pager feeds in real time.
 
 ### 2. Monitoring Live Traffic
 - Use the stream list to spot transcribing, queued, stopped, or error states. Queued means the stream was enabled and is waiting for the backend to catch up. If Whisper concurrency is full, recording continues and transcripts arrive once a slot opens.
+- Sort the stream sidebar by latest activity or stream name. Streams pinned in configuration files stay at the top regardless of the selected sort mode.
 - Open each stream's conversation view with search, time-range filters, and "Go to timestamp" controls to review recent traffic.
 - Read system log entries that mark recording and transcription start or stop events, as well as upstream connection interruptions and recoveries.
 - See stream status and unread badges in the sidebar, and trigger Start or Stop from the conversation header.
@@ -86,7 +87,7 @@ transcribing multiple radio or pager feeds in real time.
 ## Operator Interface Map
 - **Conversation Workspace**: Messenger-style layout with a sidebar that sorts streams by activity and shows unread indicators. When no streams exist, the pane reminds operators to define them in the configuration files.
 - **Metrics Cards**: Show active stream counts, transcript totals, average confidence, and processed audio time.
-- **Stream Sidebar**: Lists configured streams, highlights status at a glance, and surfaces Start/Stop controls inside each conversation header with Reset tucked behind a "More actions" overflow button. Streams themselves are defined in YAML configuration files.
+- **Stream Sidebar**: Lists configured streams, highlights status at a glance, and surfaces Start/Stop controls inside each conversation header with Reset tucked behind a "More actions" overflow button. Operators can sort entries by latest activity or name, and streams marked as pinned in configuration files stay ahead of the selected order. Streams themselves are defined in YAML configuration files.
 - **Combined Views**: Virtual sidebar entries configured in YAML that merge the activity of multiple streams into a single conversation. They show aggregated status indicators but omit transport controls so operators manage the underlying sources directly.
 - **Transcript Panel**: Fills the conversation pane with grouped bursts, timestamps (in the viewer's timezone), confidence colours, and inline playback. Segments keep their width while playing so text does not shift. Conversations stay anchored to the latest entries, auto-scroll at the live edge, and reveal a "Go to latest" pill when the user scrolls up.
 - **Global Controls**: Surface red error toasts and green confirmations after actions.
