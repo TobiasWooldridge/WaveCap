@@ -22,18 +22,11 @@ import {
   Search,
   CalendarClock,
   Loader2,
-  X,
   AlertTriangle,
   MicOff,
   Download,
 } from "lucide-react";
-import {
-  Stream,
-  TranscriptionResult,
-  TranscriptionQueryResponse,
-import { compareStreamsByName } from "../utils/streams";
-  TranscriptionReviewStatus,
-} from "@types";
+import { Stream, TranscriptionResult, TranscriptionQueryResponse, TranscriptionReviewStatus } from "@types";
 import { useAuth } from "../contexts/AuthContext";
 // Review controls are used inside StreamTranscriptThread
 import {
@@ -60,6 +53,8 @@ import StandaloneStatsDialog from "./dialogs/StandaloneStatsDialog.react";
 import { useTranscriptionAudioPlayback } from "../hooks/useTranscriptionAudioPlayback";
 import SearchPanel from "./SearchPanel.react";
 import StreamTranscriptThread from "./StreamTranscriptThread.react";
+import JumpForm from "./JumpForm.react";
+import FocusContextPanel from "./FocusContextPanel.react";
 
 export interface StandaloneStreamControls {
   streamId: string;
@@ -309,7 +304,9 @@ export const StreamTranscriptionPanel = ({
       return baseVisibleStreams;
     }
 
-    return [...baseVisibleStreams].sort(compareStreamsByName);
+    return [...baseVisibleStreams].sort((a, b) =>
+      (a.name || "").localeCompare(b.name || ""),
+    );
   }, [baseVisibleStreams, focusStreamId]);
 
   const focusedVisibleStream =
@@ -1609,75 +1606,26 @@ export const StreamTranscriptionPanel = ({
               {isExpanded && (
                 <div className="transcript-stream__details" id={detailsId}>
                   {focusState && (
-                    <div className="border border-border rounded-md p-3 text-sm bg-surface-subtle transition-colors">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <div className="font-medium text-ink-muted">
-                            Context around{" "}
-                            {focusState.anchor ? (
-                              <Timestamp
-                                value={focusState.anchor}
-                                mode="datetime"
-                              />
-                            ) : (
-                              "selected time"
-                            )}{" "}
-                            (±{focusState.windowMinutes} min)
-                          </div>
-                          {focusState.anchor && (
-                            <div className="text-xs text-ink-subtle">
-                              {focusState.transcriptions.length} transcripts in
-                              window
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            use="unstyled"
-                            onClick={() =>
-                              handleMergeFocusIntoHistory(stream.id)
-                            }
-                            disabled={focusState.transcriptions.length === 0}
-                            className="px-2 py-1 text-xs bg-insight text-on-accent rounded hover:bg-insight-strong disabled:opacity-60 disabled:cursor-not-allowed"
-                          >
-                            Add to timeline
-                          </Button>
-                          <Button
-                            use="unstyled"
-                            onClick={() => handleClearFocus(stream.id)}
-                            className="flex items-center gap-1 text-xs text-ink-muted hover:text-ink"
-                          >
-                            <X className="w-3 h-3" />
-                            Clear
-                          </Button>
-                        </div>
-                      </div>
-                      {focusState.loading ? (
-                        <div className="text-xs text-ink-subtle flex items-center gap-2">
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                          Loading context...
-                        </div>
-                      ) : focusState.error ? (
-                        <div className="text-xs text-danger">
-                          {focusState.error}
-                        </div>
-                      ) : focusState.transcriptions.length > 0 ? (
-                        <div className="space-y-2">
-                          {focusPrepared &&
-                            renderGroupedTranscriptions(
-                              stream.id,
-                              focusPrepared.groupedTranscriptions,
-                              focusPrepared.sortedTranscriptions,
-                              streamIsPager,
-                              transcriptCorrectionEnabled,
-                            )}
-                        </div>
-                      ) : (
-                        <div className="text-xs text-ink-subtle">
-                          No transcripts found in this window.
-                        </div>
-                      )}
-                    </div>
+                    <FocusContextPanel
+                      anchor={focusState.anchor}
+                      windowMinutes={focusState.windowMinutes}
+                      transcriptionsCount={focusState.transcriptions.length}
+                      loading={focusState.loading}
+                      error={focusState.error}
+                      onAddToTimeline={() =>
+                        handleMergeFocusIntoHistory(stream.id)
+                      }
+                      onClear={() => handleClearFocus(stream.id)}
+                    >
+                      {focusPrepared &&
+                        renderGroupedTranscriptions(
+                          stream.id,
+                          focusPrepared.groupedTranscriptions,
+                          focusPrepared.sortedTranscriptions,
+                          streamIsPager,
+                          transcriptCorrectionEnabled,
+                        )}
+                    </FocusContextPanel>
                   )}
 
                   <div className="transcript-stream__controls">
@@ -1750,103 +1698,69 @@ export const StreamTranscriptionPanel = ({
                       ) : null}
 
                       {!isStandaloneStreamView ? (
-                        <form
-                          className="transcript-stream__jump-form"
-                          onSubmit={(event) => {
-                            event.preventDefault();
-                            const timestampValue =
-                              jumpTimestampByStream[stream.id];
-                            const windowMinutes =
-                              jumpWindowByStream[stream.id] ??
-                              DEFAULT_FOCUS_WINDOW_MINUTES;
-                            if (!timestampValue) {
-                              setFocusByStream((prev) => ({
-                                ...prev,
-                                [stream.id]: {
-                                  anchor: null,
-                                  windowMinutes,
-                                  transcriptions: [],
-                                  loading: false,
-                                  error: "Enter a date and time to jump to.",
-                                },
-                              }));
-                              return;
-                            }
-                            const parsed = new Date(timestampValue);
-                            if (Number.isNaN(parsed.getTime())) {
-                              setFocusByStream((prev) => ({
-                                ...prev,
-                                [stream.id]: {
-                                  anchor: null,
-                                  windowMinutes,
-                                  transcriptions: [],
-                                  loading: false,
-                                  error: "Invalid date or time value.",
-                                },
-                              }));
-                              return;
-                            }
-                            setJumpTimestampByStream((prev) => ({
-                              ...prev,
-                              [stream.id]: timestampValue,
-                            }));
-                            void handleGoToTimestamp(
-                              stream.id,
-                              parsed.toISOString(),
-                              windowMinutes,
-                            );
-                          }}
-                        >
+                        <div className="transcript-stream__jump-form">
                           <span className="transcript-stream__toolbar-label">
                             Go to timestamp
                           </span>
-                          <div className="transcript-stream__jump-inputs">
-                            <div className="transcript-stream__jump-input">
-                              <CalendarClock size={16} aria-hidden="true" />
-                              <input
-                                type="datetime-local"
-                                value={jumpTimestampByStream[stream.id] ?? ""}
-                                onChange={(event) =>
-                                  setJumpTimestampByStream((prev) => ({
-                                    ...prev,
-                                    [stream.id]: event.target.value,
-                                  }))
-                                }
-                                className="form-control form-control-sm"
-                              />
-                            </div>
-                            <select
-                              value={String(
-                                jumpWindowByStream[stream.id] ??
-                                  DEFAULT_FOCUS_WINDOW_MINUTES,
-                              )}
-                              onChange={(event) =>
-                                setJumpWindowByStream((prev) => ({
+                          <JumpForm
+                            timestampValue={jumpTimestampByStream[stream.id] ?? ""}
+                            windowMinutes={
+                              jumpWindowByStream[stream.id] ??
+                              DEFAULT_FOCUS_WINDOW_MINUTES
+                            }
+                            isLoading={focusState?.loading ?? false}
+                            onTimestampChange={(value) =>
+                              setJumpTimestampByStream((prev) => ({
+                                ...prev,
+                                [stream.id]: value,
+                              }))
+                            }
+                            onWindowMinutesChange={(value) =>
+                              setJumpWindowByStream((prev) => ({
+                                ...prev,
+                                [stream.id]: value,
+                              }))
+                            }
+                            onSubmit={(timestampValue, windowMinutes) => {
+                              if (!timestampValue) {
+                                setFocusByStream((prev) => ({
                                   ...prev,
-                                  [stream.id]: Number(event.target.value),
-                                }))
+                                  [stream.id]: {
+                                    anchor: null,
+                                    windowMinutes,
+                                    transcriptions: [],
+                                    loading: false,
+                                    error: "Enter a date and time to jump to.",
+                                  },
+                                }));
+                                return;
                               }
-                              className="form-select form-select-sm"
-                            >
-                              <option value="5">±5 min</option>
-                              <option value="10">±10 min</option>
-                              <option value="30">±30 min</option>
-                            </select>
-                            <Button
-                              type="submit"
-                              size="sm"
-                              use="success"
-                              disabled={focusState?.loading ?? false}
-                              isContentInline={focusState?.loading ? false : undefined}
-                            >
-                              {focusState?.loading ? (
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                              ) : (
-                                "Go"
-                              )}
-                            </Button>
-                          </div>
-                        </form>
+                              const parsed = new Date(timestampValue);
+                              if (Number.isNaN(parsed.getTime())) {
+                                setFocusByStream((prev) => ({
+                                  ...prev,
+                                  [stream.id]: {
+                                    anchor: null,
+                                    windowMinutes,
+                                    transcriptions: [],
+                                    loading: false,
+                                    error: "Invalid date or time value.",
+                                  },
+                                }));
+                                return;
+                              }
+                              setJumpTimestampByStream((prev) => ({
+                                ...prev,
+                                [stream.id]: timestampValue,
+                              }));
+                              void handleGoToTimestamp(
+                                stream.id,
+                                parsed.toISOString(),
+                                windowMinutes,
+                              );
+                            }}
+                          />
+                        </div>
                       ) : null}
                     </div>
                   </div>

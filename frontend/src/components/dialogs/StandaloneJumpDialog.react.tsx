@@ -1,7 +1,6 @@
 import React from "react";
-import { CalendarClock, Loader2 } from "lucide-react";
 import Dialog from "../primitives/Dialog.react";
-import Button from "../primitives/Button.react";
+import JumpForm from "../JumpForm.react";
 
 export interface StandaloneJumpDialogProps {
   open: boolean;
@@ -41,47 +40,15 @@ const StandaloneJumpDialog: React.FC<StandaloneJumpDialogProps> = ({
       bodyClassName="standalone-tool-dialog__body"
       closeAriaLabel="Close go to timestamp dialog"
     >
-      <form
-        className="transcript-stream__jump-form standalone-tool-dialog__form"
-        onSubmit={(event) => {
-          event.preventDefault();
-          onSubmit(timestampValue, windowMinutes);
-        }}
-      >
-        <div className="transcript-stream__jump-inputs">
-          <div className="transcript-stream__jump-input">
-            <CalendarClock size={16} aria-hidden="true" />
-            <input
-              type="datetime-local"
-              value={timestampValue}
-              onChange={(event) => onTimestampChange(event.target.value)}
-              className="form-control form-control-sm"
-            />
-          </div>
-          <select
-            value={String(windowMinutes)}
-            onChange={(event) => onWindowMinutesChange(Number(event.target.value))}
-            className="form-select form-select-sm"
-          >
-            <option value="5">±5 min</option>
-            <option value="10">±10 min</option>
-            <option value="30">±30 min</option>
-          </select>
-          <Button
-            type="submit"
-            size="sm"
-            use="success"
-            disabled={isLoading}
-            isContentInline={isLoading ? false : undefined}
-          >
-            {isLoading ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
-            ) : (
-              "Go"
-            )}
-          </Button>
-        </div>
-      </form>
+      <JumpForm
+        formClassName="transcript-stream__jump-form standalone-tool-dialog__form"
+        timestampValue={timestampValue}
+        windowMinutes={windowMinutes}
+        isLoading={isLoading}
+        onTimestampChange={onTimestampChange}
+        onWindowMinutesChange={onWindowMinutesChange}
+        onSubmit={onSubmit}
+      />
       {error ? (
         <div className="text-danger small" role="alert">
           {error}
@@ -92,4 +59,3 @@ const StandaloneJumpDialog: React.FC<StandaloneJumpDialogProps> = ({
 };
 
 export default StandaloneJumpDialog;
-
