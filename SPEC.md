@@ -83,16 +83,16 @@ transcribing multiple radio or pager feeds in real time.
 - Start the backend with curated demo data using `--screenshot-fixtures` (alias `--fixture-set screenshot`) on `python -m wavecap_backend`, `start-app.sh`, or `start-app.ps1`. The flag resets state and loads representative streams, transcripts, reviews, alerts, and audio placeholders for documentation captures.
 
 ## Operator Interface Map
-- **Conversation Workspace**: Messenger-style layout with a sidebar that sorts streams by activity and shows unread indicators. When no streams exist, the pane prompts the operator to add one.
+- **Conversation Workspace**: Messenger-style layout with a sidebar that sorts streams by activity and shows unread indicators. When no streams exist, the pane reminds operators to define them in the configuration files.
 - **Metrics Cards**: Show active stream counts, transcript totals, average confidence, and processed audio time.
-- **Stream Sidebar**: Hosts the add-stream form plus Start and Stop controls inside each conversation header, with Reset and Remove tucked behind a "More actions" overflow button. Status badges show transcribing, stopped, or error states at a glance.
+- **Stream Sidebar**: Lists configured streams, highlights status at a glance, and surfaces Start/Stop controls inside each conversation header with Reset tucked behind a "More actions" overflow button. Streams themselves are defined in YAML configuration files.
 - **Transcript Panel**: Fills the conversation pane with grouped bursts, timestamps (in the viewer's timezone), confidence colours, and inline playback. Segments keep their width while playing so text does not shift. Conversations stay anchored to the latest entries, auto-scroll at the live edge, and reveal a "Go to latest" pill when the user scrolls up.
 - **Global Controls**: Surface red error toasts and green confirmations after actions.
 - **Transcript Correction Toggle**: Header checkbox (editors only) that hides or shows review badges, editing tools, and exports.
 - **Reviewed Export Controls**: Header controls that select review states before downloading a ZIP with JSONL transcripts and audio clips.
 
 ## Frontend Component Roles
-- **StreamDirectoryPanel**: Wraps the stream list, status badges, and controls for starting, stopping, resetting, removing, or adding streams.
+- **StreamDirectoryPanel**: Wraps the stream list, status badges, and controls for starting, stopping, or resetting streams.
 - **TranscriptionMetricsPanel**: Summarises live activity with aggregate transcription counts, confidence, and duration.
 - **StreamTranscriptionPanel**: Shows grouped transcript bursts, history and search tools, playback controls, and an optional live audio player.
 - **TranscriptionSummaryCard**: Presents a single transcription with timestamps, durations, and confidence indicators.

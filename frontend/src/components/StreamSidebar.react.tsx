@@ -1,10 +1,10 @@
-import { ChangeEvent, FormEvent, ReactNode } from "react";
-import { LogIn, Plus, Radio, X } from "lucide-react";
-import { Stream, StreamSource } from "@types";
-import Spinner from "./primitives/Spinner.react";
+import { ReactNode } from "react";
+import { LogIn, Radio, X } from "lucide-react";
+import { Stream } from "@types";
 import Button from "./primitives/Button.react";
 import Badge from "./primitives/Badge.react";
 import Flex from "./primitives/Flex.react";
+import Spinner from "./primitives/Spinner.react";
 import StreamStatusIndicator from "./StreamStatusIndicator.react";
 import "./StreamSidebar.scss";
 
@@ -22,23 +22,6 @@ export interface StreamSidebarItem {
 interface StreamSidebarProps {
   isReadOnly: boolean;
   onRequestLogin: () => void;
-  showAddStreamForm: boolean;
-  onToggleAddStreamForm: () => void;
-  onCloseAddStreamForm: () => void;
-  onClearAddStreamError: () => void;
-  addStreamError: string | null;
-  addingStream: boolean;
-  newStreamSource: StreamSource;
-  onChangeStreamSource: (value: StreamSource) => void;
-  newStreamUrl: string;
-  onChangeStreamUrl: (value: string) => void;
-  newStreamName: string;
-  onChangeStreamName: (value: string) => void;
-  newStreamLanguage: string;
-  onChangeStreamLanguage: (value: string) => void;
-  newStreamIgnoreSeconds: string;
-  onChangeStreamIgnoreSeconds: (value: string) => void;
-  onSubmitAddStream: (event: FormEvent<HTMLFormElement>) => void;
   items: StreamSidebarItem[];
   loading: boolean;
   onSelectStream: (streamId: string) => void;
@@ -47,28 +30,9 @@ interface StreamSidebarProps {
   onCloseMobileSidebar: () => void;
 }
 
-const ADD_STREAM_FORM_ID = "stream-sidebar-add-form";
-
 const StreamSidebar = ({
   isReadOnly,
   onRequestLogin,
-  showAddStreamForm,
-  onToggleAddStreamForm,
-  onCloseAddStreamForm,
-  onClearAddStreamError,
-  addStreamError,
-  addingStream,
-  newStreamSource,
-  onChangeStreamSource,
-  newStreamUrl,
-  onChangeStreamUrl,
-  newStreamName,
-  onChangeStreamName,
-  newStreamLanguage,
-  onChangeStreamLanguage,
-  newStreamIgnoreSeconds,
-  onChangeStreamIgnoreSeconds,
-  onSubmitAddStream,
   items,
   loading,
   onSelectStream,
@@ -76,18 +40,6 @@ const StreamSidebar = ({
   isMobileSidebarOpen,
   onCloseMobileSidebar,
 }: StreamSidebarProps) => {
-  const handleToggleAddForm = () => {
-    if (showAddStreamForm) {
-      onClearAddStreamError();
-    }
-    onToggleAddStreamForm();
-  };
-
-  const handleCloseAddForm = () => {
-    onClearAddStreamError();
-    onCloseAddStreamForm();
-  };
-
   const renderEmptyState = () => {
     if (loading) {
       return null;
@@ -100,8 +52,8 @@ const StreamSidebar = ({
           <p className="fw-semibold mb-1">No streams yet</p>
           <p className="mb-2 small">
             {isReadOnly
-              ? "Sign in to add streams and control live transcription."
-              : "Add a stream to start monitoring conversations."}
+              ? "Sign in to control live transcription for configured streams."
+              : "Update your configuration files to add new streams."}
           </p>
           {isReadOnly ? (
             <Button
@@ -141,18 +93,6 @@ const StreamSidebar = ({
             </p>
           </div>
           <Flex align="center" gap={2}>
-            {!isReadOnly ? (
-              <Button
-                size="sm"
-                use="primary"
-                onClick={handleToggleAddForm}
-                aria-expanded={showAddStreamForm}
-                aria-controls={ADD_STREAM_FORM_ID}
-                startContent={<Plus size={14} />}
-              >
-                {showAddStreamForm ? "Hide form" : "Add stream"}
-              </Button>
-            ) : null}
             <Button
               size="sm"
               use="secondary"
@@ -165,171 +105,6 @@ const StreamSidebar = ({
             </Button>
           </Flex>
         </Flex>
-
-        {!isReadOnly && showAddStreamForm ? (
-          <form
-            className="stream-sidebar__form"
-            onSubmit={onSubmitAddStream}
-            id={ADD_STREAM_FORM_ID}
-          >
-              <div className="mb-3">
-                <label
-                  htmlFor="sidebar-stream-source"
-                  className="form-label text-uppercase small fw-semibold text-body-secondary"
-                >
-                  Stream type
-                </label>
-                <select
-                  id="sidebar-stream-source"
-                  className="form-select form-select-sm"
-                  value={newStreamSource}
-                  onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-                    onChangeStreamSource(event.target.value as StreamSource);
-                  }}
-                >
-                  <option value="audio">Audio stream</option>
-                  <option value="pager">Pager feed</option>
-                </select>
-                {newStreamSource === "pager" ? (
-                  <p className="form-text small mb-0">
-                    Pager feeds accept webhook posts and generate their own
-                    authentication token.
-                  </p>
-                ) : null}
-              </div>
-              {newStreamSource === "audio" ? (
-                <div className="mb-3">
-                  <label
-                    htmlFor="sidebar-stream-url"
-                    className="form-label text-uppercase small fw-semibold text-body-secondary"
-                  >
-                    Stream URL
-                  </label>
-                  <input
-                    id="sidebar-stream-url"
-                    type="url"
-                    required
-                    className="form-control form-control-sm"
-                    placeholder="https://example.com/stream.mp3"
-                    value={newStreamUrl}
-                    onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                      onChangeStreamUrl(event.target.value)
-                    }
-                  />
-                </div>
-              ) : null}
-              <div className="mb-3">
-                <label
-                  htmlFor="sidebar-stream-name"
-                  className="form-label text-uppercase small fw-semibold text-body-secondary"
-                >
-                  Display name (optional)
-                </label>
-                <input
-                  id="sidebar-stream-name"
-                  type="text"
-                  className="form-control form-control-sm"
-                  placeholder="Scanner feed"
-                  value={newStreamName}
-                  onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                    onChangeStreamName(event.target.value)
-                  }
-                />
-              </div>
-              {newStreamSource === "audio" ? (
-                <div className="mb-3">
-                  <label
-                    htmlFor="sidebar-stream-language"
-                    className="form-label text-uppercase small fw-semibold text-body-secondary"
-                  >
-                    Language
-                  </label>
-                  <select
-                    id="sidebar-stream-language"
-                    className="form-select form-select-sm"
-                    value={newStreamLanguage}
-                    onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-                      onChangeStreamLanguage(event.target.value)
-                    }
-                  >
-                    <option value="en">English</option>
-                    <option value="es">Spanish</option>
-                    <option value="fr">French</option>
-                    <option value="de">German</option>
-                    <option value="it">Italian</option>
-                    <option value="pt">Portuguese</option>
-                    <option value="ru">Russian</option>
-                    <option value="ja">Japanese</option>
-                    <option value="ko">Korean</option>
-                    <option value="zh">Chinese</option>
-                    <option value="auto">Auto-detect</option>
-                  </select>
-                </div>
-              ) : null}
-              {newStreamSource === "audio" ? (
-                <div className="mb-3">
-                  <label
-                    htmlFor="sidebar-stream-ignore"
-                    className="form-label text-uppercase small fw-semibold text-body-secondary"
-                  >
-                    Skip first seconds
-                  </label>
-                  <input
-                    id="sidebar-stream-ignore"
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    className="form-control form-control-sm"
-                    placeholder="0"
-                    value={newStreamIgnoreSeconds}
-                    onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                      onChangeStreamIgnoreSeconds(event.target.value)
-                    }
-                  />
-                  <div className="form-text small mb-0">
-                    Omit the ad or dial tone at the start of the stream before
-                    recording.
-                  </div>
-                </div>
-              ) : null}
-              {addStreamError ? (
-                <div
-                  className="alert alert-warning py-2 px-3 small"
-                  role="alert"
-                >
-                  {addStreamError}
-                </div>
-              ) : null}
-              <Flex wrap="wrap" gap={2}>
-                <Button
-                  type="submit"
-                  size="sm"
-                  use="primary"
-                  disabled={addingStream}
-                  startContent={
-                    addingStream ? (
-                      <Spinner
-                        size="sm"
-                        variant="light"
-                        label="Adding stream"
-                      />
-                    ) : undefined
-                  }
-                >
-                  <span>{addingStream ? "Adding…" : "Add stream"}</span>
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  use="secondary"
-                  onClick={handleCloseAddForm}
-                  disabled={addingStream}
-                >
-                  Cancel
-                </Button>
-              </Flex>
-          </form>
-        ) : null}
 
         <div className="stream-sidebar__list">
           {loading ? (

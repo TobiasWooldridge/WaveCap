@@ -42,13 +42,13 @@ server:
 
 ## Pager feeds
 
-Some agencies publish pager updates without a backing audio stream. Add these sources as *pager* streams via the sidebar form or the `/api/streams` endpoint by sending `{ "source": "pager" }`. The backend returns a token-protected webhook at `/api/pager-feeds/<streamId>?token=<token>`; POST JSON with at least a `message` field (plus optional `sender`, `details`, or `priority`) and the text appears instantly in the UI alongside audio transcripts. Tokens persist in `state/runtime.sqlite`; delete and recreate the stream if you ever need to rotate the token.
+Some agencies publish pager updates without a backing audio stream. Add these sources as *pager* streams in your configuration files or via the `/api/streams` endpoint by sending `{ "source": "pager" }`. The backend returns a token-protected webhook at `/api/pager-feeds/<streamId>?token=<token>`; POST JSON with at least a `message` field (plus optional `sender`, `details`, or `priority`) and the text appears instantly in the UI alongside audio transcripts. Tokens persist in `state/runtime.sqlite`; delete and recreate the stream if you ever need to rotate the token.
 
 When the CAD system emits a known structured payload, add `&format=<name>` to the webhook URL so the backend can normalise it automatically. For example, South Australia CFS Flex dispatch posts can be delivered with `&format=cfs-flex`, allowing the backend to extract the incident number, address, alarm level, talkgroup, and supporting details without requiring a separate middleware script.
 
 ## Audio stream pre-roll trimming
 
-Dispatch providers such as Broadcastify play an advertisement or dial tone before the feed goes live. The backend automatically skips the first 30 seconds for Broadcastify feeds when no override is provided so operators are never greeted by the ad. Set `ignoreFirstSeconds` on any audio stream to customise the pre-roll trimming window. The value can be configured in `defaultStreams`, via `state/config.yaml`, or when adding a stream through the UI. A value of `30` skips the first half-minute, which matches the Broadcastify ad length.
+Dispatch providers such as Broadcastify play an advertisement or dial tone before the feed goes live. The backend automatically skips the first 30 seconds for Broadcastify feeds when no override is provided so operators are never greeted by the ad. Set `ignoreFirstSeconds` on any audio stream to customise the pre-roll trimming window. Configure the value in `defaultStreams` or via `state/config.yaml`. A value of `30` skips the first half-minute, which matches the Broadcastify ad length.
 
 ```yaml
 defaultStreams:
