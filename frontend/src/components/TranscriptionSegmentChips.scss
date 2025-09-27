@@ -1,0 +1,25 @@
+.transcript-silence-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.2;
+  padding-inline: 0.65rem;
+}
+
+.transcript-silence-chip__icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.transcript-synthetic-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.75rem;
+  background-color: rgba(var(--app-surface-muted-rgb), 0.5);
+  color: rgb(var(--app-ink-subtle-rgb));
+  font-size: 0.85rem;
+  line-height: 1.3;
+}
