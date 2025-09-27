@@ -62,6 +62,7 @@ import { useStreamSelection } from "./hooks/useStreamSelection";
 import { useExportSettings } from "./hooks/useExportSettings";
 import { usePagerExport } from "./hooks/usePagerExport";
 import { useCombinedStreamViews } from "./hooks/useCombinedStreamViews";
+import { compareStreamsByName, getStreamTitle } from "./utils/streams";
 import "./App.scss";
 
 const REVIEW_STATUS_OPTIONS: Array<{
@@ -94,10 +95,6 @@ const MOBILE_ACTIONS_PANEL_ID = "conversation-mobile-actions-panel";
 
 const STREAM_SORT_STORAGE_KEY = "wavecap-stream-sort-mode";
 const STREAM_SORT_DEFAULT: StreamSortMode = "activity";
-const STREAM_TITLE_COLLATOR = new Intl.Collator(undefined, {
-  numeric: true,
-  sensitivity: "base",
-});
 
 const resolveCommandMessage = (
   action: ClientCommandType,
@@ -163,20 +160,6 @@ const getLatestTranscription = (
     },
     null,
   );
-};
-
-const getStreamTitle = (stream: Stream): string => {
-  const trimmedName = stream.name?.trim();
-  if (trimmedName) {
-    return trimmedName;
-  }
-
-  const trimmedUrl = stream.url?.trim();
-  if (trimmedUrl) {
-    return trimmedUrl;
-  }
-
-  return "Untitled stream";
 };
 
 const getLatestActivityTimestamp = (stream?: Stream | null): number => {
@@ -954,10 +937,7 @@ function App() {
       }
 
       if (streamSortMode === "name") {
-        const nameComparison = STREAM_TITLE_COLLATOR.compare(
-          getStreamTitle(a),
-          getStreamTitle(b),
-        );
+        const nameComparison = compareStreamsByName(a, b);
         if (nameComparison !== 0) {
           return nameComparison;
         }
@@ -975,15 +955,7 @@ function App() {
         return activityDifference;
       }
 
-      const nameComparison = STREAM_TITLE_COLLATOR.compare(
-        getStreamTitle(a),
-        getStreamTitle(b),
-      );
-      if (nameComparison !== 0) {
-        return nameComparison;
-      }
-
-      return a.id.localeCompare(b.id);
+      return compareStreamsByName(a, b);
     });
   }, [displayStreams, streamSortMode]);
 
