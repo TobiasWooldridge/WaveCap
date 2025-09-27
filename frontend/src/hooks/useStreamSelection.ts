@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
-import { Stream } from "@types";
-
 export const STREAM_QUERY_PARAM = "stream";
 
 interface UseStreamSelectionOptions {
   streamsInitialized: boolean;
 }
 
-export const useStreamSelection = (
-  streams: Stream[],
+export const useStreamSelection = <T extends { id: string }>(
+  streams: T[],
   { streamsInitialized }: UseStreamSelectionOptions,
 ): {
   selectedStreamId: string | null;

@@ -92,6 +92,14 @@ def _merge_configs(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, 
         )
     elif "defaultStreams" in base:
         merged["defaultStreams"] = list(_ensure_stream_list(base.get("defaultStreams")))
+    if "combinedStreamViews" in override:
+        merged["combinedStreamViews"] = list(
+            _ensure_view_list(override.get("combinedStreamViews"))
+        )
+    elif "combinedStreamViews" in base:
+        merged["combinedStreamViews"] = list(
+            _ensure_view_list(base.get("combinedStreamViews"))
+        )
     return merged
 
 
@@ -102,6 +110,16 @@ def _ensure_stream_list(value: Any) -> List[Any]:
         return value
     raise TypeError(
         "defaultStreams must be provided as a list when overriding configuration"
+    )
+
+
+def _ensure_view_list(value: Any) -> List[Any]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    raise TypeError(
+        "combinedStreamViews must be provided as a list when overriding configuration"
     )
 
 

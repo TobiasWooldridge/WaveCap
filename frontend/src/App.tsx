@@ -21,7 +21,7 @@ import {
   Activity,
   Pencil,
 } from "lucide-react";
-import { useStreams } from "./hooks/useTranscriptions";
+import { useStreams, STREAM_TRANSCRIPTION_PREVIEW_LIMIT } from "./hooks/useTranscriptions";
 import {
   useWebSocket,
   type WebSocketCommandResult,
@@ -38,7 +38,10 @@ import {
   TranscriptionResult,
   TranscriptionReviewStatus,
   StreamCommandState,
+  CombinedStreamView,
 } from "@types";
+import { CombinedTranscriptionLog } from "./components/CombinedTranscriptionLog.react";
+import { dedupeAndSortTranscriptions } from "./components/StreamTranscriptionPanel.logic";
 import { useUISettings } from "./contexts/UISettingsContext";
 import SettingsModal from "./components/SettingsModal.react";
 import { useToast } from "./hooks/useToast";
@@ -57,6 +60,7 @@ import { useKeywordAlerts } from "./hooks/useKeywordAlerts";
 import { useStreamSelection } from "./hooks/useStreamSelection";
 import { useExportSettings } from "./hooks/useExportSettings";
 import { usePagerExport } from "./hooks/usePagerExport";
+import { useCombinedStreamViews } from "./hooks/useCombinedStreamViews";
 import "./App.scss";
 
 const REVIEW_STATUS_OPTIONS: Array<{
@@ -247,6 +251,13 @@ const renderStandaloneStatusIcon = (
   }
 };
 
+type CombinedViewInstance = {
+  view: CombinedStreamView;
+  stream: Stream;
+  members: Stream[];
+  missingStreamIds: string[];
+};
+
 function App() {
   const {
     themeMode,
@@ -271,6 +282,12 @@ function App() {
     patchStream,
     fetchStreams,
   } = useStreams();
+  const {
+    data: combinedStreamViews = [],
+    isFetching: combinedViewsLoading,
+    isFetched: combinedViewsFetched,
+    error: combinedViewsError,
+  } = useCombinedStreamViews();
 
   const {
     role,
@@ -285,7 +302,6 @@ function App() {
     authFetch,
   } = useAuth();
   const isReadOnly = role !== "editor";
-  const showAuthLoading = loading && !streamsInitialized;
   const canViewWebhookDetails =
     !isReadOnly && (authenticated || !requiresPassword);
   const [loginPassword, setLoginPassword] = useState("");
@@ -744,6 +760,123 @@ function App() {
   }, [setLoginVisible]);
 
   const normalizedStreams = Array.isArray(streams) ? streams : [];
+  const combinedViewData = useMemo(() => {
+    const map = new Map<string, CombinedViewInstance>();
+    const virtualStreams: Stream[] = [];
+    const streamLookup = new Map(
+      normalizedStreams.map((stream) => [stream.id, stream]),
+    );
+
+    combinedStreamViews.forEach((view) => {
+      const members = view.streamIds
+        .map((streamId) => streamLookup.get(streamId))
+        .filter((stream): stream is Stream => Boolean(stream));
+      const missingStreamIds = view.streamIds.filter(
+        (streamId) => !streamLookup.has(streamId),
+      );
+
+      const combinedTranscriptions = dedupeAndSortTranscriptions(
+        members.flatMap((stream) => stream.transcriptions ?? []),
+      );
+      const trimmedTranscriptions =
+        combinedTranscriptions.length > STREAM_TRANSCRIPTION_PREVIEW_LIMIT
+          ? combinedTranscriptions.slice(
+              combinedTranscriptions.length -
+                STREAM_TRANSCRIPTION_PREVIEW_LIMIT,
+            )
+          : combinedTranscriptions;
+
+      const activityCandidates: number[] = [];
+      trimmedTranscriptions.forEach((transcription) => {
+        activityCandidates.push(safeTimestamp(transcription.timestamp));
+      });
+      members.forEach((stream) => {
+        const activity =
+          safeTimestamp(stream.lastActivityAt) ||
+          safeTimestamp(stream.createdAt);
+        if (activity > 0) {
+          activityCandidates.push(activity);
+        }
+      });
+      const lastActivityMs =
+        activityCandidates.length > 0 ? Math.max(...activityCandidates) : 0;
+      const lastActivityAt =
+        lastActivityMs > 0 ? new Date(lastActivityMs).toISOString() : null;
+
+      const createdCandidates = members
+        .map((stream) => safeTimestamp(stream.createdAt))
+        .filter((value) => value > 0);
+      const createdAtMs =
+        createdCandidates.length > 0
+          ? Math.min(...createdCandidates)
+          : Date.now();
+      const createdAt = new Date(createdAtMs).toISOString();
+
+      const anyTranscribing = members.some(
+        (stream) => stream.status === "transcribing",
+      );
+      const anyQueued = members.some((stream) => stream.status === "queued");
+      const anyEnabled = members.some((stream) => stream.enabled);
+      const anyError = members.some(
+        (stream) => stream.status === "error" || Boolean(stream.error),
+      );
+
+      let status: Stream["status"] = "stopped";
+      if (missingStreamIds.length > 0) {
+        status = "error";
+      } else if (anyError) {
+        status = "error";
+      } else if (anyTranscribing) {
+        status = "transcribing";
+      } else if (anyQueued) {
+        status = "queued";
+      }
+
+      const enabled =
+        status === "transcribing" || status === "queued" || anyEnabled;
+
+      const errorMessage =
+        missingStreamIds.length > 0
+          ? `Missing streams: ${missingStreamIds.join(", ")}`
+          : anyError
+          ? "One or more streams reporting errors"
+          : null;
+
+      const combinedStream: Stream = {
+        id: view.id,
+        name: view.name,
+        url: `combined:${view.id}`,
+        status,
+        enabled,
+        createdAt,
+        transcriptions: trimmedTranscriptions,
+        source: "combined",
+        ignoreFirstSeconds: 0,
+        lastActivityAt,
+        error: errorMessage,
+        combinedStreamIds: [...view.streamIds],
+      };
+
+      map.set(view.id, {
+        view,
+        stream: combinedStream,
+        members,
+        missingStreamIds,
+      });
+      virtualStreams.push(combinedStream);
+    });
+
+    return { map, virtualStreams };
+  }, [combinedStreamViews, normalizedStreams]);
+
+  const combinedViewMap = combinedViewData.map;
+  const virtualStreams = combinedViewData.virtualStreams;
+
+  const displayStreams = useMemo(
+    () => [...normalizedStreams, ...virtualStreams],
+    [normalizedStreams, virtualStreams],
+  );
+
   const totalTranscriptions = normalizedStreams.reduce(
     (total, stream) => total + (stream.transcriptions?.length || 0),
     0,
@@ -757,22 +890,29 @@ function App() {
   const [lastViewedAtByConversation, setLastViewedAtByConversation] = useState<
     Record<string, number>
   >(() => ({}));
-  const sortedStreams = useMemo(() => {
-    if (!streams) {
+  const sortedConversations = useMemo(() => {
+    if (displayStreams.length === 0) {
       return [] as Stream[];
     }
 
-    return [...streams].sort(
+    return [...displayStreams].sort(
       (a, b) => getLatestActivityTimestamp(b) - getLatestActivityTimestamp(a),
     );
-  }, [streams]);
+  }, [displayStreams]);
 
-  const { selectedStreamId, selectStream } = useStreamSelection(sortedStreams, {
-    streamsInitialized,
-  });
+  const selectionInitialized = streamsInitialized && combinedViewsFetched;
+  const { selectedStreamId, selectStream } = useStreamSelection(
+    sortedConversations,
+    {
+      streamsInitialized: selectionInitialized,
+    },
+  );
+  const sidebarLoading = loading || combinedViewsLoading;
+  const showAuthLoading = sidebarLoading && !selectionInitialized;
+  const combinedViewsErrorMessage = combinedViewsError?.message ?? null;
 
   const streamSidebarItems = useMemo<StreamSidebarItem[]>(() => {
-    const items: StreamSidebarItem[] = sortedStreams.map((stream) => {
+    const items: StreamSidebarItem[] = sortedConversations.map((stream) => {
       const latestTranscription = getLatestTranscription(stream);
       const title =
         stream.name?.trim() || stream.url?.trim() || "Untitled stream";
@@ -780,6 +920,7 @@ function App() {
 
       return {
         id: stream.id,
+        type: stream.source === "combined" ? "combined" : "stream",
         title,
         previewText: buildPreviewText(latestTranscription),
         previewTime:
@@ -804,7 +945,7 @@ function App() {
     });
 
     return items;
-  }, [lastViewedAtByConversation, selectedStreamId, sortedStreams]);
+  }, [lastViewedAtByConversation, selectedStreamId, sortedConversations]);
 
   const selectedStream = useMemo(() => {
     if (!selectedStreamId) {
@@ -812,12 +953,13 @@ function App() {
     }
 
     return (
-      sortedStreams.find((stream) => stream.id === selectedStreamId) ?? null
+      sortedConversations.find((stream) => stream.id === selectedStreamId) ??
+      null
     );
-  }, [sortedStreams, selectedStreamId]);
+  }, [sortedConversations, selectedStreamId]);
 
   useEffect(() => {
-    if (!selectedStream) {
+    if (!selectedStream || selectedStream.source === "combined") {
       setStandaloneControls(null);
     }
   }, [selectedStream]);
@@ -832,12 +974,31 @@ function App() {
   );
   const selectedStreamTitle = selectedStream?.name || selectedStream?.url || "";
   const selectedStreamIsPager = useMemo(
-    () => isPagerStream(selectedStream),
+    () => (selectedStream?.source ?? "audio") === "pager",
     [selectedStream],
   );
+  const selectedStreamIsCombined = useMemo(
+    () => (selectedStream?.source ?? "audio") === "combined",
+    [selectedStream],
+  );
+  const selectedCombinedMetadata = selectedStream
+    ? combinedViewMap.get(selectedStream.id) ?? null
+    : null;
+  const selectedCombinedMembers = selectedCombinedMetadata?.members ?? [];
+  const selectedCombinedMissing =
+    selectedCombinedMetadata?.missingStreamIds ?? [];
+  const selectedCombinedView = selectedCombinedMetadata?.view ?? null;
+  const combinedMemberNames = useMemo(
+    () =>
+      selectedCombinedMembers.map(
+        (stream) => stream.name?.trim() || stream.url?.trim() || stream.id,
+      ),
+    [selectedCombinedMembers],
+  );
+  const combinedMemberList = combinedMemberNames.join(", ");
 
   useEffect(() => {
-    if (selectedStream && isPagerStream(selectedStream)) {
+    if (selectedStream && (selectedStream.source ?? "audio") === "pager") {
       selectPagerExportStream(selectedStream.id);
     }
   }, [selectedStream, selectPagerExportStream]);
@@ -845,10 +1006,16 @@ function App() {
     if (!selectedStream || !canViewWebhookDetails) {
       return null;
     }
+    if ((selectedStream.source ?? "audio") !== "pager") {
+      return null;
+    }
     return buildPagerWebhookUrl(selectedStream);
   }, [canViewWebhookDetails, selectedStream]);
   const selectedStreamWebhookPath = useMemo(() => {
     if (!selectedStream || !canViewWebhookDetails) {
+      return null;
+    }
+    if ((selectedStream.source ?? "audio") !== "pager") {
       return null;
     }
     return buildPagerWebhookPath(selectedStream);
@@ -872,7 +1039,7 @@ function App() {
       let changed = false;
       const next = { ...current };
 
-      sortedStreams.forEach((stream) => {
+      sortedConversations.forEach((stream) => {
         if (!(stream.id in next)) {
           next[stream.id] = 0;
           changed = true;
@@ -881,7 +1048,7 @@ function App() {
 
       return changed ? next : current;
     });
-  }, [sortedStreams]);
+  }, [sortedConversations]);
 
   useEffect(() => {
     if (!selectedStreamId || !selectedStream) {
@@ -966,7 +1133,12 @@ function App() {
     );
   }
 
-  if (!isReadOnly && selectedStream && !selectedStreamIsPager) {
+  if (
+    !isReadOnly &&
+    selectedStream &&
+    !selectedStreamIsPager &&
+    !selectedStreamIsCombined
+  ) {
     const isEnabled = selectedStream.enabled;
     const pendingCommand = pendingStreamCommands[selectedStream.id];
     const isStarting = pendingCommand === "starting";
@@ -1019,7 +1191,7 @@ function App() {
     );
   }
 
-  if (!isReadOnly && selectedStream) {
+  if (!isReadOnly && selectedStream && !selectedStreamIsCombined) {
     const pendingCommand = pendingStreamCommands[selectedStream.id];
     const commandPending = Boolean(pendingCommand);
     const isResetting = pendingCommand === "resetting";
@@ -1271,7 +1443,7 @@ function App() {
               isReadOnly={isReadOnly}
               onRequestLogin={requestLogin}
               items={streamSidebarItems}
-              loading={loading}
+              loading={sidebarLoading}
               onSelectStream={handleSelectStream}
               isMobileViewport={isMobileViewport}
               isMobileSidebarOpen={isMobileSidebarOpen}
@@ -1302,7 +1474,14 @@ function App() {
                               className="d-inline-flex align-items-center gap-2"
                               textClassName="text-capitalize"
                             />
-                            {selectedStreamIsPager ? (
+                            {selectedStreamIsCombined ? (
+                              <>
+                                <span className="mx-1">·</span>
+                                <span className="badge text-bg-primary-subtle text-primary-emphasis text-uppercase fw-semibold">
+                                  Combined view
+                                </span>
+                              </>
+                            ) : selectedStreamIsPager ? (
                               <>
                                 <span className="mx-1">·</span>
                                 <span className="badge text-bg-info-subtle text-info-emphasis text-uppercase fw-semibold">
@@ -1335,6 +1514,19 @@ function App() {
                                 </a>
                               </>
                             )}
+                            {selectedStreamIsCombined && combinedMemberList ? (
+                              <span className="ms-2 d-inline-flex align-items-center gap-1">
+                                <span>Includes</span>
+                                <span>{combinedMemberList}</span>
+                              </span>
+                            ) : null}
+                            {selectedStreamIsCombined &&
+                            selectedCombinedMissing.length > 0 ? (
+                              <span className="ms-2 text-danger d-inline-flex align-items-center gap-1">
+                                <AlertTriangle size={14} />
+                                Missing {selectedCombinedMissing.join(", ")}
+                              </span>
+                            ) : null}
                             {selectedStreamLatestTimestamp ? (
                               <span className="ms-1">
                                 · Last activity {" "}
@@ -1345,8 +1537,14 @@ function App() {
                               </span>
                             ) : null}
                           </div>
+                          {selectedStreamIsCombined &&
+                          selectedCombinedView?.description ? (
+                            <p className="small text-body-secondary mb-0 mt-1">
+                              {selectedCombinedView.description}
+                            </p>
+                          ) : null}
                         </>
-                      ) : sortedStreams.length === 0 ? (
+                      ) : sortedConversations.length === 0 ? (
                         <>
                           <h2 className="h5 mb-1">No streams available</h2>
                           <div className="small text-body-secondary">
@@ -1534,6 +1732,15 @@ function App() {
                     </div>
                   )}
 
+                  {combinedViewsErrorMessage && (
+                    <div className="alert alert-warning" role="alert">
+                      <div className="fw-semibold mb-1">
+                        Unable to load combined views
+                      </div>
+                      <div>{combinedViewsErrorMessage}</div>
+                    </div>
+                  )}
+
                   {transcriptCorrectionEnabled && exportError && (
                     <div className="alert alert-warning" role="alert">
                       <div className="fw-semibold mb-1">Export error</div>
@@ -1551,19 +1758,27 @@ function App() {
 
                 <div className="conversation-panel__body">
                   {selectedStream ? (
-                    <StreamTranscriptionPanel
-                      streams={streams ?? []}
-                      onResetStream={handleResetStream}
-                      onReviewTranscription={reviewTranscription}
-                      focusStreamId={selectedStream.id}
-                      onStandaloneControlsChange={setStandaloneControls}
-                      pagerExporting={exportingPagerFeed}
-                      onExportPagerFeed={exportPagerFeed}
-                      onSelectPagerExportStream={selectPagerExportStream}
-                    />
+                    selectedStreamIsCombined ? (
+                      <CombinedTranscriptionLog
+                        streams={selectedCombinedMembers}
+                        loading={sidebarLoading}
+                        limit={STREAM_TRANSCRIPTION_PREVIEW_LIMIT}
+                      />
+                    ) : (
+                      <StreamTranscriptionPanel
+                        streams={streams ?? []}
+                        onResetStream={handleResetStream}
+                        onReviewTranscription={reviewTranscription}
+                        focusStreamId={selectedStream.id}
+                        onStandaloneControlsChange={setStandaloneControls}
+                        pagerExporting={exportingPagerFeed}
+                        onExportPagerFeed={exportPagerFeed}
+                        onSelectPagerExportStream={selectPagerExportStream}
+                      />
+                    )
                   ) : (
                     <div className="conversation-panel__placeholder text-body-secondary text-center">
-                      {sortedStreams.length === 0 ? (
+                      {sortedConversations.length === 0 ? (
                         <>
                           <p className="fw-semibold mb-1">
                             No streams available

@@ -33,17 +33,22 @@ def test_load_config_uses_repository_defaults() -> None:
         TranscriptionReviewStatus.CORRECTED,
         TranscriptionReviewStatus.VERIFIED,
     ]
+    assert config.combinedStreamViews
+    combined_view = config.combinedStreamViews[0]
+    assert combined_view.streamIds
+    assert "broadcastify-2653" in combined_view.streamIds
 
 
 def test_state_config_can_clear_default_streams(tmp_path: Path) -> None:
     """Users can override the shipped streams by setting an empty list."""
 
     override_path = tmp_path / "config.yaml"
-    override_path.write_text("defaultStreams: []\n")
+    override_path.write_text("defaultStreams: []\ncombinedStreamViews: []\n")
 
     config = load_config()
 
     assert config.defaultStreams == []
+    assert config.combinedStreamViews == []
 
 
 def test_default_config_supports_password_only_login() -> None:

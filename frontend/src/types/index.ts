@@ -1,6 +1,6 @@
 export type StreamStatus = "stopped" | "queued" | "transcribing" | "error";
 
-export type StreamSource = "audio" | "pager";
+export type StreamSource = "audio" | "pager" | "combined";
 
 export type ThemeMode = "light" | "dark" | "system";
 
@@ -91,6 +91,7 @@ export interface Stream {
   webhookToken?: string | null;
   ignoreFirstSeconds?: number;
   lastActivityAt?: IsoDateTimeString | null;
+  combinedStreamIds?: string[];
 }
 
 export type StreamUpdate = Pick<Stream, "id"> & Partial<Omit<Stream, "id">>;
@@ -227,6 +228,13 @@ export interface AppConfig {
   logging?: LoggingConfig;
   alerts?: AlertsConfig;
   ui?: UISettingsConfig;
+}
+
+export interface CombinedStreamView {
+  id: string;
+  name: string;
+  description?: string;
+  streamIds: string[];
 }
 
 export interface AccessDescriptor {

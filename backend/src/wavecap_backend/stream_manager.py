@@ -438,12 +438,12 @@ class StreamManager:
                     resumed_streams.append(stream)
             for stream in resumed_streams:
                 try:
-                    self._start_triggers.pop(stream.id, None)
+                    trigger = self._start_triggers.get(stream.id) or SystemEventTrigger.automatic_resume()
                     await self._record_system_event(
                         stream,
                         TranscriptionEventType.RECORDING_STARTED,
                         RECORDING_STARTED_MESSAGE,
-                        trigger=SystemEventTrigger.automatic_resume(),
+                        trigger=trigger,
                     )
                 except Exception:  # pragma: no cover - defensive startup
                     LOGGER.exception(
