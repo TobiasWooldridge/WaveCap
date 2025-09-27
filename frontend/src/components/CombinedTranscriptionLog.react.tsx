@@ -1,26 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
-import { ArrowDownCircle, List, Pause, Play, Radio } from "lucide-react";
+import { ArrowDownCircle, List } from "lucide-react";
 import { Stream, TranscriptionResult } from "@types";
 import { useUISettings } from "../contexts/UISettingsContext";
 import { useAutoScroll } from "../hooks/useAutoScroll";
-import {
-  getNotifiableAlerts,
-  getReviewStatus,
-  getTranscriptionDisplayText,
-  isBlankAudioText,
-  isSystemTranscription,
-} from "../utils/transcriptions";
+// helpers for metadata are encapsulated in TranscriptMessageRow
 import { useTranscriptionAudioPlayback } from "../hooks/useTranscriptionAudioPlayback";
-import {
-  buildPlaybackQueue,
-  dedupeAndSortTranscriptions,
-  getRecordingElementId,
-} from "./StreamTranscriptionPanel.logic";
-import { Timestamp } from "./primitives/Timestamp.react";
+import { buildPlaybackQueue, dedupeAndSortTranscriptions } from "./StreamTranscriptionPanel.logic";
 import Button from "./primitives/Button.react";
-import { TranscriptionSegmentChips } from "./TranscriptionSegmentChips.react";
-import { AlertChips } from "./chips/AlertChips.react";
-import { SystemEventChip } from "./chips/SystemEventChip.react";
+import TranscriptMessageRow from "./TranscriptMessageRow.react";
 
 interface CombinedTranscriptionLogProps {
   streams: Stream[];
@@ -199,66 +186,7 @@ export const CombinedTranscriptionLog: React.FC<CombinedTranscriptionLogProps> =
     [playRecording],
   );
 
-  const renderMetadata = (transcription: TranscriptionResult) => {
-    const parts: React.ReactNode[] = [];
-
-    const alertTriggers = getNotifiableAlerts(transcription.alerts);
-    if (alertTriggers.length > 0) {
-      parts.push(
-        <AlertChips key="alerts" triggers={alertTriggers} mode="collapsed" />,
-      );
-    }
-
-    const durationSeconds = transcription.duration;
-    if (typeof durationSeconds === "number" && durationSeconds > 0) {
-      parts.push(
-        <span key="duration" className="chip-button chip-button--surface">
-          {durationSeconds.toFixed(1)}s duration
-        </span>,
-      );
-    }
-
-    if (transcriptCorrectionEnabled) {
-      const reviewStatus = getReviewStatus(transcription);
-      if (reviewStatus !== "pending") {
-        parts.push(
-          <span
-            key="review"
-            className={`review-badge review-badge--${reviewStatus}`}
-          >
-            {reviewStatus === "verified" ? "Verified" : "Corrected"}
-          </span>,
-        );
-      }
-
-      if (transcription.reviewedBy) {
-        parts.push(
-          <span key="reviewedBy" className="chip-button chip-button--surface">
-            by {transcription.reviewedBy}
-          </span>,
-        );
-      }
-
-      if (transcription.reviewedAt) {
-        parts.push(
-          <Timestamp
-            key="reviewedAt"
-            value={transcription.reviewedAt}
-            className="chip-button chip-button--surface"
-            prefix="Reviewed "
-            showDate
-            dateClassName="ms-1"
-          />,
-        );
-      }
-    }
-
-    if (parts.length === 0) {
-      return null;
-    }
-
-    return <div className="transcript-message__meta">{parts}</div>;
-  };
+  // metadata rendering moved into TranscriptMessageRow
 
   return (
     <section className="transcript-view">
@@ -299,130 +227,25 @@ export const CombinedTranscriptionLog: React.FC<CombinedTranscriptionLogProps> =
           </div>
         ) : (
           <div className="transcript-message-list">
-            {combinedEntries.map(({ transcription, streamId, streamName }) => {
-              const isSystemEvent = isSystemTranscription(transcription);
-              const blankAudio = isBlankAudioText(transcription.text);
-              const displayText = getTranscriptionDisplayText(transcription);
-              const alertTriggers = getNotifiableAlerts(transcription.alerts);
-              const hasAlerts = alertTriggers.length > 0;
-              const recordingUrl = transcription.recordingUrl;
-              const recordingId = recordingUrl
-                ? getRecordingElementId(recordingUrl)
-                : null;
-              const orderedTranscriptions =
-                transcriptionsByStream.get(streamId) ?? [];
-              const isRecordingActive = Boolean(
-                recordingId &&
-                  playingRecording === recordingId &&
-                  playingTranscriptionId === transcription.id,
-              );
-              const chipElements: React.ReactNode[] = [];
-
-              if (isSystemEvent) {
-                const label = displayText ?? transcription.text ?? "System event";
-                if (label) {
-                  chipElements.push(
-                    <SystemEventChip
-                      key={`${transcription.id}-system`}
-                      label={label}
-                      eventType={transcription.eventType}
-                    />,
-                  );
+            {combinedEntries.map(({ transcription, streamId, streamName }) => (
+              <TranscriptMessageRow
+                key={transcription.id}
+                streamId={streamId}
+                streamName={streamName}
+                transcription={transcription}
+                orderedTranscriptions={
+                  transcriptionsByStream.get(streamId) ?? []
                 }
-              } else if (recordingUrl && recordingId) {
-                chipElements.push(
-                  <Button
-                    use="unstyled"
-                    key={`${transcription.id}-play`}
-                    onClick={() =>
-                      handlePlayAll(
-                        streamId,
-                        transcription,
-                        orderedTranscriptions,
-                      )
-                    }
-                    className="chip-button chip-button--accent"
-                  >
-                    {isRecordingActive ? (
-                      <Pause size={14} />
-                    ) : (
-                      <Play size={14} />
-                    )}
-                    {isRecordingActive ? "Stop" : "Play all"}
-                  </Button>,
-                );
-              }
-
-              chipElements.push(
-                <TranscriptionSegmentChips
-                  key={`${transcription.id}-segments`}
-                  transcription={transcription}
-                  displayText={displayText}
-                  blankAudio={blankAudio}
-                  transcriptCorrectionEnabled={transcriptCorrectionEnabled}
-                  recordingUrl={recordingUrl}
-                  recordingId={recordingId}
-                  playingSegmentId={playingSegment}
-                  onPlaySegment={playSegment}
-                  isSegmentCurrentlyPlaying={isSegmentCurrentlyPlaying}
-                />,
-              );
-
-              return (
-                <article
-                  key={transcription.id}
-                  className={`transcript-message${hasAlerts ? " transcript-message--alert" : ""}`}
-                >
-                  <div
-                    className="transcript-message__avatar"
-                    aria-hidden="true"
-                  >
-                    <Radio size={18} />
-                  </div>
-                  <div className="transcript-message__content">
-                    <header className="transcript-message__header">
-                      <span className="transcript-message__channel">
-                        {streamName}
-                      </span>
-                  {transcription.timestamp ? (
-                    <Timestamp
-                      value={transcription.timestamp}
-                      className="transcript-message__timestamp"
-                      showDate
-                      dateClassName="ms-1"
-                    />
-                  ) : (
-                    <span className="transcript-message__timestamp">
-                      Unknown timestamp
-                    </span>
-                  )}
-                    </header>
-
-                    {renderMetadata(transcription)}
-
-                    <div className="transcript-message__chips">
-                      {chipElements}
-                    </div>
-                    {recordingUrl && recordingId ? (
-                      <audio
-                        key={`${recordingId}-audio`}
-                        id={recordingId}
-                        data-recording-url={recordingUrl}
-                        preload="none"
-                        className="hidden"
-                        ref={(element) => {
-                          if (element) {
-                            recordingAudioRefs.current[recordingId] = element;
-                          } else {
-                            delete recordingAudioRefs.current[recordingId];
-                          }
-                        }}
-                      />
-                    ) : null}
-                  </div>
-                </article>
-              );
-            })}
+                transcriptCorrectionEnabled={transcriptCorrectionEnabled}
+                playingRecording={playingRecording}
+                playingTranscriptionId={playingTranscriptionId}
+                playingSegmentId={playingSegment}
+                recordingAudioRefs={recordingAudioRefs}
+                onPlayAll={handlePlayAll}
+                onPlaySegment={playSegment}
+                isSegmentCurrentlyPlaying={isSegmentCurrentlyPlaying}
+              />
+            ))}
           </div>
         )}
       </div>

@@ -6,6 +6,7 @@ import {
   type PlaybackQueueState,
 } from "../components/StreamTranscriptionPanel.logic";
 import { setAudioElementSource } from "../utils/audio";
+import { computePlaybackRange } from "../utils/playback";
 
 export interface SegmentPlayOptions {
   recordingStartOffset?: number;
@@ -229,20 +230,11 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
       }
 
       setAudioElementSource(audio, recordingUrl);
-
-      const safeStart = typeof startTime === "number" && Number.isFinite(startTime) ? startTime : null;
-      const safeEnd = typeof endTime === "number" && Number.isFinite(endTime) ? endTime : null;
-      const recordingOffset =
-        typeof options?.recordingStartOffset === "number" && Number.isFinite(options.recordingStartOffset)
-          ? Math.max(0, options.recordingStartOffset)
-          : null;
-
-      const playbackStart = safeStart !== null && safeStart > 0 ? safeStart : (recordingOffset ?? (safeStart !== null ? Math.max(0, safeStart) : 0));
-      const segmentDuration = safeEnd !== null && safeStart !== null ? Math.max(0, safeEnd - safeStart) : null;
-
-      let playbackEnd = segmentDuration !== null ? playbackStart + segmentDuration : safeEnd !== null && safeEnd > playbackStart ? safeEnd : playbackStart;
-      if (!Number.isFinite(playbackEnd)) playbackEnd = playbackStart;
-      if (playbackEnd <= playbackStart) playbackEnd = playbackStart + 0.25;
+      const { start: playbackStart, end: playbackEnd } = computePlaybackRange(
+        startTime ?? null,
+        endTime ?? null,
+        options?.recordingStartOffset ?? null,
+      );
 
       const segmentKey = `${recordingId}-${startTime ?? playbackStart}-${endTime ?? playbackEnd}`;
 

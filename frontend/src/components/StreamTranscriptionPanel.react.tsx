@@ -68,6 +68,7 @@ import StandaloneSearchDialog from "./dialogs/StandaloneSearchDialog.react";
 import StandaloneJumpDialog from "./dialogs/StandaloneJumpDialog.react";
 import StandaloneStatsDialog from "./dialogs/StandaloneStatsDialog.react";
 import { useTranscriptionAudioPlayback } from "../hooks/useTranscriptionAudioPlayback";
+import SearchPanel from "./SearchPanel.react";
 
 export interface StandaloneStreamControls {
   streamId: string;
@@ -930,189 +931,7 @@ export const StreamTranscriptionPanel = ({
 
   };
 
-  const renderSearchContent = useCallback(
-    (
-      streamId: string,
-      close: () => void,
-      {
-        id,
-        headingId,
-        variant = "popover",
-      }: {
-        id?: string;
-        headingId?: string;
-        variant?: "popover" | "dialog";
-      } = {},
-    ): ReactNode => {
-      const searchState = searchStateByStream[streamId];
-      const searchValue = searchInputByStream[streamId] ?? "";
-      const isPopover = variant === "popover";
-      const titleId = headingId ?? (id ? `${id}-heading` : undefined);
-
-      return (
-        <div
-          className="transcript-stream__search-popover"
-          id={id}
-          role={isPopover ? "dialog" : undefined}
-          aria-modal={isPopover ? "false" : undefined}
-          aria-labelledby={isPopover ? titleId : undefined}
-        >
-          {isPopover ? (
-            <div className="transcript-stream__search-header" id={titleId}>
-              <div className="fw-semibold text-body">Search history</div>
-              <Button
-                size="sm"
-                use="link"
-                className="p-0 text-body-secondary"
-                onClick={close}
-                aria-label="Close search panel"
-              >
-                <X size={16} />
-              </Button>
-            </div>
-          ) : (
-            <div className="text-body-secondary small">
-              Search saved transcripts by keyword.
-            </div>
-          )}
-
-          <form
-            className="transcript-stream__search-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void handleSearch(streamId, searchValue);
-            }}
-          >
-            <div className="transcript-stream__search-input-group">
-              <Search size={16} aria-hidden="true" />
-              <input
-                type="text"
-                value={searchValue}
-                onChange={(event) =>
-                  setSearchInputByStream((prev) => ({
-                    ...prev,
-                    [streamId]: event.target.value,
-                  }))
-                }
-                placeholder="Keywords or phrases"
-                className="form-control form-control-sm"
-              />
-              <Button
-                type="submit"
-                size="sm"
-                use="primary"
-                disabled={searchState?.loading ?? false}
-                startContent={
-                  searchState?.loading ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <Search size={14} />
-                  )
-                }
-              >
-                Search
-              </Button>
-            </div>
-          </form>
-
-          {searchState ? (
-            <div className="transcript-stream__search-results">
-              <div className="transcript-stream__search-summary">
-                <div className="fw-semibold text-body">
-                  Results for “{searchState.query}” (
-                  {searchState.results.length})
-                </div>
-                <Button
-                  size="sm"
-                  use="link"
-                  onClick={() => handleClearSearch(streamId)}
-                  className="text-accent p-0"
-                >
-                  <X size={14} />
-                  Clear
-                </Button>
-              </div>
-
-              {searchState.loading ? (
-                <div className="text-xs text-ink-subtle d-flex align-items-center gap-2">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  Searching…
-                </div>
-              ) : searchState.error ? (
-                <div className="text-xs text-danger">{searchState.error}</div>
-              ) : searchState.results.length === 0 ? (
-                <div className="text-xs text-accent-strong">
-                  No matches found.
-                </div>
-              ) : (
-                <ul className="transcript-stream__search-results-list">
-                  {searchState.results.map((result) => (
-                    <li
-                      key={`${result.id}-${result.timestamp}`}
-                      className="bg-surface border border-accent/30 rounded p-2 transition-colors"
-                    >
-                      <div className="d-flex align-items-start justify-content-between gap-3">
-                        <div className="flex-grow-1">
-                          <div className="d-flex align-items-center gap-2 text-xs text-ink-subtle mb-1">
-                            <Clock className="w-3 h-3 text-neutral" />
-                            {result.timestamp ? (
-                              <Timestamp value={result.timestamp} mode="datetime" />
-                            ) : (
-                              <span>Unknown time</span>
-                            )}
-                          </div>
-                          <div>{result.text}</div>
-                        </div>
-                        <div className="d-flex flex-column align-items-end gap-1 text-xs">
-                          <Button
-                            size="sm"
-                            use="primary"
-                            onClick={() => {
-                              setJumpTimestampByStream((prev) => ({
-                                ...prev,
-                                [streamId]: toDatetimeLocalValue(
-                                  result.timestamp,
-                                ),
-                              }));
-                              const windowMinutes =
-                                jumpWindowByStream[streamId] ??
-                                DEFAULT_FOCUS_WINDOW_MINUTES;
-                              void handleGoToTimestamp(
-                                streamId,
-                                result.timestamp,
-                                windowMinutes,
-                              );
-                              close();
-                            }}
-                          >
-                            View context
-                          </Button>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ) : (
-            <div className="text-xs text-ink-subtle">
-              Search saved transcripts by keyword.
-            </div>
-          )}
-        </div>
-      );
-    },
-    [
-      searchStateByStream,
-      searchInputByStream,
-      setSearchInputByStream,
-      handleSearch,
-      handleClearSearch,
-      setJumpTimestampByStream,
-      jumpWindowByStream,
-      handleGoToTimestamp,
-    ],
-  );
+  // Search panel extracted into component
 
   const standaloneControls = useMemo<StandaloneStreamControls | null>(() => {
     if (!focusedVisibleStream) {
@@ -1249,9 +1068,29 @@ export const StreamTranscriptionPanel = ({
           streamId={streamId}
           sanitizedStreamId={sanitizedStreamId}
         >
-          {renderSearchContent(streamId, closeStandaloneDialog, {
-            variant: "dialog",
-          })}
+          <SearchPanel
+            variant="dialog"
+            searchValue={searchInputByStream[streamId] ?? ""}
+            loading={Boolean(searchStateByStream[streamId]?.loading)}
+            error={searchStateByStream[streamId]?.error ?? null}
+            results={searchStateByStream[streamId]?.results ?? []}
+            onChange={(value) =>
+              setSearchInputByStream((prev) => ({ ...prev, [streamId]: value }))
+            }
+            onSearch={(value) => void handleSearch(streamId, value)}
+            onClear={() => handleClearSearch(streamId)}
+            onClose={closeStandaloneDialog}
+            onViewContext={(timestamp) => {
+              setJumpTimestampByStream((prev) => ({
+                ...prev,
+                [streamId]: toDatetimeLocalValue(timestamp),
+              }));
+              const windowMinutes =
+                jumpWindowByStream[streamId] ?? DEFAULT_FOCUS_WINDOW_MINUTES;
+              void handleGoToTimestamp(streamId, timestamp, windowMinutes);
+              closeStandaloneDialog();
+            }}
+          />
         </StandaloneSearchDialog>,
       );
     }
@@ -1351,7 +1190,6 @@ export const StreamTranscriptionPanel = ({
     setJumpTimestampByStream,
     setJumpWindowByStream,
     setFocusByStream,
-    renderSearchContent,
     setOpenStandaloneTool,
     openStandaloneTool,
     isReadOnly,
@@ -2178,13 +2016,49 @@ export const StreamTranscriptionPanel = ({
                             {searchPanelOpen ? "Hide search" : "Search history"}
                           </Button>
 
-                          {searchPanelOpen
-                            ? renderSearchContent(stream.id, closeSearchPanel, {
-                                id: searchPopoverId,
-                                headingId: searchHeadingId,
-                                variant: "popover",
-                              })
-                            : null}
+                          {searchPanelOpen ? (
+                            <SearchPanel
+                              variant="popover"
+                              id={searchPopoverId}
+                              headingId={searchHeadingId}
+                              searchValue={searchInputByStream[stream.id] ?? ""}
+                              loading={Boolean(
+                                searchStateByStream[stream.id]?.loading,
+                              )}
+                              error={
+                                searchStateByStream[stream.id]?.error ?? null
+                              }
+                              results={
+                                searchStateByStream[stream.id]?.results ?? []
+                              }
+                              onChange={(value) =>
+                                setSearchInputByStream((prev) => ({
+                                  ...prev,
+                                  [stream.id]: value,
+                                }))
+                              }
+                              onSearch={(value) =>
+                                void handleSearch(stream.id, value)
+                              }
+                              onClear={() => handleClearSearch(stream.id)}
+                              onClose={closeSearchPanel}
+                              onViewContext={(timestamp) => {
+                                setJumpTimestampByStream((prev) => ({
+                                  ...prev,
+                                  [stream.id]: toDatetimeLocalValue(timestamp),
+                                }));
+                                const windowMinutes =
+                                  jumpWindowByStream[stream.id] ??
+                                  DEFAULT_FOCUS_WINDOW_MINUTES;
+                                void handleGoToTimestamp(
+                                  stream.id,
+                                  timestamp,
+                                  windowMinutes,
+                                );
+                                closeSearchPanel();
+                              }}
+                            />
+                          ) : null}
                         </div>
                       ) : null}
 
