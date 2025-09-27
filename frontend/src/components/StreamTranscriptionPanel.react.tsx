@@ -36,6 +36,7 @@ import {
   Stream,
   TranscriptionResult,
   TranscriptionQueryResponse,
+import { compareStreamsByName } from "../utils/streams";
   TranscriptionReviewStatus,
 } from "@types";
 import { useAuth } from "../contexts/AuthContext";
@@ -336,7 +337,7 @@ export const StreamTranscriptionPanel = ({
     playbackQueueRef.current = playbackQueue;
   }, [playbackQueue]);
 
-  const visibleStreams = useMemo<Stream[]>(() => {
+  const baseVisibleStreams = useMemo<Stream[]>(() => {
     if (!Array.isArray(streams) || streams.length === 0) {
       return [];
     }
@@ -347,6 +348,14 @@ export const StreamTranscriptionPanel = ({
 
     return streams.filter((stream) => stream.id === focusStreamId);
   }, [streams, focusStreamId]);
+
+  const visibleStreams = useMemo<Stream[]>(() => {
+    if (focusStreamId) {
+      return baseVisibleStreams;
+    }
+
+    return [...baseVisibleStreams].sort(compareStreamsByName);
+  }, [baseVisibleStreams, focusStreamId]);
 
   const focusedVisibleStream =
     visibleStreams.length === 1 ? visibleStreams[0] : null;
