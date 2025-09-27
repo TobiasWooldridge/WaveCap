@@ -65,6 +65,9 @@ import { AlertChips } from "./chips/AlertChips.react";
 import { SystemEventChip } from "./chips/SystemEventChip.react";
 import { PagerTranscriptGroup } from "./PagerTranscriptGroup.react";
 import "./StreamTranscriptionPanel.scss";
+import StandaloneSearchDialog from "./dialogs/StandaloneSearchDialog.react";
+import StandaloneJumpDialog from "./dialogs/StandaloneJumpDialog.react";
+import StandaloneStatsDialog from "./dialogs/StandaloneStatsDialog.react";
 
 export interface StandaloneStreamControls {
   streamId: string;
@@ -1455,12 +1458,6 @@ export const StreamTranscriptionPanel = ({
     const sanitizedStreamId = sanitizeStreamId(streamId);
     const focusState = focusByStream[streamId];
     const metrics = calculatePerformanceMetrics(visibleTranscriptions);
-    const lastMetricsTimestamp =
-      typeof metrics.lastTranscriptionTime === "number" &&
-      Number.isFinite(metrics.lastTranscriptionTime)
-        ? metrics.lastTranscriptionTime
-        : null;
-    const hasMetricsData = metrics.transcriptionCount > 0;
 
     const closeStandaloneDialog = () => {
       setOpenStandaloneTool(null);
@@ -1540,250 +1537,83 @@ export const StreamTranscriptionPanel = ({
     const dialogs: ReactNode[] = [];
 
     if (openStandaloneTool === "search") {
-      const dialogTitleId = `standalone-search-${sanitizedStreamId}-title`;
-
       dialogs.push(
-        <div
+        <StandaloneSearchDialog
           key="search"
-          className="app-modal"
-          role="presentation"
-          onClick={closeStandaloneDialog}
+          open
+          onClose={closeStandaloneDialog}
+          streamId={streamId}
+          sanitizedStreamId={sanitizedStreamId}
         >
-          <div
-            className="app-modal__dialog standalone-tool-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={dialogTitleId}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="app-modal__header d-flex align-items-start justify-content-between gap-3">
-              <h2 className="h5 mb-0" id={dialogTitleId}>
-                Search transcripts
-              </h2>
-              <Button
-                size="sm"
-                use="secondary"
-                onClick={closeStandaloneDialog}
-                aria-label="Close search dialog"
-              >
-                <X size={16} />
-              </Button>
-            </div>
-            <div className="app-modal__body standalone-tool-dialog__body">
-              {renderSearchContent(streamId, closeStandaloneDialog, {
-                variant: "dialog",
-              })}
-            </div>
-          </div>
-        </div>,
+          {renderSearchContent(streamId, closeStandaloneDialog, {
+            variant: "dialog",
+          })}
+        </StandaloneSearchDialog>,
       );
     }
 
     if (openStandaloneTool === "jump") {
-      const dialogTitleId = `standalone-jump-${sanitizedStreamId}-title`;
-
       dialogs.push(
-        <div
+        <StandaloneJumpDialog
           key="jump"
-          className="app-modal"
-          role="presentation"
-          onClick={closeStandaloneDialog}
-        >
-          <div
-            className="app-modal__dialog standalone-tool-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={dialogTitleId}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="app-modal__header d-flex align-items-start justify-content-between gap-3">
-              <h2 className="h5 mb-0" id={dialogTitleId}>
-                Go to timestamp
-              </h2>
-              <Button
-                size="sm"
-                use="secondary"
-                onClick={closeStandaloneDialog}
-                aria-label="Close go to timestamp dialog"
-              >
-                <X size={16} />
-              </Button>
-            </div>
-            <div className="app-modal__body standalone-tool-dialog__body">
-              <form
-                className="transcript-stream__jump-form standalone-tool-dialog__form"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  const timestampValue = jumpTimestampValue;
-                  const windowMinutes = jumpWindowValue;
-                  if (!timestampValue) {
-                    setFocusByStream((prev) => ({
-                      ...prev,
-                      [streamId]: {
-                        anchor: null,
-                        windowMinutes,
-                        transcriptions: [],
-                        loading: false,
-                        error: "Enter a date and time to jump to.",
-                      },
-                    }));
-                    return;
-                  }
-                  const parsed = new Date(timestampValue);
-                  if (Number.isNaN(parsed.getTime())) {
-                    setFocusByStream((prev) => ({
-                      ...prev,
-                      [streamId]: {
-                        anchor: null,
-                        windowMinutes,
-                        transcriptions: [],
-                        loading: false,
-                        error: "Invalid date or time value.",
-                      },
-                    }));
-                    return;
-                  }
-                  setJumpTimestampByStream((prev) => ({
-                    ...prev,
-                    [streamId]: timestampValue,
-                  }));
-                  void handleGoToTimestamp(
-                    streamId,
-                    parsed.toISOString(),
-                    windowMinutes,
-                  );
-                  closeStandaloneDialog();
-                }}
-              >
-                <div className="transcript-stream__jump-inputs">
-                  <div className="transcript-stream__jump-input">
-                    <CalendarClock size={16} aria-hidden="true" />
-                    <input
-                      type="datetime-local"
-                      value={jumpTimestampValue}
-                      onChange={(event) =>
-                        setJumpTimestampByStream((prev) => ({
-                          ...prev,
-                          [streamId]: event.target.value,
-                        }))
-                      }
-                      className="form-control form-control-sm"
-                    />
-                  </div>
-                  <select
-                    value={String(jumpWindowValue)}
-                    onChange={(event) =>
-                      setJumpWindowByStream((prev) => ({
-                        ...prev,
-                        [streamId]: Number(event.target.value),
-                      }))
-                    }
-                    className="form-select form-select-sm"
-                  >
-                    <option value="5">±5 min</option>
-                    <option value="10">±10 min</option>
-                    <option value="30">±30 min</option>
-                  </select>
-                  <Button
-                    type="submit"
-                    size="sm"
-                    use="success"
-                    disabled={focusState?.loading ?? false}
-                    isContentInline={focusState?.loading ? false : undefined}
-                  >
-                    {focusState?.loading ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      "Go"
-                    )}
-                  </Button>
-                </div>
-              </form>
-              {focusState?.error ? (
-                <div className="text-danger small" role="alert">
-                  {focusState.error}
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </div>,
+          open
+          onClose={closeStandaloneDialog}
+          sanitizedStreamId={sanitizedStreamId}
+          timestampValue={jumpTimestampValue}
+          windowMinutes={jumpWindowValue}
+          isLoading={focusState?.loading ?? false}
+          error={focusState?.error ?? null}
+          onTimestampChange={(value) =>
+            setJumpTimestampByStream((prev) => ({ ...prev, [streamId]: value }))
+          }
+          onWindowMinutesChange={(value) =>
+            setJumpWindowByStream((prev) => ({ ...prev, [streamId]: value }))
+          }
+          onSubmit={(value, windowMinutes) => {
+            if (!value) {
+              setFocusByStream((prev) => ({
+                ...prev,
+                [streamId]: {
+                  anchor: null,
+                  windowMinutes,
+                  transcriptions: [],
+                  loading: false,
+                  error: "Enter a date and time to jump to.",
+                },
+              }));
+              return;
+            }
+            const parsed = new Date(value);
+            if (Number.isNaN(parsed.getTime())) {
+              setFocusByStream((prev) => ({
+                ...prev,
+                [streamId]: {
+                  anchor: null,
+                  windowMinutes,
+                  transcriptions: [],
+                  loading: false,
+                  error: "Invalid date or time value.",
+                },
+              }));
+              return;
+            }
+            setJumpTimestampByStream((prev) => ({ ...prev, [streamId]: value }));
+            void handleGoToTimestamp(streamId, parsed.toISOString(), windowMinutes);
+            closeStandaloneDialog();
+          }}
+        />,
       );
     }
 
     if (openStandaloneTool === "stats") {
-      const dialogTitleId = `standalone-stats-${sanitizedStreamId}-title`;
-
       dialogs.push(
-        <div
+        <StandaloneStatsDialog
           key="stats"
-          className="app-modal"
-          role="presentation"
-          onClick={closeStandaloneDialog}
-        >
-          <div
-            className="app-modal__dialog standalone-tool-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={dialogTitleId}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="app-modal__header d-flex align-items-start justify-content-between gap-3">
-              <h2 className="h5 mb-0" id={dialogTitleId}>
-                Stream statistics
-              </h2>
-              <Button
-                size="sm"
-                use="secondary"
-                onClick={closeStandaloneDialog}
-                aria-label="Close stats dialog"
-              >
-                <X size={16} />
-              </Button>
-            </div>
-            <div className="app-modal__body standalone-tool-dialog__body">
-              {hasMetricsData ? (
-                <>
-                  <div className="conversation-panel__stats-title">
-                    Performance summary
-                  </div>
-                  <dl className="conversation-panel__stats-list">
-                    <div className="conversation-panel__stats-item">
-                      <dt>Transcriptions</dt>
-                      <dd>{metrics.transcriptionCount}</dd>
-                    </div>
-                    <div className="conversation-panel__stats-item">
-                      <dt>Avg confidence</dt>
-                      <dd>
-                        {clampAccuracyPercentage(
-                          metrics.averageAccuracy,
-                        ).toFixed(1)}
-                        %
-                      </dd>
-                    </div>
-                    <div className="conversation-panel__stats-item">
-                      <dt>Avg duration</dt>
-                      <dd>{formatDurationSeconds(metrics.averageDuration)}</dd>
-                    </div>
-                    <div className="conversation-panel__stats-item">
-                      <dt>Total duration</dt>
-                      <dd>{formatDurationSeconds(metrics.totalDuration)}</dd>
-                    </div>
-                  </dl>
-                  {lastMetricsTimestamp ? (
-                    <div className="conversation-panel__stats-footer">
-                      Last transcription: {" "}
-                      <Timestamp value={lastMetricsTimestamp} mode="datetime" />
-                    </div>
-                  ) : null}
-                </>
-              ) : (
-                <div className="conversation-panel__stats-empty">
-                  No transcription metrics available yet.
-                </div>
-              )}
-            </div>
-          </div>
-        </div>,
+          open
+          onClose={closeStandaloneDialog}
+          sanitizedStreamId={sanitizedStreamId}
+          metrics={metrics}
+        />,
       );
     }
 
