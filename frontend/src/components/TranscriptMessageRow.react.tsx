@@ -4,6 +4,7 @@ import type { TranscriptionResult } from "@types";
 import { getNotifiableAlerts, getReviewStatus, getTranscriptionDisplayText, isBlankAudioText, isSystemTranscription } from "../utils/transcriptions";
 import { getRecordingElementId } from "./StreamTranscriptionPanel.logic";
 import Button from "./primitives/Button.react";
+import AudioElement from "./primitives/AudioElement.react";
 import { Timestamp } from "./primitives/Timestamp.react";
 import { TranscriptionSegmentChips } from "./TranscriptionSegmentChips.react";
 import { AlertChips } from "./chips/AlertChips.react";
@@ -197,19 +198,10 @@ export const TranscriptMessageRow: React.FC<TranscriptMessageRowProps> = ({
 
         <div className="transcript-message__chips">{chipElements}</div>
         {recordingUrl && recordingId ? (
-          <audio
-            key={`${recordingId}-audio`}
-            id={recordingId}
-            data-recording-url={recordingUrl}
-            preload="none"
-            className="hidden"
-            ref={(element) => {
-              if (element) {
-                recordingAudioRefs.current[recordingId] = element;
-              } else {
-                delete recordingAudioRefs.current[recordingId];
-              }
-            }}
+          <AudioElement
+            recordingId={recordingId}
+            recordingUrl={recordingUrl}
+            refsMap={recordingAudioRefs}
           />
         ) : null}
       </div>
@@ -218,4 +210,3 @@ export const TranscriptMessageRow: React.FC<TranscriptMessageRowProps> = ({
 };
 
 export default TranscriptMessageRow;
-

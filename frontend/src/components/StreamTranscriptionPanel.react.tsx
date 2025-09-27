@@ -17,7 +17,6 @@ import {
   Target,
   BarChart3,
   Play,
-  Pause,
   Volume2,
   RotateCcw,
   Search,
@@ -36,39 +35,31 @@ import { compareStreamsByName } from "../utils/streams";
   TranscriptionReviewStatus,
 } from "@types";
 import { useAuth } from "../contexts/AuthContext";
-import { TranscriptionReviewControls } from "./TranscriptionReviewControls.react";
+// Review controls are used inside StreamTranscriptThread
 import {
   buildPlaybackQueue,
   dedupeAndSortTranscriptions,
-  getRecordingElementId,
   prepareTranscriptions,
   selectVisibleTranscriptions,
   type TranscriptionGroup,
 } from "./StreamTranscriptionPanel.logic";
-import { condensePagerTranscriptions } from "../utils/pagerMessages";
 import { calculatePerformanceMetrics } from "../hooks/usePerformance";
 import { useUISettings } from "../contexts/UISettingsContext";
 import { useAutoScroll } from "../hooks/useAutoScroll";
-import {
-  getNotifiableAlerts,
-  isBlankAudioText,
-  isSystemTranscription,
-} from "../utils/transcriptions";
+// Transcription utils used inside extracted components
 // audio element source and playback are managed by useTranscriptionAudioPlayback
 import { StreamTranscriptList } from "./StreamTranscriptList.react";
 import { Timestamp } from "./primitives/Timestamp.react";
 import Button from "./primitives/Button.react";
 import ButtonGroup from "./primitives/ButtonGroup.react";
-import { TranscriptionSegmentChips } from "./TranscriptionSegmentChips.react";
-import { AlertChips } from "./chips/AlertChips.react";
-import { SystemEventChip } from "./chips/SystemEventChip.react";
-import { PagerTranscriptGroup } from "./PagerTranscriptGroup.react";
+// Group row rendering handled by StreamTranscriptThread
 import "./StreamTranscriptionPanel.scss";
 import StandaloneSearchDialog from "./dialogs/StandaloneSearchDialog.react";
 import StandaloneJumpDialog from "./dialogs/StandaloneJumpDialog.react";
 import StandaloneStatsDialog from "./dialogs/StandaloneStatsDialog.react";
 import { useTranscriptionAudioPlayback } from "../hooks/useTranscriptionAudioPlayback";
 import SearchPanel from "./SearchPanel.react";
+import StreamTranscriptThread from "./StreamTranscriptThread.react";
 
 export interface StandaloneStreamControls {
   streamId: string;
@@ -245,7 +236,7 @@ export const StreamTranscriptionPanel = ({
     // playbackQueue,
     playRecording,
     playSegment,
-    stopCurrentRecording,
+    // stopCurrentRecording,
     isSegmentCurrentlyPlaying,
   } = useTranscriptionAudioPlayback();
   const [historyByStream, setHistoryByStream] = useState<
@@ -1216,340 +1207,35 @@ export const StreamTranscriptionPanel = ({
 
   const { transcriptCorrectionEnabled } = useUISettings();
 
+
   const renderGroupedTranscriptions = (
     streamId: string,
     groups: TranscriptionGroup[],
     orderedTranscriptions: TranscriptionResult[],
     streamIsPager: boolean,
+    transcriptCorrectionEnabled: boolean,
   ) =>
-    groups.map((group) => {
-      const renderedRecordings = new Set<string>();
-      const audioElements: JSX.Element[] = [];
-      const incidentSource = group.transcriptions.find(
-        (item) => item.pagerIncident?.incidentId,
-      );
-      const incidentDetails = incidentSource?.pagerIncident ?? null;
-      const incidentIdLabel = (() => {
-        const value =
-          incidentDetails?.incidentId ?? group.pagerIncidentId ?? null;
-        if (typeof value !== "string") {
-          return null;
-        }
-        const trimmed = value.trim();
-        return trimmed.length > 0 ? trimmed : null;
-      })();
-      const incidentCallType = incidentDetails?.callType ?? null;
-      const incidentMetaParts: string[] = [];
-      if (incidentDetails?.address) {
-        incidentMetaParts.push(incidentDetails.address);
-      }
-      if (incidentDetails?.alarmLevel) {
-        incidentMetaParts.push(`Alarm level ${incidentDetails.alarmLevel}`);
-      }
-      if (incidentDetails?.talkgroup) {
-        incidentMetaParts.push(`Talkgroup ${incidentDetails.talkgroup}`);
-      }
-      if (incidentDetails?.map) {
-        incidentMetaParts.push(`Map ${incidentDetails.map}`);
-      }
-      const incidentNarrative = incidentDetails?.narrative ?? null;
-      const incidentLocationQuery = (() => {
-        if (!incidentDetails) {
-          return null;
-        }
-        const parts: string[] = [];
-        if (incidentDetails.address) {
-          parts.push(incidentDetails.address);
-        }
-        if (incidentDetails.map && !parts.includes(incidentDetails.map)) {
-          parts.push(`Map ${incidentDetails.map}`);
-        }
-        return parts.length > 0 ? parts.join(", ") : null;
-      })();
-
-      const incidentLocationUrls = incidentLocationQuery
-        ? (() => {
-            const encodedQuery = encodeURIComponent(incidentLocationQuery);
-            // The iframe embed intentionally uses the public Google Maps Embed
-            // endpoint instead of a heavier npm integration. Dedicated Google
-            // Maps libraries require shipping an API key and latitude/longitude
-            // coordinates, but pager incidents only provide freeform address
-            // text. The embed URL lets Google handle geocoding while keeping
-            // secrets out of the frontend bundle.
-            return {
-              embed: `https://maps.google.com/maps?hl=en&q=${encodedQuery}&ie=UTF8&output=embed`,
-              link: `https://maps.google.com/maps?hl=en&q=${encodedQuery}&ie=UTF8&z=15`,
-            } as const;
-          })()
-        : null;
-
-      const transcriptionElements = group.transcriptions.map((transcription) => {
-        const items: JSX.Element[] = [];
-          const recordingUrl = transcription.recordingUrl;
-          const recordingId = recordingUrl
-            ? getRecordingElementId(recordingUrl)
-            : null;
-          const isSystemEvent = isSystemTranscription(transcription);
-
-          if (
-            recordingUrl &&
-            recordingId &&
-            !renderedRecordings.has(recordingId)
-          ) {
-            renderedRecordings.add(recordingId);
-            audioElements.push(
-              <audio
-                key={recordingId}
-                id={recordingId}
-                data-recording-url={recordingUrl}
-                preload="none"
-                className="hidden"
-                ref={(element) => {
-                  if (element) {
-                    recordingAudioRefs.current[recordingId] = element;
-                  } else {
-                    delete recordingAudioRefs.current[recordingId];
-                  }
-                }}
-              />,
-            );
-          }
-
-          if (isSystemEvent) {
-            const label =
-              typeof transcription.text === "string"
-                ? transcription.text.trim()
-                : "";
-            if (label) {
-              items.push(
-                <SystemEventChip
-                  key={`${transcription.id}-system`}
-                  label={label}
-                  eventType={transcription.eventType}
-                />,
-              );
-            }
-            return { id: transcription.id, items };
-          }
-
-          const blankAudio = isBlankAudioText(transcription.text);
-          const reviewStatus: TranscriptionReviewStatus =
-            transcription.reviewStatus ?? "pending";
-          const correctedText =
-            typeof transcription.correctedText === "string" &&
-            transcription.correctedText.trim().length > 0
-              ? transcription.correctedText
-              : null;
-          const displayText = correctedText ?? transcription.text;
-          const alertTriggers = getNotifiableAlerts(transcription.alerts);
-
-          if (alertTriggers.length > 0) {
-            items.push(
-              <AlertChips
-                key={`${transcription.id}-alert`}
-                triggers={alertTriggers}
-                mode="collapsed"
-              />,
-            );
-          }
-
-          items.push(
-            <TranscriptionSegmentChips
-              key={`${transcription.id}-segments`}
-              transcription={transcription}
-              displayText={displayText}
-              blankAudio={blankAudio}
-              transcriptCorrectionEnabled={transcriptCorrectionEnabled}
-              recordingUrl={recordingUrl}
-              recordingId={recordingId}
-              playingSegmentId={playingSegment}
-              onPlaySegment={playSegment}
-              isSegmentCurrentlyPlaying={isSegmentCurrentlyPlaying}
-              boundaryKey="end-marker"
-            />,
-          );
-
-          if (transcriptCorrectionEnabled && reviewStatus !== "pending") {
-            items.push(
-              <span
-                key={`${transcription.id}-status`}
-                className={`review-badge review-badge--${reviewStatus}`}
-              >
-                {reviewStatus === "verified" ? "Verified" : "Correction saved"}
-              </span>,
-            );
-          }
-
-          if (transcriptCorrectionEnabled) {
-            items.push(
-              <div key={`${transcription.id}-review`} className="w-full">
-                <TranscriptionReviewControls
-                  transcription={transcription}
-                  onReview={onReviewTranscription}
-                  readOnly={isReadOnly}
-                />
-              </div>,
-            );
-          }
-
-          return { id: transcription.id, items };
-        });
-      const transcriptionItems = transcriptionElements.flatMap(
-        (entry) => entry.items,
-      );
-
-      const groupHasAlerts = group.transcriptions.some(
-        (item) => getNotifiableAlerts(item.alerts).length > 0,
-      );
-      const hasStandardTranscriptions = group.transcriptions.some(
-        (item) => !isSystemTranscription(item),
-      );
-      const firstPlayableTranscription = group.transcriptions.find(
-        (transcription) => Boolean(transcription.recordingUrl),
-      );
-      const isGroupPlaying = group.transcriptions.some((transcription) => {
-        if (!transcription.recordingUrl) {
-          return false;
-        }
-        const recordingId = getRecordingElementId(transcription.recordingUrl);
-        return (
-          playingRecording === recordingId &&
-          playingTranscriptionId === transcription.id
-        );
-      });
-      const playButton = firstPlayableTranscription ? (
-        <Button
-          key={`${group.id}-play`}
-          use="unstyled"
-          onClick={() => {
-            if (isGroupPlaying) {
-              stopCurrentRecording();
-              return;
-            }
-            handlePlayAll(streamId, firstPlayableTranscription, orderedTranscriptions);
-          }}
-          className="chip-button chip-button--accent"
-        >
-          {isGroupPlaying ? <Pause size={14} /> : <Play size={14} />}
-          {isGroupPlaying ? "Stop" : "Play all"}
-        </Button>
-      ) : null;
-
-      const pagerMessages = streamIsPager
-        ? condensePagerTranscriptions(
-            group.transcriptions.filter((item) => !isSystemTranscription(item)),
-          )
-        : [];
-
-      const elementMap = new Map(
-        transcriptionElements.map((entry) => [entry.id, entry.items] as const),
-      );
-
-      const aggregatedIds =
-        pagerMessages.length > 0
-          ? new Set<string>(
-              pagerMessages.flatMap((message) =>
-                message.fragments.map((fragment) => fragment.id),
-              ),
-            )
-          : null;
-
-      const baseItems =
-        aggregatedIds !== null
-          ? transcriptionElements
-              .filter((entry) => !aggregatedIds.has(entry.id))
-              .flatMap((entry) => entry.items)
-          : transcriptionItems;
-
-      const pagerContent =
-        pagerMessages.length > 0
-          ? [
-              <PagerTranscriptGroup
-                key={`${group.id}-pager`}
-                groupId={group.id}
-                messages={pagerMessages}
-                elementMap={elementMap}
-                openMessageIds={openPagerMessageIds}
-                onToggleMessage={togglePagerMessageFragments}
-                incidentLocationUrls={incidentLocationUrls}
-                incidentLocationQuery={incidentLocationQuery ?? undefined}
-              />,
-            ]
-          : [];
-
-      const groupContent = [
-        ...(playButton ? [playButton] : []),
-        ...pagerContent,
-        ...baseItems,
-      ];
-
-      const transcriptContentClassName = streamIsPager
-        ? "transcript-thread__content transcript-thread__content--pager"
-        : "transcript-thread__content";
-
-      return (
-        <article
-          key={group.id}
-          className={`transcript-thread${groupHasAlerts ? " transcript-thread--alert" : ""}`}
-        >
-          <div className="transcript-thread__body">
-            <header className="transcript-thread__header">
-              {group.startTimestamp ? (
-                <Timestamp
-                  value={group.startTimestamp}
-                  className="transcript-thread__time"
-                />
-              ) : (
-                <span className="transcript-thread__time">Unknown</span>
-              )}
-              {group.transcriptions.length > 1 ? (
-                <span className="transcript-thread__updates">
-                  +{group.transcriptions.length - 1} updates
-                </span>
-              ) : null}
-              {!hasStandardTranscriptions ? (
-                <span className="transcript-meta__confidence transcript-meta__confidence--system">
-                  System event
-                </span>
-              ) : null}
-            </header>
-            {incidentIdLabel || incidentCallType || incidentMetaParts.length > 0 || incidentNarrative ? (
-              <div className="transcript-thread__incident-summary">
-                {incidentIdLabel || incidentCallType ? (
-                  <div className="transcript-thread__incident">
-                    {incidentIdLabel ? (
-                      <span className="transcript-thread__incident-id">
-                        {incidentIdLabel}
-                      </span>
-                    ) : null}
-                    {incidentCallType ? (
-                      <span className="transcript-thread__incident-type">
-                        {incidentCallType}
-                      </span>
-                    ) : null}
-                  </div>
-                ) : null}
-                {incidentMetaParts.length > 0 ? (
-                  <div className="transcript-thread__incident-meta">
-                    {incidentMetaParts.map((part, index) => (
-                      <span key={`${group.id}-incident-meta-${index}`}>{part}</span>
-                    ))}
-                  </div>
-                ) : null}
-                {incidentNarrative ? (
-                  <div className="transcript-thread__incident-narrative">
-                    {incidentNarrative}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-            <div className={transcriptContentClassName}>{groupContent}</div>
-            {audioElements}
-          </div>
-        </article>
-      );
-    });
-
+    groups.map((group) => (
+      <StreamTranscriptThread
+        key={group.id}
+        streamId={streamId}
+        group={group}
+        orderedTranscriptions={orderedTranscriptions}
+        streamIsPager={streamIsPager}
+        transcriptCorrectionEnabled={transcriptCorrectionEnabled}
+        isReadOnly={isReadOnly}
+        playingRecording={playingRecording}
+        playingTranscriptionId={playingTranscriptionId}
+        playingSegmentId={playingSegment}
+        recordingAudioRefs={recordingAudioRefs}
+        onPlayAll={handlePlayAll}
+        onPlaySegment={playSegment}
+        isSegmentCurrentlyPlaying={isSegmentCurrentlyPlaying}
+        openPagerMessageIds={openPagerMessageIds}
+        onTogglePagerMessage={togglePagerMessageFragments}
+        onReviewTranscription={onReviewTranscription}
+      />
+    ));
   if (visibleStreams.length === 0) {
     return (
       <section className="transcript-view">
@@ -1983,6 +1669,7 @@ export const StreamTranscriptionPanel = ({
                               focusPrepared.groupedTranscriptions,
                               focusPrepared.sortedTranscriptions,
                               streamIsPager,
+                              transcriptCorrectionEnabled,
                             )}
                         </div>
                       ) : (
@@ -2187,6 +1874,7 @@ export const StreamTranscriptionPanel = ({
                           groupedTranscriptions,
                           orderedTranscriptions,
                           streamIsPager,
+                          transcriptCorrectionEnabled,
                         )}
                       </StreamTranscriptList>
                     </div>
