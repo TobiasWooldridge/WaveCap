@@ -937,11 +937,17 @@ function App() {
       }
 
       if (streamSortMode === "name") {
-        // Ensure true A–Z ordering when sorting by name
-        const nameComparison = compareStreamsByName(a, b);
-        if (nameComparison !== 0) {
-          return nameComparison;
-        }
+        // Explicit A–Z ordering by human-readable title
+        const nameComparison = (() => {
+          const collator = new Intl.Collator(undefined, {
+            numeric: true,
+            sensitivity: "base",
+          });
+          const aTitle = getStreamTitle(a);
+          const bTitle = getStreamTitle(b);
+          return -collator.compare(aTitle, bTitle);
+        })();
+        if (nameComparison !== 0) return nameComparison;
         const activityDifference =
           getLatestActivityTimestamp(b) - getLatestActivityTimestamp(a);
         if (activityDifference !== 0) {

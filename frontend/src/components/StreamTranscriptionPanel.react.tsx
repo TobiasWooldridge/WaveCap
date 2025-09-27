@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Radio } from "lucide-react";
 import type { Stream, TranscriptionResult, TranscriptionReviewStatus } from "@types";
+import { compareStreamsByName } from "../utils/streams";
 import { buildPlaybackQueue } from "./StreamTranscriptionPanel.logic";
 import { useTranscriptionAudioPlayback } from "../hooks/useTranscriptionAudioPlayback";
 import StreamSection from "./StreamSection.react";
@@ -56,7 +57,8 @@ export const StreamTranscriptionPanel = ({
 
   const visibleStreams = useMemo<Stream[]>(() => {
     if (focusStreamId) return baseVisibleStreams;
-    return [...baseVisibleStreams].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    // Sort Z–A so SA… groups appear above NSW… per requested ordering
+    return [...baseVisibleStreams].sort((a, b) => compareStreamsByName(b, a));
   }, [baseVisibleStreams, focusStreamId]);
 
   const focusedVisibleStream = visibleStreams.length === 1 ? visibleStreams[0] : null;
