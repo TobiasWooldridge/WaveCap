@@ -8,7 +8,6 @@ export type StreamCommandState =
   | "starting"
   | "stopping"
   | "resetting"
-  | "removing"
   | "updating";
 
 export type AccessRole = "read_only" | "editor";

@@ -11,7 +11,6 @@ import {
   Play,
   Square,
   RotateCcw,
-  Trash2,
   AlertTriangle,
   Pause,
   MicOff,
@@ -34,7 +33,6 @@ import {
 import {
   ClientCommandType,
   Stream,
-  StreamSource,
   StreamUpdate,
   ThemeMode,
   TranscriptionResult,
@@ -297,8 +295,6 @@ function App() {
   const {
     isConnected: wsConnected,
     lastMessage,
-    addStream: wsAddStream,
-    removeStream: wsRemoveStream,
     startTranscription: wsStartTranscription,
     stopTranscription: wsStopTranscription,
     resetStream: wsResetStream,
@@ -512,83 +508,6 @@ function App() {
       return resolvedMessage;
     },
     [requestLogin, showToast],
-  );
-
-  const handleAddStream = useCallback(
-    async ({
-      url,
-      name,
-      language,
-      source,
-      ignoreFirstSeconds,
-    }: {
-      url?: string;
-      name?: string;
-      language?: string;
-      source: StreamSource;
-      ignoreFirstSeconds?: number;
-    }): Promise<WebSocketCommandResult> => {
-      if (!requireEditor("add streams")) {
-        const message = "Sign in to add streams.";
-        setAddStreamError(message);
-        return { success: false, action: "add_stream", message };
-      }
-      try {
-        console.log("🔄 Adding stream:", {
-          url,
-          name,
-          language,
-          source,
-          ignoreFirstSeconds,
-        });
-        const result = await wsAddStream({
-          url,
-          name,
-          language,
-          source,
-          ignoreFirstSeconds,
-        });
-        if (!result.success) {
-          const resolvedMessage = reportCommandFailure(
-            result.action,
-            result.message,
-          );
-          setAddStreamError(resolvedMessage);
-        }
-        return result;
-      } catch (error) {
-        console.error("Failed to add stream:", error);
-        const resolvedMessage = reportCommandFailure("add_stream");
-        setAddStreamError(resolvedMessage);
-        return {
-          success: false,
-          action: "add_stream",
-          message: resolvedMessage,
-        };
-      }
-    },
-    [reportCommandFailure, requireEditor, wsAddStream],
-  );
-
-  const handleRemoveStream = useCallback(
-    async (streamId: string) => {
-      if (!requireEditor("remove streams")) {
-        return;
-      }
-      setStreamCommandState(streamId, "removing");
-      try {
-        const result = await wsRemoveStream(streamId);
-        if (!result.success) {
-          reportCommandFailure(result.action, result.message);
-        }
-      } catch (error) {
-        console.error("Failed to remove stream:", error);
-        reportCommandFailure("remove_stream");
-      } finally {
-        setStreamCommandState(streamId, null);
-      }
-    },
-    [reportCommandFailure, requireEditor, setStreamCommandState, wsRemoveStream],
   );
 
   const optimisticallyUpdateStream = useCallback(
@@ -838,39 +757,6 @@ function App() {
   const [lastViewedAtByConversation, setLastViewedAtByConversation] = useState<
     Record<string, number>
   >(() => ({}));
-  const [showAddStreamForm, setShowAddStreamForm] = useState(false);
-  const [newStreamUrl, setNewStreamUrl] = useState("");
-  const [newStreamName, setNewStreamName] = useState("");
-  const [newStreamLanguage, setNewStreamLanguage] = useState("en");
-  const [newStreamIgnoreSeconds, setNewStreamIgnoreSeconds] = useState("0");
-  const [newStreamSource, setNewStreamSource] = useState<StreamSource>("audio");
-  const [addStreamError, setAddStreamError] = useState<string | null>(null);
-  const [addingStream, setAddingStream] = useState(false);
-
-  useEffect(() => {
-    if (isReadOnly) {
-      setShowAddStreamForm(false);
-      setAddStreamError(null);
-    }
-  }, [isReadOnly]);
-
-  const clearAddStreamError = useCallback(() => {
-    setAddStreamError(null);
-  }, []);
-
-  const toggleAddStreamForm = useCallback(() => {
-    setShowAddStreamForm((current) => {
-      if (current) {
-        clearAddStreamError();
-      }
-      return !current;
-    });
-  }, [clearAddStreamError]);
-
-  const closeAddStreamForm = useCallback(() => {
-    setShowAddStreamForm(false);
-  }, []);
-
   const sortedStreams = useMemo(() => {
     if (!streams) {
       return [] as Stream[];
@@ -1032,56 +918,6 @@ function App() {
     [closeMobileSidebar, isMobileViewport, selectStream, setIsMobileActionsOpen],
   );
 
-  const handleAddStreamSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    const trimmedUrl = newStreamUrl.trim();
-    const ignoreSecondsInput = newStreamIgnoreSeconds.trim();
-    const ignoreSeconds =
-      ignoreSecondsInput === "" ? 0 : Number.parseFloat(ignoreSecondsInput);
-
-    if (newStreamSource === "audio" && !trimmedUrl) {
-      setAddStreamError("Stream URL is required for audio streams.");
-      return;
-    }
-
-    if (Number.isNaN(ignoreSeconds) || ignoreSeconds < 0) {
-      setAddStreamError("Seconds to skip must be a non-negative number.");
-      return;
-    }
-
-    setAddingStream(true);
-    clearAddStreamError();
-
-    const result = await handleAddStream({
-      url: newStreamSource === "audio" ? trimmedUrl : undefined,
-      name: newStreamName.trim() || undefined,
-      language: newStreamSource === "audio" ? newStreamLanguage : undefined,
-      source: newStreamSource,
-      ignoreFirstSeconds:
-        newStreamSource === "audio" && ignoreSeconds > 0
-          ? ignoreSeconds
-          : undefined,
-    });
-
-    if (result.success) {
-      setNewStreamUrl("");
-      setNewStreamName("");
-      setNewStreamIgnoreSeconds("0");
-      if (newStreamSource === "pager") {
-        setNewStreamSource("audio");
-      }
-      closeAddStreamForm();
-      clearAddStreamError();
-    } else {
-      if (!result.message) {
-        setAddStreamError(DEFAULT_ERROR_MESSAGES.add_stream);
-      }
-    }
-
-    setAddingStream(false);
-  };
-
   const renderConversationStatusBadge = () => {
     if (!standaloneControls) {
       return null;
@@ -1187,7 +1023,6 @@ function App() {
     const pendingCommand = pendingStreamCommands[selectedStream.id];
     const commandPending = Boolean(pendingCommand);
     const isResetting = pendingCommand === "resetting";
-    const isRemoving = pendingCommand === "removing";
     const isUpdating = pendingCommand === "updating";
     const renameButton = (
       <Button
@@ -1284,40 +1119,6 @@ function App() {
     );
 
     conversationOverflowButtons.push(resetButton);
-
-    const removeButton = (
-      <Button
-        key="remove"
-        size="sm"
-        use="secondary"
-        onClick={() => {
-          if (!requireEditor("remove streams")) {
-            return;
-          }
-          if (
-            window.confirm(
-              `Remove "${selectedStreamTitle}" from the workspace?`,
-            )
-          ) {
-            void handleRemoveStream(selectedStream.id);
-          }
-        }}
-        disabled={commandPending}
-        startContent={
-          isRemoving ? (
-            <Spinner size="sm" variant="light" label="Removing stream" />
-          ) : (
-            <Trash2 size={14} />
-          )
-        }
-      >
-        <span className="conversation-panel__action-label">
-          {isRemoving ? "Removing…" : "Remove"}
-        </span>
-      </Button>
-    );
-
-    conversationOverflowButtons.push(removeButton);
   }
 
   const conversationActionButtonGroup =
@@ -1469,25 +1270,6 @@ function App() {
             <StreamSidebar
               isReadOnly={isReadOnly}
               onRequestLogin={requestLogin}
-              showAddStreamForm={showAddStreamForm}
-              onToggleAddStreamForm={toggleAddStreamForm}
-              onCloseAddStreamForm={closeAddStreamForm}
-              onClearAddStreamError={clearAddStreamError}
-              addStreamError={addStreamError}
-              addingStream={addingStream}
-              newStreamSource={newStreamSource}
-              onChangeStreamSource={(value) => setNewStreamSource(value)}
-              newStreamUrl={newStreamUrl}
-              onChangeStreamUrl={(value) => setNewStreamUrl(value)}
-              newStreamName={newStreamName}
-              onChangeStreamName={(value) => setNewStreamName(value)}
-              newStreamLanguage={newStreamLanguage}
-              onChangeStreamLanguage={(value) => setNewStreamLanguage(value)}
-              newStreamIgnoreSeconds={newStreamIgnoreSeconds}
-              onChangeStreamIgnoreSeconds={(value) =>
-                setNewStreamIgnoreSeconds(value)
-              }
-              onSubmitAddStream={handleAddStreamSubmit}
               items={streamSidebarItems}
               loading={loading}
               onSelectStream={handleSelectStream}
