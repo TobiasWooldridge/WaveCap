@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { Stream } from "@types";
+import type { Stream, TranscriptionResult } from "@types";
 
 type StreamStatusVariant = "active" | "queued" | "error" | "idle";
 
@@ -29,18 +29,22 @@ const toTitleCase = (label: string): string => {
     .join(" ");
 };
 
-const resolveUpstreamConnectivity = (stream: Stream): boolean | null => {
+export const resolveUpstreamConnectivity = (
+  stream: Stream,
+): boolean | null => {
   const candidate = (stream as { upstreamConnected?: unknown }).upstreamConnected;
   if (typeof candidate === "boolean") {
     return candidate;
   }
 
-  const transcriptions = Array.isArray(stream.transcriptions)
+  const transcriptions: TranscriptionResult[] = Array.isArray(
+    stream.transcriptions,
+  )
     ? stream.transcriptions
     : [];
 
-  for (let index = transcriptions.length - 1; index >= 0; index -= 1) {
-    const eventType = transcriptions[index]?.eventType;
+  for (const transcription of transcriptions) {
+    const eventType = transcription?.eventType;
     if (eventType === "upstream_disconnected") {
       return false;
     }
@@ -52,7 +56,9 @@ const resolveUpstreamConnectivity = (stream: Stream): boolean | null => {
   return null;
 };
 
-const resolveStreamStatus = (stream: Stream): StreamStatusResolution => {
+export const resolveStreamStatus = (
+  stream: Stream,
+): StreamStatusResolution => {
   if (!stream.enabled) {
     return { variant: "idle", label: "Transcription stopped" };
   }
