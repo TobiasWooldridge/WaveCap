@@ -3,6 +3,11 @@ import { Stream } from "@types";
 
 type StreamStatusVariant = "active" | "queued" | "error" | "idle";
 
+type StreamStatusResolution = {
+  variant: StreamStatusVariant;
+  label: string;
+};
+
 type StreamStatusIndicatorProps = {
   stream: Stream;
   showText?: boolean;
@@ -47,33 +52,29 @@ const resolveUpstreamConnectivity = (stream: Stream): boolean | null => {
   return null;
 };
 
-const resolveStreamStatusVariant = (stream: Stream): StreamStatusVariant => {
+const resolveStreamStatus = (stream: Stream): StreamStatusResolution => {
   if (!stream.enabled) {
-    return "idle";
+    return { variant: "idle", label: "Transcription stopped" };
   }
 
   if (stream.status === "queued") {
-    return "queued";
+    return { variant: "queued", label: "Queued for transcription" };
   }
 
   if (stream.status === "error") {
-    return "error";
+    return { variant: "error", label: "Stream error" };
   }
 
   const connectivity = resolveUpstreamConnectivity(stream);
-  if (connectivity === true) {
-    return "active";
-  }
-
   if (connectivity === false) {
-    return "error";
+    return { variant: "error", label: "Upstream disconnected" };
   }
 
-  if (stream.status === "transcribing") {
-    return "active";
+  if (connectivity === true || stream.status === "transcribing") {
+    return { variant: "active", label: "Live transcription" };
   }
 
-  return "idle";
+  return { variant: "idle", label: "Awaiting audio" };
 };
 
 const getStatusIndicatorClass = (variant: StreamStatusVariant): string => {
@@ -97,9 +98,11 @@ const StreamStatusIndicator = ({
   dotClassName,
   textClassName,
 }: StreamStatusIndicatorProps) => {
-  const variant = resolveStreamStatusVariant(stream);
+  const { variant, label: defaultLabel } = resolveStreamStatus(stream);
   const indicatorClass = getStatusIndicatorClass(variant);
-  const resolvedLabel = label ? formatLabel(label) : formatLabel(stream.status);
+  const resolvedLabel = label
+    ? formatLabel(label)
+    : formatLabel(defaultLabel);
   const tooltip = resolvedLabel ? toTitleCase(resolvedLabel) : undefined;
   const ariaLabel = showText ? undefined : tooltip;
 
