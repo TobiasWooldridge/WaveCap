@@ -85,7 +85,7 @@ const StreamSidebar = ({
     onSortModeChange(nextValue);
   };
 
-  const sortLabel = sortMode === "name" ? "Name (A–Z)" : "Latest activity";
+  // Sort label text removed from header as redundant with the dropdown
 
   return (
     <div
@@ -103,9 +103,7 @@ const StreamSidebar = ({
             <p className="text-uppercase small fw-semibold text-body-secondary mb-1">
               Streams
             </p>
-            <p className="mb-0 small text-body-secondary">
-              Sorted by {sortLabel}
-            </p>
+            {/* Removed redundant sort description; dropdown indicates selection */}
           </div>
           <Flex align="center" gap={2} wrap="wrap">
             <div className="stream-sidebar__sort-control">

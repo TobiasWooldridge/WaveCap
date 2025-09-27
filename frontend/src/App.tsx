@@ -937,6 +937,7 @@ function App() {
       }
 
       if (streamSortMode === "name") {
+        // Ensure true A–Z ordering when sorting by name
         const nameComparison = compareStreamsByName(a, b);
         if (nameComparison !== 0) {
           return nameComparison;
