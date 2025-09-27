@@ -4,21 +4,57 @@ set -euo pipefail
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
+mapfile -t UNSTAGED_CHANGES < <(git diff --name-only)
+mapfile -t UNTRACKED_CHANGES < <(git ls-files --others --exclude-standard)
+
+if [ ${#UNSTAGED_CHANGES[@]} -gt 0 ] || [ ${#UNTRACKED_CHANGES[@]} -gt 0 ]; then
+  echo "Error: uncommitted files detected. Please stage or stash the following files before committing:"
+
+  if [ ${#UNSTAGED_CHANGES[@]} -gt 0 ]; then
+    printf '  %s (modified)\n' "${UNSTAGED_CHANGES[@]}"
+  fi
+
+  if [ ${#UNTRACKED_CHANGES[@]} -gt 0 ]; then
+    printf '  %s (untracked)\n' "${UNTRACKED_CHANGES[@]}"
+  fi
+
+  exit 1
+fi
+
 mapfile -t STAGED_FILES < <(git diff --cached --name-only --diff-filter=ACM)
 
 run_ts=false
 run_py=false
+run_prettier=false
+
+declare -a prettier_files=()
 
 for file in "${STAGED_FILES[@]}"; do
   case "$file" in
     *.ts|*.tsx)
       run_ts=true
+      if [[ "$file" == frontend/* ]]; then
+        run_prettier=true
+        prettier_files+=("${file#frontend/}")
+      fi
       ;;
     *.py)
       run_py=true
       ;;
+    *.js|*.jsx|*.json|*.css|*.scss|*.md|*.html|*.yml|*.yaml)
+      if [[ "$file" == frontend/* ]]; then
+        run_prettier=true
+        prettier_files+=("${file#frontend/}")
+      fi
+      ;;
   esac
 done
+
+if $run_prettier; then
+  echo "Running Prettier formatting..."
+  npm --prefix frontend exec prettier --write "${prettier_files[@]}"
+  echo "Prettier formatting completed."
+fi
 
 if $run_ts; then
   echo "Running TypeScript type check..."
@@ -30,6 +66,17 @@ if $run_py; then
   echo "Running Python type check..."
   mapfile -t backend_py_files < <(printf '%s\n' "${STAGED_FILES[@]}" | sed -n 's/^backend\///p' | grep '\.py$' || true)
   mapfile -t external_py_files < <(printf '%s\n' "${STAGED_FILES[@]}" | grep '\.py$' | grep -v '^backend/' || true)
+
+  if [ ${#backend_py_files[@]} -gt 0 ]; then
+    echo "Running Black formatting on backend Python files..."
+    poetry -C backend run black "${backend_py_files[@]}"
+  fi
+
+  if [ ${#external_py_files[@]} -gt 0 ]; then
+    mapfile -t adjusted_external < <(printf '%s\n' "${external_py_files[@]}" | sed 's#^#../#')
+    echo "Running Black formatting on external Python files..."
+    poetry -C backend run black "${adjusted_external[@]}"
+  fi
 
   if [ ${#backend_py_files[@]} -gt 0 ]; then
     poetry -C backend run mypy "${backend_py_files[@]}"
