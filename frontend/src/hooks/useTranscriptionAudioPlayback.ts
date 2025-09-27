@@ -229,6 +229,13 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
         return;
       }
 
+      // Ensure only one audio element plays at a time. If another recording is
+      // currently playing, stop it before starting this segment.
+      const currentRecordingId = playingRecordingRef.current;
+      if (currentRecordingId && currentRecordingId !== recordingId) {
+        stopCurrentRecording();
+      }
+
       setAudioElementSource(audio, recordingUrl);
       const { start: playbackStart, end: playbackEnd } = computePlaybackRange(
         startTime ?? null,
@@ -285,7 +292,7 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
         if (audio.readyState === 0) audio.load();
       }
     },
-    [resetAudioPlaybackState, setPlaybackQueue, setPlayingRecording, setPlayingSegment, setPlayingTranscriptionId],
+    [resetAudioPlaybackState, setPlaybackQueue, setPlayingRecording, setPlayingSegment, setPlayingTranscriptionId, stopCurrentRecording],
   );
 
   return {
