@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import secrets
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -18,12 +17,12 @@ from .alerts import TranscriptionAlertEvaluator
 from .datetime_utils import utcnow
 from .database import StreamDatabase
 from .models import (
-    AddStreamRequest,
     AlertsConfig,
     AppConfig,
     ExportTranscriptionsRequest,
     PagerWebhookRequest,
     Stream,
+    StreamConfig,
     StreamSource,
     StreamStatus,
     TranscriptionEventType,
@@ -349,36 +348,102 @@ class StreamManager:
         if should_broadcast or worker_to_start or worker_to_stop:
             await self._broadcast_streams()
 
+    def _build_stream_from_config(
+        self, stream_config: StreamConfig, existing: Optional[Stream]
+    ) -> Stream:
+        if stream_config.source == StreamSource.PAGER:
+            url = (stream_config.url or f"/api/pager-feeds/{stream_config.id}").strip()
+            base = existing or Stream(
+                id=stream_config.id,
+                name=stream_config.name,
+                url=url,
+                status=StreamStatus.TRANSCRIBING,
+                enabled=True,
+                createdAt=utcnow(),
+                language=None,
+                transcriptions=[],
+                source=StreamSource.PAGER,
+                webhookToken=stream_config.webhookToken,
+                ignoreFirstSeconds=0.0,
+            )
+            return base.model_copy(
+                update={
+                    "name": stream_config.name,
+                    "url": url,
+                    "source": StreamSource.PAGER,
+                    "webhookToken": stream_config.webhookToken,
+                    "ignoreFirstSeconds": 0.0,
+                    "language": None,
+                    "enabled": True,
+                    "status": StreamStatus.TRANSCRIBING,
+                    "error": None,
+                }
+            )
+
+        url = (stream_config.url or "").strip()
+        language = stream_config.language.strip() if stream_config.language else None
+        ignore_seconds = resolve_ignore_first_seconds(
+            StreamSource.AUDIO, url, stream_config.ignoreFirstSeconds
+        )
+        if existing is None:
+            enabled = bool(stream_config.enabled)
+            status = StreamStatus.STOPPED
+            return Stream(
+                id=stream_config.id,
+                name=stream_config.name,
+                url=url,
+                status=status,
+                enabled=enabled,
+                createdAt=utcnow(),
+                language=language,
+                transcriptions=[],
+                source=StreamSource.AUDIO,
+                webhookToken=None,
+                ignoreFirstSeconds=ignore_seconds,
+            )
+        updates = {
+            "name": stream_config.name,
+            "url": url,
+            "language": language,
+            "source": StreamSource.AUDIO,
+            "ignoreFirstSeconds": ignore_seconds,
+            "webhookToken": None,
+        }
+        return existing.model_copy(update=updates)
+
     async def initialize(self) -> None:
         await self._executor.start()
-        streams = await self.database.load_streams()
-        if not streams:
-            LOGGER.info("No streams in persistence; loading defaults")
-            for stream_config in self.config.defaultStreams:
-                if not stream_config.enabled:
-                    LOGGER.debug(
-                        "Skipping disabled default stream %s", stream_config.id
-                    )
-                    continue
-                ignore_seconds = resolve_ignore_first_seconds(
-                    StreamSource.AUDIO,
-                    stream_config.url,
-                    stream_config.ignoreFirstSeconds,
+        persisted_streams = {
+            stream.id: stream for stream in await self.database.load_streams()
+        }
+        configured_ids = {stream.id for stream in self.config.streams}
+
+        for stream_id in list(persisted_streams.keys()):
+            if stream_id not in configured_ids:
+                LOGGER.info(
+                    "Removing persisted stream %s not present in configuration",
+                    stream_id,
                 )
-                enabled = bool(stream_config.enabled)
-                stream = Stream(
-                    id=stream_config.id or str(uuid.uuid4()),
-                    name=stream_config.name,
-                    url=stream_config.url,
-                    status=StreamStatus.STOPPED,
-                    enabled=enabled,
-                    createdAt=utcnow(),
-                    language=stream_config.language,
-                    transcriptions=[],
-                    ignoreFirstSeconds=ignore_seconds,
+                await self._delete_stream(stream_id)
+                self._delete_recordings(stream_id)
+                persisted_streams.pop(stream_id, None)
+
+        streams: List[Stream] = []
+        for stream_config in self.config.streams:
+            existing = persisted_streams.get(stream_config.id)
+            if existing and existing.source != stream_config.source:
+                LOGGER.info(
+                    "Recreating stream %s after source change (%s → %s)",
+                    stream_config.id,
+                    existing.source,
+                    stream_config.source,
                 )
-                await self._save_stream(stream)
-                streams.append(stream)
+                await self._delete_stream(existing.id)
+                self._delete_recordings(existing.id)
+                existing = None
+            stream = self._build_stream_from_config(stream_config, existing)
+            await self._save_stream(stream)
+            streams.append(stream)
         streams_to_activate: List[Stream] = []
         for stream in streams:
             await self._apply_default_preroll(stream)
@@ -453,44 +518,6 @@ class StreamManager:
     def get_streams(self) -> List[Stream]:
         return [stream.model_copy() for stream in self.streams.values()]
 
-    async def add_stream(self, request: AddStreamRequest) -> Stream:
-        async with self._lock:
-            stream_id = request.id or str(uuid.uuid4())
-            if stream_id in self.streams:
-                raise ValueError("Stream ID already exists")
-            source = request.source or StreamSource.AUDIO
-            language = request.language
-            url = request.url or ""
-            webhook_token: Optional[str] = None
-            status = StreamStatus.STOPPED
-            enabled = source != StreamSource.AUDIO
-            if source == StreamSource.PAGER:
-                webhook_token = secrets.token_urlsafe(32)
-                url = request.url or f"/api/pager-feeds/{stream_id}"
-                language = None
-                status = StreamStatus.TRANSCRIBING
-                enabled = True
-            ignore_seconds = resolve_ignore_first_seconds(
-                source, url, request.ignoreFirstSeconds
-            )
-            stream = Stream(
-                id=stream_id,
-                name=request.name or (url if url else f"Stream {stream_id}"),
-                url=url,
-                status=status,
-                enabled=enabled,
-                createdAt=utcnow(),
-                language=language,
-                transcriptions=[],
-                source=source,
-                webhookToken=webhook_token,
-                ignoreFirstSeconds=ignore_seconds,
-            )
-            self.streams[stream.id] = stream
-            await self._save_stream(stream)
-        await self._broadcast_streams()
-        return stream
-
     async def update_stream(
         self, stream_id: str, request: UpdateStreamRequest
     ) -> Stream:
@@ -536,24 +563,6 @@ class StreamManager:
             await self._broadcast_streams()
 
         return updated_stream
-
-    async def remove_stream(self, stream_id: str) -> None:
-        worker: Optional[StreamWorker] = None
-        delete_recordings = False
-        async with self._lock:
-            worker = self.workers.pop(stream_id, None)
-            stream = self.streams.pop(stream_id, None)
-            if stream:
-                self._start_triggers.pop(stream_id, None)
-                self._stop_triggers.pop(stream_id, None)
-                self._last_event_timestamps.pop(stream_id, None)
-                await self._delete_stream(stream_id)
-                delete_recordings = True
-        if worker:
-            await worker.stop()
-        if delete_recordings:
-            self._delete_recordings(stream_id)
-        await self._broadcast_streams()
 
     async def start_stream(
         self,

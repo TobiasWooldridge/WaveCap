@@ -2,7 +2,6 @@ import { useState, useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Stream,
-  StreamSource,
   StreamUpdate,
   TranscriptionResult,
   TranscriptionReviewStatus,
@@ -12,14 +11,6 @@ import { useAuth } from "../contexts/AuthContext";
 const API_BASE = "/api";
 export const STREAM_TRANSCRIPTION_PREVIEW_LIMIT = 100;
 const STREAMS_QUERY_KEY = ["streams"] as const;
-
-type AddStreamArgs = {
-  url?: string;
-  name?: string;
-  language?: string;
-  source?: StreamSource;
-  ignoreFirstSeconds?: number;
-};
 
 const toError = (value: unknown, fallback: string): Error => {
   if (value instanceof Error) {
@@ -100,75 +91,6 @@ export const useStreams = () => {
       throw errorObject;
     }
   }, [refetch]);
-
-  const addStreamMutation = useMutation<Stream, Error, AddStreamArgs>({
-    mutationFn: async ({
-      url,
-      name,
-      language,
-      source = "audio",
-      ignoreFirstSeconds,
-    }) => {
-      const response = await authFetch(`${API_BASE}/streams`, {
-        method: "POST",
-        headers: buildHeaders("application/json"),
-        body: JSON.stringify({
-          url,
-          name,
-          language,
-          source,
-          ignoreFirstSeconds,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const newStream = (await response.json()) as Stream;
-      return normalizeStream(newStream);
-    },
-    onSuccess: (newStream) => {
-      setError(null);
-      updateCachedStreams((previous) => {
-        if (previous.some((stream) => stream.id === newStream.id)) {
-          return previous.map((stream) =>
-            stream.id === newStream.id ? newStream : stream,
-          );
-        }
-        return [...previous, newStream];
-      });
-    },
-    onError: (err) => {
-      const errorObject = toError(err, "Failed to add stream");
-      console.error("Error adding stream:", errorObject);
-      setError(errorObject.message);
-    },
-  });
-
-  const removeStreamMutation = useMutation<void, Error, string>({
-    mutationFn: async (streamId: string) => {
-      const response = await authFetch(`${API_BASE}/streams/${streamId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-    },
-    onSuccess: (_, streamId) => {
-      setError(null);
-      updateCachedStreams((previous) => {
-        const next = previous.filter((stream) => stream.id !== streamId);
-        return next.length === previous.length ? previous : next;
-      });
-    },
-    onError: (err) => {
-      const errorObject = toError(err, "Failed to remove stream");
-      console.error("Error removing stream:", errorObject);
-      setError(errorObject.message);
-    },
-  });
 
   const startStreamMutation = useMutation<void, Error, string>({
     mutationFn: async (streamId: string) => {
@@ -388,16 +310,6 @@ export const useStreams = () => {
     },
   });
 
-  const addStream = useCallback(
-    (args: AddStreamArgs) => addStreamMutation.mutateAsync(args),
-    [addStreamMutation],
-  );
-
-  const removeStream = useCallback(
-    (streamId: string) => removeStreamMutation.mutateAsync(streamId),
-    [removeStreamMutation],
-  );
-
   const startStreamTranscription = useCallback(
     (streamId: string) => startStreamMutation.mutateAsync(streamId),
     [startStreamMutation],
@@ -529,8 +441,6 @@ export const useStreams = () => {
     initialized: isFetched,
     error,
     fetchStreams,
-    addStream,
-    removeStream,
     startStreamTranscription,
     stopStreamTranscription,
     resetStream,

@@ -3,7 +3,6 @@ import {
   ClientCommandType,
   ClientToServerMessage,
   ServerToClientMessage,
-  StreamSource,
 } from "@types";
 
 export interface WebSocketCommandResult {
@@ -433,49 +432,6 @@ export const useWebSocket = (
     [isConnected, sendMessage, socket],
   );
 
-  const addStream = useCallback(
-    ({
-      url,
-      name,
-      language,
-      source,
-      ignoreFirstSeconds,
-    }: {
-      url?: string;
-      name?: string;
-      language?: string;
-      source?: StreamSource;
-      ignoreFirstSeconds?: number;
-    }) => {
-      console.log("📡 Sending add_stream WebSocket message:", {
-        url,
-        name,
-        language,
-        source,
-        ignoreFirstSeconds,
-      });
-      return sendCommand({
-        type: "add_stream",
-        url,
-        name,
-        language,
-        source,
-        ignoreFirstSeconds,
-      });
-    },
-    [sendCommand],
-  );
-
-  const removeStream = useCallback(
-    (streamId: string) => {
-      return sendCommand({
-        type: "remove_stream",
-        streamId,
-      });
-    },
-    [sendCommand],
-  );
-
   const startTranscription = useCallback(
     (streamId: string) => {
       return sendCommand({
@@ -540,8 +496,6 @@ export const useWebSocket = (
     error,
     sendMessage,
     sendCommand,
-    addStream,
-    removeStream,
     startTranscription,
     stopTranscription,
     resetStream,

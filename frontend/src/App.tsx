@@ -75,8 +75,6 @@ const REVIEW_STATUS_ORDER = REVIEW_STATUS_OPTIONS.map((option) => option.value);
 const GENERIC_SERVER_ERROR_MESSAGE = "An unexpected server error occurred.";
 
 const DEFAULT_ACK_MESSAGES: Record<ClientCommandType, string> = {
-  add_stream: "Stream added successfully.",
-  remove_stream: "Stream removed.",
   start_transcription: "Transcription started.",
   stop_transcription: "Transcription stopped.",
   reset_stream: "Stream reset.",
@@ -84,8 +82,6 @@ const DEFAULT_ACK_MESSAGES: Record<ClientCommandType, string> = {
 };
 
 const DEFAULT_ERROR_MESSAGES: Record<ClientCommandType, string> = {
-  add_stream: "Unable to add stream. Please try again.",
-  remove_stream: "Unable to remove stream. Please try again.",
   start_transcription: "Unable to start transcription. Please try again.",
   stop_transcription: "Unable to stop transcription. Please try again.",
   reset_stream: "Unable to reset stream. Please try again.",

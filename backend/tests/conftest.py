@@ -84,7 +84,7 @@ def minimal_config() -> AppConfig:
                 "port": 8000,
                 "corsOrigin": "http://localhost:5173",
             },
-            "defaultStreams": [],
+            "streams": [],
             "access": {
                 "defaultRole": "read_only",
                 "credentials": [

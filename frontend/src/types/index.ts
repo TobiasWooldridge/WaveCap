@@ -97,8 +97,6 @@ export interface Stream {
 export type StreamUpdate = Pick<Stream, "id"> & Partial<Omit<Stream, "id">>;
 
 export type ClientCommandType =
-  | "add_stream"
-  | "remove_stream"
   | "start_transcription"
   | "stop_transcription"
   | "reset_stream"
@@ -109,15 +107,6 @@ export interface ClientMessageBase {
 }
 
 export type ClientToServerMessage =
-  | ({
-      type: "add_stream";
-      url?: string;
-      name?: string;
-      language?: string;
-      source?: StreamSource;
-      ignoreFirstSeconds?: number;
-    } & ClientMessageBase)
-  | ({ type: "remove_stream"; streamId: string } & ClientMessageBase)
   | ({ type: "start_transcription"; streamId: string } & ClientMessageBase)
   | ({ type: "stop_transcription"; streamId: string } & ClientMessageBase)
   | ({ type: "reset_stream"; streamId: string } & ClientMessageBase)
@@ -148,6 +137,8 @@ export interface StreamConfig {
   enabled?: boolean;
   language?: string;
   ignoreFirstSeconds?: number;
+  source?: StreamSource;
+  webhookToken?: string;
 }
 
 export interface ServerConfig {
@@ -222,7 +213,7 @@ export interface UISettingsConfig {
 }
 
 export interface AppConfig {
-  defaultStreams: StreamConfig[];
+  streams: StreamConfig[];
   server: ServerConfig;
   whisper?: WhisperConfig;
   logging?: LoggingConfig;

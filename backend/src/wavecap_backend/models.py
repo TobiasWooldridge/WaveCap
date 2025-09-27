@@ -374,9 +374,11 @@ class UISettingsConfig(APIModel):
 class StreamConfig(APIModel):
     id: str
     name: str
-    url: str
+    source: StreamSource = StreamSource.AUDIO
+    url: Optional[str] = None
     enabled: bool = True
     language: Optional[str] = None
+    webhookToken: Optional[str] = Field(default=None, alias="webhookToken")
     ignoreFirstSeconds: float = Field(default=0.0, alias="ignoreFirstSeconds")
 
     @field_validator("ignoreFirstSeconds")
@@ -385,6 +387,20 @@ class StreamConfig(APIModel):
         if value < 0:
             raise ValueError("ignoreFirstSeconds must be non-negative")
         return float(value)
+
+    @model_validator(mode="after")
+    def _validate_source_requirements(self) -> "StreamConfig":
+        if self.source == StreamSource.AUDIO:
+            if not self.url or not self.url.strip():
+                raise ValueError("Audio streams require a non-empty url")
+            if self.webhookToken is not None:
+                raise ValueError("Audio streams must not define webhookToken")
+        elif self.source == StreamSource.PAGER:
+            if not self.webhookToken or not self.webhookToken.strip():
+                raise ValueError("Pager streams require a webhookToken")
+            if self.language is not None:
+                raise ValueError("Pager streams do not support language settings")
+        return self
 
 
 class CombinedStreamViewConfig(APIModel):
@@ -446,8 +462,10 @@ class AppConfig(APIModel):
     logging: LoggingConfig = LoggingConfig()
     whisper: WhisperConfig = WhisperConfig()
     alerts: AlertsConfig = AlertsConfig()
-    defaultStreams: List[StreamConfig] = Field(
-        default_factory=list, alias="defaultStreams"
+    streams: List[StreamConfig] = Field(
+        default_factory=list,
+        alias="streams",
+        validation_alias=AliasChoices("streams", "defaultStreams"),
     )
     combinedStreamViews: List[CombinedStreamViewConfig] = Field(
         default_factory=list, alias="combinedStreamViews"
@@ -464,28 +482,6 @@ class UpdateAlertsRequest(AlertsConfig):
             if not rule.phrases:
                 raise ValueError("Each alert rule must provide at least one phrase")
         return rules
-
-
-class AddStreamRequest(APIModel):
-    url: Optional[str] = None
-    name: Optional[str] = None
-    id: Optional[str] = None
-    language: Optional[str] = None
-    source: StreamSource = Field(default=StreamSource.AUDIO)
-    ignoreFirstSeconds: float = Field(default=0.0, alias="ignoreFirstSeconds")
-
-    @field_validator("ignoreFirstSeconds")
-    @classmethod
-    def _validate_ignore_first_seconds(cls, value: float) -> float:
-        if value < 0:
-            raise ValueError("ignoreFirstSeconds must be non-negative")
-        return float(value)
-
-    @model_validator(mode="after")
-    def validate_url(cls, values: "AddStreamRequest") -> "AddStreamRequest":
-        if values.source == StreamSource.AUDIO and not values.url:
-            raise ValueError("Audio streams require a URL")
-        return values
 
 
 class UpdateStreamRequest(APIModel):
