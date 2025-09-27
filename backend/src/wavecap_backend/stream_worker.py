@@ -972,8 +972,9 @@ class StreamWorker:
         )
 
         recording_file: Optional[Path] = None
-        if text != BLANK_AUDIO_TOKEN:
-            recording_file = await self._write_recording(trimmed_samples)
+        samples_to_write = trimmed_samples if trimmed_samples.size > 0 else chunk.samples
+        if samples_to_write.size > 0:
+            recording_file = await self._write_recording(samples_to_write)
         duration = float(
             effective_duration
             if effective_duration > 0

@@ -476,7 +476,9 @@ async def test_worker_stop_terminates_hanging_ffmpeg(monkeypatch, tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_worker_emits_blank_audio_placeholder(tmp_path):
+async def test_worker_emits_blank_audio_placeholder(tmp_path, monkeypatch):
+    recordings_root = tmp_path / "recordings"
+    monkeypatch.setattr(stream_worker_module, "RECORDINGS_DIR", recordings_root)
     config = WhisperConfig(
         sampleRate=16000,
         chunkLength=4,
@@ -531,6 +533,15 @@ async def test_worker_emits_blank_audio_placeholder(tmp_path):
     await worker._ingest_pcm_bytes(silence)
 
     assert len(captured) == 1
+    transcription = captured[0]
+    assert transcription.text == BLANK_AUDIO_TOKEN
+    assert transcription.recordingUrl is not None
+    assert transcription.recordingUrl.startswith("/recordings/")
+
+    recording_name = transcription.recordingUrl.rsplit("/", 1)[-1]
+    recording_path = recordings_root / recording_name
+    assert recording_path.exists()
+    assert recording_path.stat().st_size > 0
 
 
 @pytest.mark.asyncio

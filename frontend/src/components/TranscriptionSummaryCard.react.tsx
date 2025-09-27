@@ -1,10 +1,18 @@
-import React from "react";
-import { AlertTriangle, Clock, VolumeX } from "lucide-react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { AlertTriangle, Clock, Loader2, Pause, Play, VolumeX } from "lucide-react";
 import { TranscriptionResult } from "@types";
 import { useUISettings } from "../contexts/UISettingsContext";
 import { getNotifiableAlerts, isBlankAudioText } from "../utils/transcriptions";
 import { Timestamp } from "./primitives/Timestamp.react";
 import Flex from "./primitives/Flex.react";
+import Button from "./primitives/Button.react";
+import { getBlankAudioSegmentBounds } from "./StreamTranscriptionPanel.logic";
 import "./TranscriptionSummaryCard.scss";
 
 interface TranscriptionSummaryCardProps {
@@ -56,6 +64,22 @@ export const TranscriptionSummaryCard: React.FC<
   };
 
   const isBlankAudio = isBlankAudioText(transcription.text);
+  const hasSilenceRecording =
+    isBlankAudio && typeof transcription.recordingUrl === "string"
+      ? transcription.recordingUrl.trim().length > 0
+      : false;
+  const silenceBounds = useMemo(() => {
+    if (!hasSilenceRecording) {
+      return null;
+    }
+    return getBlankAudioSegmentBounds(transcription);
+  }, [hasSilenceRecording, transcription]);
+  const silenceDurationSeconds = useMemo(() => {
+    if (!silenceBounds) {
+      return 0;
+    }
+    return Math.max(0, silenceBounds.end - silenceBounds.start);
+  }, [silenceBounds]);
   const reviewStatus = transcription.reviewStatus ?? "pending";
   const showReview = transcriptCorrectionEnabled && reviewStatus !== "pending";
   const finalText =
@@ -86,6 +110,179 @@ export const TranscriptionSummaryCard: React.FC<
     if (confidence >= 0.6) return "text-caution";
     return "text-danger";
   };
+
+  const formatDurationLabel = useCallback((seconds: number): string => {
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+      return "0s";
+    }
+
+    if (seconds < 60) {
+      const rounded = seconds.toFixed(seconds >= 10 ? 0 : 1);
+      return `${rounded.replace(/\.0$/, "")}s`;
+    }
+
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    const roundedSeconds = remainingSeconds.toFixed(
+      remainingSeconds >= 10 ? 0 : 1,
+    );
+
+    if (Number(roundedSeconds) === 0) {
+      return `${minutes}m`;
+    }
+
+    return `${minutes}m ${roundedSeconds.replace(/\.0$/, "")}s`;
+  }, []);
+
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const playbackBoundsRef = useRef<{ start: number; end: number }>({
+    start: 0,
+    end: 0,
+  });
+  const isPlayingRef = useRef(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoadingPlayback, setIsLoadingPlayback] = useState(false);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
+
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
+
+  useEffect(() => {
+    if (!silenceBounds) {
+      playbackBoundsRef.current = { start: 0, end: 0 };
+      return;
+    }
+    playbackBoundsRef.current = silenceBounds;
+  }, [silenceBounds]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) {
+      return;
+    }
+
+    const handleTimeUpdate = () => {
+      if (!isPlayingRef.current) {
+        return;
+      }
+
+      const { start, end } = playbackBoundsRef.current;
+      if (end <= start) {
+        return;
+      }
+
+      const completionThreshold = Math.max(start, end - 0.05);
+      if (audio.currentTime >= completionThreshold) {
+        audio.pause();
+        audio.currentTime = Math.max(start, 0);
+        setIsPlaying(false);
+      }
+    };
+
+    const handlePause = () => {
+      setIsPlaying(false);
+    };
+
+    const handleEnded = () => {
+      setIsPlaying(false);
+    };
+
+    const handleError = () => {
+      setPlaybackError("Unable to play silence clip");
+      setIsPlaying(false);
+    };
+
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("pause", handlePause);
+    audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("error", handleError);
+
+    return () => {
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("pause", handlePause);
+      audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("error", handleError);
+    };
+  }, []);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) {
+      return;
+    }
+
+    if (!hasSilenceRecording) {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+      setIsPlaying(false);
+      setPlaybackError(null);
+      return;
+    }
+
+    const recordingUrl = transcription.recordingUrl?.trim() ?? "";
+    if (!recordingUrl) {
+      return;
+    }
+
+    const previousSrc = audio.getAttribute("data-loaded-src") ?? "";
+    if (previousSrc !== recordingUrl) {
+      audio.setAttribute("data-loaded-src", recordingUrl);
+      audio.src = recordingUrl;
+      audio.load();
+      setIsPlaying(false);
+    }
+  }, [hasSilenceRecording, transcription.recordingUrl]);
+
+  useEffect(() => {
+    return () => {
+      const audio = audioRef.current;
+      if (!audio) {
+        return;
+      }
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+    };
+  }, []);
+
+  const handleToggleSilencePlayback = useCallback(async () => {
+    if (!hasSilenceRecording) {
+      return;
+    }
+    const audio = audioRef.current;
+    if (!audio) {
+      return;
+    }
+
+    if (isPlayingRef.current) {
+      audio.pause();
+      audio.currentTime = Math.max(playbackBoundsRef.current.start, 0);
+      return;
+    }
+
+    setPlaybackError(null);
+    setIsLoadingPlayback(true);
+    try {
+      const startTime = Math.max(playbackBoundsRef.current.start, 0);
+      audio.currentTime = startTime;
+      const playResult = audio.play();
+      if (playResult instanceof Promise) {
+        await playResult;
+      }
+      setIsPlaying(true);
+    } catch (error) {
+      console.error("Error playing silence clip", error);
+      setPlaybackError("Unable to play silence clip");
+    } finally {
+      setIsLoadingPlayback(false);
+    }
+  }, [hasSilenceRecording]);
+
+  const silencePlaybackLabel = isPlaying
+    ? "Stop silence clip"
+    : `Play silence clip${silenceDurationSeconds > 0 ? ` (${formatDurationLabel(silenceDurationSeconds)})` : ""}`;
 
   return (
     <div
@@ -151,9 +348,35 @@ export const TranscriptionSummaryCard: React.FC<
           </Flex>
         )}
         {isBlankAudio ? (
-          <Flex align="center" gap={2} className="text-body-secondary small fst-italic">
-            <VolumeX size={16} className="text-body-tertiary" />
-            <span>No speech detected</span>
+          <Flex align="center" gap={3} wrap="wrap">
+            <Flex align="center" gap={2} className="text-body-secondary small fst-italic">
+              <VolumeX size={16} className="text-body-tertiary" />
+              <span>No speech detected</span>
+            </Flex>
+            {hasSilenceRecording ? (
+              <Button
+                use="secondary"
+                appearance="outline"
+                size="sm"
+                onClick={handleToggleSilencePlayback}
+                disabled={isLoadingPlayback}
+                startContent={
+                  isLoadingPlayback ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : isPlaying ? (
+                    <Pause size={14} />
+                  ) : (
+                    <Play size={14} />
+                  )
+                }
+              >
+                {silencePlaybackLabel}
+              </Button>
+            ) : null}
+            {playbackError ? (
+              <span className="text-danger small">{playbackError}</span>
+            ) : null}
+            <audio ref={audioRef} preload="none" className="d-none" />
           </Flex>
         ) : (
           <p className="timeline-entry__text mb-0">{finalText}</p>
