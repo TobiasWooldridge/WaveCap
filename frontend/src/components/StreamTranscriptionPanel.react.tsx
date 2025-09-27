@@ -44,6 +44,7 @@ export const StreamTranscriptionPanel = ({
     playingSegment,
     playRecording,
     playSegment,
+    stopCurrentRecording,
     isSegmentCurrentlyPlaying,
   } = useTranscriptionAudioPlayback();
 
@@ -116,6 +117,7 @@ export const StreamTranscriptionPanel = ({
             onPlayAll={handlePlayAll}
             onPlaySegment={playSegment}
             isSegmentCurrentlyPlaying={isSegmentCurrentlyPlaying}
+            onStopPlayback={stopCurrentRecording}
             onReviewTranscription={onReviewTranscription}
             onResetStream={onResetStream}
             onStandaloneControlsChange={onStandaloneControlsChange}

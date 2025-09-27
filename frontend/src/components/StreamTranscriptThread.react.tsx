@@ -47,6 +47,7 @@ export interface StreamTranscriptThreadProps {
   recordingAudioRefs: React.MutableRefObject<Record<string, HTMLAudioElement | null>>;
   onPlayAll: PlayAllHandler;
   onPlaySegment: PlaySegmentHandler;
+  onStopPlayback: () => void;
   isSegmentCurrentlyPlaying: (
     recordingUrl: string,
     startTime: number,
@@ -77,6 +78,7 @@ const StreamTranscriptThread: React.FC<StreamTranscriptThreadProps> = ({
   recordingAudioRefs,
   onPlayAll,
   onPlaySegment,
+  onStopPlayback,
   isSegmentCurrentlyPlaying,
   openPagerMessageIds,
   onTogglePagerMessage,
@@ -234,8 +236,11 @@ const StreamTranscriptThread: React.FC<StreamTranscriptThreadProps> = ({
       key={`${group.id}-play`}
       use="unstyled"
       onClick={() => {
-        if (isGroupPlaying) return; // stop handled by panel button elsewhere
-        onPlayAll(streamId, firstPlayableTranscription, orderedTranscriptions);
+        if (isGroupPlaying) {
+          onStopPlayback();
+        } else {
+          onPlayAll(streamId, firstPlayableTranscription, orderedTranscriptions);
+        }
       }}
       className="chip-button chip-button--accent"
     >

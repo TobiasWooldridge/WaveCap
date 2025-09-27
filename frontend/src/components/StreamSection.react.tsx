@@ -115,6 +115,7 @@ export interface StreamSectionProps {
     endTime: number | null | undefined,
     transcriptionId: string,
   ) => void;
+  onStopPlayback: () => void;
   isSegmentCurrentlyPlaying: (
     recordingUrl: string | undefined,
     startTime: number,
@@ -144,6 +145,7 @@ const StreamSection: React.FC<StreamSectionProps> = ({
   playingSegmentId,
   onPlayAll,
   onPlaySegment,
+  onStopPlayback,
   isSegmentCurrentlyPlaying,
   onReviewTranscription,
   onResetStream,
@@ -288,6 +290,7 @@ const StreamSection: React.FC<StreamSectionProps> = ({
         recordingAudioRefs={recordingAudioRefs}
         onPlayAll={(_sid, t) => onPlayAll(stream.id, t, orderedTranscriptions)}
         onPlaySegment={onPlaySegment}
+        onStopPlayback={onStopPlayback}
         isSegmentCurrentlyPlaying={isSegmentCurrentlyPlaying}
         openPagerMessageIds={openPagerMessageIds}
         onTogglePagerMessage={togglePagerMessageFragments}
