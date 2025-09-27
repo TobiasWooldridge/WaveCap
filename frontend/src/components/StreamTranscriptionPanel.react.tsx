@@ -38,12 +38,10 @@ import { useAuth } from "../contexts/AuthContext";
 import { TranscriptionReviewControls } from "./TranscriptionReviewControls.react";
 import {
   buildPlaybackQueue,
-  advancePlaybackQueue,
   dedupeAndSortTranscriptions,
   getRecordingElementId,
   prepareTranscriptions,
   selectVisibleTranscriptions,
-  type PlaybackQueueState,
   type TranscriptionGroup,
 } from "./StreamTranscriptionPanel.logic";
 import { condensePagerTranscriptions } from "../utils/pagerMessages";
@@ -55,7 +53,7 @@ import {
   isBlankAudioText,
   isSystemTranscription,
 } from "../utils/transcriptions";
-import { setAudioElementSource } from "../utils/audio";
+// audio element source and playback are managed by useTranscriptionAudioPlayback
 import { StreamTranscriptList } from "./StreamTranscriptList.react";
 import { Timestamp } from "./primitives/Timestamp.react";
 import Button from "./primitives/Button.react";
@@ -68,6 +66,7 @@ import "./StreamTranscriptionPanel.scss";
 import StandaloneSearchDialog from "./dialogs/StandaloneSearchDialog.react";
 import StandaloneJumpDialog from "./dialogs/StandaloneJumpDialog.react";
 import StandaloneStatsDialog from "./dialogs/StandaloneStatsDialog.react";
+import { useTranscriptionAudioPlayback } from "../hooks/useTranscriptionAudioPlayback";
 
 export interface StandaloneStreamControls {
   streamId: string;
@@ -235,50 +234,18 @@ export const StreamTranscriptionPanel = ({
   const [expandedStreams, setExpandedStreams] = useState<Set<string>>(
     new Set(),
   );
-  const [playingRecording, setPlayingRecording] = useState<string | null>(null);
-  const [playingTranscriptionId, setPlayingTranscriptionId] = useState<
-    string | null
-  >(null);
-  const [playingSegment, setPlayingSegment] = useState<string | null>(null);
-  const [currentPlayTime, setCurrentPlayTime] = useState<number>(0);
-  const [playbackQueue, setPlaybackQueue] = useState<PlaybackQueueState | null>(
-    null,
-  );
-  const playbackQueueRef = useRef<PlaybackQueueState | null>(null);
-  const playingRecordingRef = useRef<string | null>(null);
-  const playingTranscriptionIdRef = useRef<string | null>(null);
-  const playingSegmentRef = useRef<string | null>(null);
-  // Track playback state in refs so event callbacks always see the latest values.
-  // Without this the auto-advance logic would read stale state between renders,
-  // treat queued clips as "new" recordings, and clear the playback queue.
-  const updatePlayingRecording = useCallback(
-    (value: string | null) => {
-      playingRecordingRef.current = value;
-      setPlayingRecording(value);
-    },
-    [setPlayingRecording],
-  );
-  const updatePlayingTranscriptionId = useCallback(
-    (value: string | null) => {
-      playingTranscriptionIdRef.current = value;
-      setPlayingTranscriptionId(value);
-    },
-    [setPlayingTranscriptionId],
-  );
-  const updatePlayingSegment = useCallback(
-    (value: string | null) => {
-      playingSegmentRef.current = value;
-      setPlayingSegment(value);
-    },
-    [setPlayingSegment],
-  );
-  const updatePlaybackQueue = useCallback(
-    (queue: PlaybackQueueState | null) => {
-      playbackQueueRef.current = queue;
-      setPlaybackQueue(queue);
-    },
-    [setPlaybackQueue],
-  );
+  const {
+    recordingAudioRefs,
+    playingRecording,
+    playingTranscriptionId,
+    playingSegment,
+    // currentPlayTime,
+    // playbackQueue,
+    playRecording,
+    playSegment,
+    stopCurrentRecording,
+    isSegmentCurrentlyPlaying,
+  } = useTranscriptionAudioPlayback();
   const [historyByStream, setHistoryByStream] = useState<
     Record<string, StreamHistoryState>
   >({});
@@ -312,7 +279,6 @@ export const StreamTranscriptionPanel = ({
   const [openStandaloneTool, setOpenStandaloneTool] =
     useState<StandaloneTool | null>(null);
   const liveAudioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
-  const recordingAudioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
 
   const togglePagerMessageFragments = useCallback((messageId: string) => {
     setOpenPagerMessageIds((previous) => ({
@@ -331,9 +297,7 @@ export const StreamTranscriptionPanel = ({
   const focusedViewPreviousCountRef = useRef(0);
   const focusedViewStreamIdRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    playbackQueueRef.current = playbackQueue;
-  }, [playbackQueue]);
+  // playbackQueue state is managed inside useTranscriptionAudioPlayback
 
   const visibleStreams = useMemo<Stream[]>(() => {
     if (!Array.isArray(streams) || streams.length === 0) {
@@ -683,276 +647,7 @@ export const StreamTranscriptionPanel = ({
     }
   };
 
-  const isSegmentCurrentlyPlaying = (
-    recordingUrl: string | undefined,
-    startTime: number,
-    endTime: number,
-  ) => {
-    if (!recordingUrl || !playingRecording) return false;
-    const recordingId = getRecordingElementId(recordingUrl);
-    if (playingRecording !== recordingId) return false;
-    return currentPlayTime >= startTime && currentPlayTime <= endTime;
-  };
-
-  const resetAudioPlaybackState = useCallback(
-    (audio: HTMLAudioElement | null, options?: { clearQueue?: boolean }) => {
-      if (audio) {
-        audio.loop = false;
-        audio.ontimeupdate = null;
-        audio.onended = null;
-        audio.onerror = null;
-      }
-      updatePlayingRecording(null);
-      updatePlayingTranscriptionId(null);
-      updatePlayingSegment(null);
-      setCurrentPlayTime(0);
-      if (options?.clearQueue ?? true) {
-        updatePlaybackQueue(null);
-      }
-    },
-    [
-      updatePlaybackQueue,
-      updatePlayingRecording,
-      updatePlayingSegment,
-      updatePlayingTranscriptionId,
-    ],
-  );
-
-  const stopCurrentRecording = () => {
-    const currentRecordingId = playingRecordingRef.current;
-    if (!currentRecordingId) {
-      return;
-    }
-    const currentAudio = recordingAudioRefs.current[currentRecordingId] ?? null;
-    if (currentAudio) {
-      currentAudio.pause();
-    }
-    resetAudioPlaybackState(currentAudio, { clearQueue: true });
-  };
-
-  const playRecording = (
-    transcription: TranscriptionResult,
-    options?: { queue?: PlaybackQueueState },
-  ) => {
-    if (!transcription.recordingUrl) {
-      console.warn("⚠️ No recording available for this transcription");
-      return;
-    }
-
-    const recordingId = getRecordingElementId(transcription.recordingUrl);
-    const audio = recordingAudioRefs.current[recordingId] ?? null;
-
-    if (!audio) {
-      console.error(`❌ Audio element not found: ${recordingId}`);
-      return;
-    }
-
-    setAudioElementSource(audio, transcription.recordingUrl);
-
-    const startOffset = Math.max(0, transcription.recordingStartOffset ?? 0);
-
-    const currentRecordingId = playingRecordingRef.current;
-    const currentTranscriptionId = playingTranscriptionIdRef.current;
-
-    if (
-      currentRecordingId === recordingId &&
-      currentTranscriptionId === transcription.id
-    ) {
-      stopCurrentRecording();
-      audio.currentTime = startOffset;
-      return;
-    }
-
-    if (currentRecordingId && currentRecordingId !== recordingId) {
-      stopCurrentRecording();
-    }
-
-    if (options?.queue) {
-      updatePlaybackQueue(options.queue);
-    } else {
-      updatePlaybackQueue(null);
-    }
-
-    updatePlayingRecording(recordingId);
-    updatePlayingTranscriptionId(transcription.id);
-    updatePlayingSegment(null);
-
-    const handleEnded = () => {
-      const advance = advancePlaybackQueue(
-        playbackQueueRef.current,
-        transcription,
-      );
-      if (advance) {
-        resetAudioPlaybackState(audio, { clearQueue: false });
-        updatePlaybackQueue(advance.nextQueue);
-        setTimeout(() => {
-          playRecording(advance.nextTranscription, {
-            queue: advance.nextQueue,
-          });
-        }, 0);
-        return;
-      }
-
-      resetAudioPlaybackState(audio);
-    };
-
-    const handleError = (error: Event | string) => {
-      console.error("❌ Error playing audio:", error);
-      resetAudioPlaybackState(audio);
-    };
-
-    const updateTime = () => {
-      setCurrentPlayTime(audio.currentTime);
-    };
-
-    const startPlayback = () => {
-      audio.loop = false;
-      audio.currentTime = startOffset;
-      setCurrentPlayTime(startOffset);
-      audio.ontimeupdate = updateTime;
-      audio.onended = handleEnded;
-      audio.onerror = handleError;
-
-      audio.play().catch((error) => {
-        console.error("❌ Error starting audio playback:", error);
-        resetAudioPlaybackState(audio);
-      });
-    };
-
-    if (audio.readyState >= 2) {
-      startPlayback();
-    } else {
-      const onReady = () => {
-        audio.removeEventListener("loadeddata", onReady);
-        audio.removeEventListener("canplay", onReady);
-        startPlayback();
-      };
-      audio.addEventListener("loadeddata", onReady, { once: true });
-      audio.addEventListener("canplay", onReady, { once: true });
-      if (audio.readyState === 0) {
-        audio.load();
-      }
-    }
-  };
-
-  const playSegment = (
-    recordingUrl: string,
-    startTime: number | undefined,
-    endTime: number | undefined,
-    transcriptionId: string,
-    options?: { recordingStartOffset?: number },
-  ) => {
-    const recordingId = getRecordingElementId(recordingUrl);
-    const audio = recordingAudioRefs.current[recordingId] ?? null;
-
-    if (!audio) {
-      console.error(`❌ Audio element not found: ${recordingId}`);
-      return;
-    }
-
-    setAudioElementSource(audio, recordingUrl);
-
-    const currentRecordingId = playingRecordingRef.current;
-    if (currentRecordingId && currentRecordingId !== recordingId) {
-      stopCurrentRecording();
-    }
-
-    const safeStart =
-      typeof startTime === "number" && Number.isFinite(startTime)
-        ? startTime
-        : null;
-    const safeEnd =
-      typeof endTime === "number" && Number.isFinite(endTime) ? endTime : null;
-    const recordingOffset =
-      typeof options?.recordingStartOffset === "number" &&
-      Number.isFinite(options.recordingStartOffset)
-        ? Math.max(0, options.recordingStartOffset)
-        : null;
-
-    const playbackStart =
-      safeStart !== null && safeStart > 0
-        ? safeStart
-        : (recordingOffset ??
-          (safeStart !== null ? Math.max(0, safeStart) : 0));
-    const segmentDuration =
-      safeEnd !== null && safeStart !== null
-        ? Math.max(0, safeEnd - safeStart)
-        : null;
-
-    let playbackEnd =
-      segmentDuration !== null
-        ? playbackStart + segmentDuration
-        : safeEnd !== null && safeEnd > playbackStart
-          ? safeEnd
-          : playbackStart;
-
-    if (!Number.isFinite(playbackEnd)) {
-      playbackEnd = playbackStart;
-    }
-
-    if (playbackEnd <= playbackStart) {
-      playbackEnd = playbackStart + 0.25;
-    }
-
-    const segmentKey = `${recordingId}-${startTime ?? playbackStart}-${endTime ?? playbackEnd}`;
-
-    updatePlaybackQueue(null);
-    updatePlayingRecording(recordingId);
-    updatePlayingTranscriptionId(transcriptionId);
-    updatePlayingSegment(segmentKey);
-
-    const handleError = (error: Event | string) => {
-      console.error("❌ Error playing audio:", error);
-      resetAudioPlaybackState(audio);
-    };
-
-    const handleSegmentTimeUpdate = () => {
-      const nextTime = audio.currentTime;
-      setCurrentPlayTime(nextTime);
-
-      const completionThreshold = Math.max(playbackStart, playbackEnd - 0.05);
-
-      if (
-        nextTime >= completionThreshold &&
-        playingSegmentRef.current === segmentKey
-      ) {
-        updatePlayingSegment(null);
-      }
-    };
-
-    const handleEnded = () => {
-      resetAudioPlaybackState(audio);
-    };
-
-    const startPlayback = () => {
-      audio.loop = false;
-      audio.currentTime = Math.max(0, playbackStart);
-      setCurrentPlayTime(Math.max(0, playbackStart));
-      audio.ontimeupdate = handleSegmentTimeUpdate;
-      audio.onended = handleEnded;
-      audio.onerror = handleError;
-
-      audio.play().catch((error) => {
-        console.error("❌ Error starting audio playback:", error);
-        resetAudioPlaybackState(audio);
-      });
-    };
-
-    if (audio.readyState >= 2) {
-      startPlayback();
-    } else {
-      const onReady = () => {
-        audio.removeEventListener("loadeddata", onReady);
-        audio.removeEventListener("canplay", onReady);
-        startPlayback();
-      };
-      audio.addEventListener("loadeddata", onReady, { once: true });
-      audio.addEventListener("canplay", onReady, { once: true });
-      if (audio.readyState === 0) {
-        audio.load();
-      }
-    }
-  };
+  // audio playback is provided by useTranscriptionAudioPlayback
 
   const handlePlayAll = (
     streamId: string,
