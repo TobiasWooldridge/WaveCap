@@ -236,8 +236,8 @@ export const TranscriptionSummaryCard: React.FC<
   }, [hasSilenceRecording, transcription.recordingUrl]);
 
   useEffect(() => {
+    const audio = audioRef.current;
     return () => {
-      const audio = audioRef.current;
       if (!audio) {
         return;
       }
