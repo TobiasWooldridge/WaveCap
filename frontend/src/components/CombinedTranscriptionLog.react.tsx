@@ -13,13 +13,8 @@ import {
   Pause,
   Play,
   Radio,
-  VolumeX,
 } from "lucide-react";
-import {
-  Stream,
-  TranscriptionResult,
-  TranscriptionSegment as TranscriptionSegmentData,
-} from "@types";
+import { Stream, TranscriptionResult } from "@types";
 import { useUISettings } from "../contexts/UISettingsContext";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import {
@@ -35,17 +30,11 @@ import {
   buildPlaybackQueue,
   dedupeAndSortTranscriptions,
   getRecordingElementId,
-  getBlankAudioSegmentBounds,
-  getSegmentDisplayStart,
-  getTranscriptionDurationMs,
   type PlaybackQueueState,
 } from "./StreamTranscriptionPanel.logic";
-import {
-  TranscriptBoundaryMarker,
-  TranscriptSegmentListItem,
-} from "./TranscriptSegmentButton.react";
 import { Timestamp } from "./primitives/Timestamp.react";
 import Button from "./primitives/Button.react";
+import { TranscriptionSegmentChips } from "./TranscriptionSegmentChips.react";
 
 interface CombinedTranscriptionLogProps {
   streams: Stream[];
@@ -658,9 +647,6 @@ export const CombinedTranscriptionLog: React.FC<
                   playingRecording === recordingId &&
                   playingTranscriptionId === transcription.id,
               );
-              const transcriptionDurationSeconds =
-                getTranscriptionDurationMs(transcription) / 1000;
-
               const chipElements: React.ReactNode[] = [];
 
               if (isSystemEvent) {
@@ -701,171 +687,20 @@ export const CombinedTranscriptionLog: React.FC<
                 );
               }
 
-              if (blankAudio && recordingUrl && recordingId) {
-                const { start: silenceStart, end: silenceEnd } =
-                  getBlankAudioSegmentBounds(transcription);
-                const silenceIdentifier = `${recordingId}-${silenceStart}-${silenceEnd}`;
-                const isPlayingSilence = Boolean(
-                  (recordingId && playingSegment === silenceIdentifier) ||
-                    isSegmentCurrentlyPlaying(
-                      recordingUrl,
-                      silenceStart,
-                      silenceEnd,
-                    ),
-                );
-
-                chipElements.push(
-                  <TranscriptSegmentListItem
-                    key={`${transcription.id}-blank`}
-                    segment={{
-                      id: -1,
-                      text: "Silence",
-                      start: silenceStart,
-                      end: silenceEnd,
-                    }}
-                    recordingUrl={recordingUrl}
-                    transcriptionId={transcription.id}
-                    isPlaying={isPlayingSilence}
-                    onPlay={playSegment}
-                    displayOffsetSeconds={silenceStart}
-                    recordingStartOffset={transcription.recordingStartOffset}
-                  />,
-                );
-
-                if (
-                  transcriptCorrectionEnabled &&
-                  transcriptionDurationSeconds > 0
-                ) {
-                  chipElements.push(
-                    <TranscriptBoundaryMarker
-                      key={`${transcription.id}-boundary`}
-                      timeSeconds={transcriptionDurationSeconds}
-                    />,
-                  );
-                }
-              } else if (blankAudio) {
-                chipElements.push(
-                  <span
-                    key={`${transcription.id}-silence`}
-                    className="transcript-boundary"
-                    title="No speech detected"
-                  >
-                    <VolumeX size={14} className="text-neutral" />
-                    <span>Silence</span>
-                  </span>,
-                );
-              } else if (
-                transcription.segments &&
-                transcription.segments.length > 0
-              ) {
-                transcription.segments.forEach(
-                  (segment: TranscriptionSegmentData, index: number) => {
-                    const segmentKey = `${transcription.id}-${segment.start}-${segment.end}-${index}`;
-                    const segmentIdentifier = recordingId
-                      ? `${recordingId}-${segment.start}-${segment.end}`
-                      : `${transcription.id}-${segment.start}-${segment.end}`;
-                    const isPlayingSegment = Boolean(
-                      (recordingId && playingSegment === segmentIdentifier) ||
-                        isSegmentCurrentlyPlaying(
-                          recordingUrl,
-                          segment.start,
-                          segment.end,
-                        ),
-                    );
-
-                    chipElements.push(
-                      <TranscriptSegmentListItem
-                        key={segmentKey}
-                        segment={segment}
-                        recordingUrl={recordingUrl}
-                        transcriptionId={transcription.id}
-                        isPlaying={isPlayingSegment}
-                        onPlay={playSegment}
-                        displayOffsetSeconds={getSegmentDisplayStart(
-                          segment,
-                          transcription,
-                        )}
-                        recordingStartOffset={
-                          transcription.recordingStartOffset
-                        }
-                      />,
-                    );
-                  },
-                );
-
-                if (
-                  transcriptCorrectionEnabled &&
-                  transcriptionDurationSeconds > 0
-                ) {
-                  chipElements.push(
-                    <TranscriptBoundaryMarker
-                      key={`${transcription.id}-boundary`}
-                      timeSeconds={transcriptionDurationSeconds}
-                    />,
-                  );
-                }
-              } else if (displayText) {
-                const fallbackStart =
-                  typeof transcription.recordingStartOffset === "number" &&
-                  Number.isFinite(transcription.recordingStartOffset)
-                    ? Math.max(0, transcription.recordingStartOffset)
-                    : 0;
-                const fallbackEnd =
-                  transcriptionDurationSeconds > 0
-                    ? fallbackStart + transcriptionDurationSeconds
-                    : fallbackStart;
-
-                const syntheticSegment: TranscriptionSegmentData = {
-                  id: -1,
-                  text: displayText,
-                  start: fallbackStart,
-                  end: fallbackEnd,
-                  avg_logprob: Number.NaN,
-                  no_speech_prob: Number.NaN,
-                  temperature: Number.NaN,
-                  compression_ratio: Number.NaN,
-                  seek: -1,
-                };
-
-                const syntheticKey = `${transcription.id}-synthetic`;
-                const syntheticIdentifier = recordingId
-                  ? `${recordingId}-${syntheticSegment.start}-${syntheticSegment.end}`
-                  : syntheticKey;
-                const isPlayingSynthetic = Boolean(
-                  (recordingId && playingSegment === syntheticIdentifier) ||
-                    (recordingUrl &&
-                      isSegmentCurrentlyPlaying(
-                        recordingUrl,
-                        syntheticSegment.start,
-                        syntheticSegment.end,
-                      )),
-                );
-
-                chipElements.push(
-                  <TranscriptSegmentListItem
-                    key={syntheticKey}
-                    segment={syntheticSegment}
-                    recordingUrl={recordingUrl}
-                    transcriptionId={transcription.id}
-                    isPlaying={isPlayingSynthetic}
-                    onPlay={playSegment}
-                    displayOffsetSeconds={fallbackStart}
-                    recordingStartOffset={transcription.recordingStartOffset}
-                  />,
-                );
-
-                if (
-                  transcriptCorrectionEnabled &&
-                  transcriptionDurationSeconds > 0
-                ) {
-                  chipElements.push(
-                    <TranscriptBoundaryMarker
-                      key={`${transcription.id}-boundary`}
-                      timeSeconds={transcriptionDurationSeconds}
-                    />,
-                  );
-                }
-              }
+              chipElements.push(
+                <TranscriptionSegmentChips
+                  key={`${transcription.id}-segments`}
+                  transcription={transcription}
+                  displayText={displayText}
+                  blankAudio={blankAudio}
+                  transcriptCorrectionEnabled={transcriptCorrectionEnabled}
+                  recordingUrl={recordingUrl}
+                  recordingId={recordingId}
+                  playingSegmentId={playingSegment}
+                  onPlaySegment={playSegment}
+                  isSegmentCurrentlyPlaying={isSegmentCurrentlyPlaying}
+                />,
+              );
 
               return (
                 <article

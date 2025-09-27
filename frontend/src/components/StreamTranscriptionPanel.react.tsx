@@ -20,7 +20,6 @@ import {
   Play,
   Pause,
   Volume2,
-  VolumeX,
   RotateCcw,
   Search,
   CalendarClock,
@@ -36,24 +35,16 @@ import {
 import {
   Stream,
   TranscriptionResult,
-  TranscriptionSegment as TranscriptionSegmentData,
   TranscriptionQueryResponse,
   TranscriptionReviewStatus,
 } from "@types";
 import { useAuth } from "../contexts/AuthContext";
-import {
-  TranscriptBoundaryMarker,
-  TranscriptSegmentListItem,
-} from "./TranscriptSegmentButton.react";
 import { TranscriptionReviewControls } from "./TranscriptionReviewControls.react";
 import {
   buildPlaybackQueue,
   advancePlaybackQueue,
   dedupeAndSortTranscriptions,
   getRecordingElementId,
-  getBlankAudioSegmentBounds,
-  getSegmentDisplayStart,
-  getTranscriptionDurationMs,
   prepareTranscriptions,
   selectVisibleTranscriptions,
   type PlaybackQueueState,
@@ -76,6 +67,7 @@ import { StreamTranscriptList } from "./StreamTranscriptList.react";
 import { Timestamp } from "./primitives/Timestamp.react";
 import Button from "./primitives/Button.react";
 import ButtonGroup from "./primitives/ButtonGroup.react";
+import { TranscriptionSegmentChips } from "./TranscriptionSegmentChips.react";
 import "./StreamTranscriptionPanel.scss";
 
 export interface StandaloneStreamControls {
@@ -1929,8 +1921,6 @@ export const StreamTranscriptionPanel = ({
           const recordingId = recordingUrl
             ? getRecordingElementId(recordingUrl)
             : null;
-          const transcriptionDurationSeconds =
-            getTranscriptionDurationMs(transcription) / 1000;
           const isSystemEvent = isSystemTranscription(transcription);
 
           if (
@@ -2016,166 +2006,21 @@ export const StreamTranscriptionPanel = ({
             );
           }
 
-          if (blankAudio && recordingUrl && recordingId) {
-            const { start: silenceStart, end: silenceEnd } =
-              getBlankAudioSegmentBounds(transcription);
-            const silenceIdentifier = `${recordingId}-${silenceStart}-${silenceEnd}`;
-            const isPlayingSilence =
-              (recordingId && playingSegment === silenceIdentifier) ||
-              isSegmentCurrentlyPlaying(recordingUrl, silenceStart, silenceEnd);
-
-            items.push(
-              <TranscriptSegmentListItem
-                key={`${transcription.id}-blank`}
-                segment={{
-                  id: -1,
-                  text: "Silence",
-                  start: silenceStart,
-                  end: silenceEnd,
-                }}
-                recordingUrl={recordingUrl}
-                transcriptionId={transcription.id}
-                isPlaying={isPlayingSilence}
-                onPlay={playSegment}
-                displayOffsetSeconds={silenceStart}
-                recordingStartOffset={transcription.recordingStartOffset}
-              />,
-            );
-
-            if (
-              transcriptCorrectionEnabled &&
-              transcriptionDurationSeconds > 0
-            ) {
-              items.push(
-                <TranscriptBoundaryMarker
-                  key={`${transcription.id}-end-marker`}
-                  timeSeconds={transcriptionDurationSeconds}
-                />,
-              );
-            }
-          } else if (
-            !blankAudio &&
-            transcription.segments &&
-            transcription.segments.length > 0
-          ) {
-            transcription.segments.forEach(
-              (segment: TranscriptionSegmentData, index: number) => {
-                const segmentKey = `${transcription.id}-${segment.start}-${segment.end}-${index}`;
-                const segmentIdentifier = recordingId
-                  ? `${recordingId}-${segment.start}-${segment.end}`
-                  : `${transcription.id}-${segment.start}-${segment.end}`;
-                const isPlayingSegment =
-                  (recordingId && playingSegment === segmentIdentifier) ||
-                  isSegmentCurrentlyPlaying(
-                    recordingUrl,
-                    segment.start,
-                    segment.end,
-                  );
-
-                items.push(
-                  <TranscriptSegmentListItem
-                    key={segmentKey}
-                    segment={segment}
-                    recordingUrl={recordingUrl}
-                    transcriptionId={transcription.id}
-                    isPlaying={isPlayingSegment}
-                    onPlay={playSegment}
-                    displayOffsetSeconds={getSegmentDisplayStart(
-                      segment,
-                      transcription,
-                    )}
-                    recordingStartOffset={transcription.recordingStartOffset}
-                  />,
-                );
-              },
-            );
-
-            if (
-              transcriptCorrectionEnabled &&
-              transcriptionDurationSeconds > 0
-            ) {
-              items.push(
-                <TranscriptBoundaryMarker
-                  key={`${transcription.id}-end-marker`}
-                  timeSeconds={transcriptionDurationSeconds}
-                />,
-              );
-            }
-          } else if (blankAudio) {
-            items.push(
-              <span
-                key={`${transcription.id}-blank`}
-                className="transcript-boundary"
-                title="No speech detected"
-              >
-                <VolumeX size={14} className="text-neutral" />
-                <span>Silence</span>
-              </span>,
-            );
-          } else if (displayText) {
-            const fallbackStart =
-              typeof transcription.recordingStartOffset === "number" &&
-              Number.isFinite(transcription.recordingStartOffset)
-                ? Math.max(0, transcription.recordingStartOffset)
-                : 0;
-            const fallbackEnd =
-              transcriptionDurationSeconds > 0
-                ? fallbackStart + transcriptionDurationSeconds
-                : fallbackStart;
-
-            const syntheticSegment: TranscriptionSegmentData = {
-              id: -1,
-              text: displayText,
-              start: fallbackStart,
-              end: fallbackEnd,
-              avg_logprob: Number.NaN,
-              no_speech_prob: Number.NaN,
-              temperature: Number.NaN,
-              compression_ratio: Number.NaN,
-              seek: -1,
-            };
-
-            const syntheticKey = `${transcription.id}-synthetic`;
-            const syntheticIdentifier = recordingId
-              ? `${recordingId}-${syntheticSegment.start}-${syntheticSegment.end}`
-              : syntheticKey;
-            const isPlayingSynthetic = Boolean(
-              (recordingId && playingSegment === syntheticIdentifier) ||
-                (recordingUrl &&
-                  isSegmentCurrentlyPlaying(
-                    recordingUrl,
-                    syntheticSegment.start,
-                    syntheticSegment.end,
-                  )),
-            );
-
-            items.push(
-              <TranscriptSegmentListItem
-                key={syntheticKey}
-                segment={syntheticSegment}
-                recordingUrl={recordingUrl}
-                transcriptionId={transcription.id}
-                isPlaying={isPlayingSynthetic}
-                onPlay={playSegment}
-                displayOffsetSeconds={fallbackStart}
-                recordingStartOffset={transcription.recordingStartOffset}
-              />,
-            );
-          }
-
-          if (
-            transcriptCorrectionEnabled &&
-            !blankAudio &&
-            transcriptionDurationSeconds > 0 &&
-            !transcription.segments?.length
-          ) {
-            items.push(
-              <TranscriptBoundaryMarker
-                key={`${transcription.id}-end-marker`}
-                timeSeconds={transcriptionDurationSeconds}
-              />,
-            );
-          }
+          items.push(
+            <TranscriptionSegmentChips
+              key={`${transcription.id}-segments`}
+              transcription={transcription}
+              displayText={displayText}
+              blankAudio={blankAudio}
+              transcriptCorrectionEnabled={transcriptCorrectionEnabled}
+              recordingUrl={recordingUrl}
+              recordingId={recordingId}
+              playingSegmentId={playingSegment}
+              onPlaySegment={playSegment}
+              isSegmentCurrentlyPlaying={isSegmentCurrentlyPlaying}
+              boundaryKey="end-marker"
+            />,
+          );
 
           if (transcriptCorrectionEnabled && reviewStatus !== "pending") {
             items.push(
