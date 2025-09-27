@@ -136,7 +136,7 @@ wavecap/
 │   │   └── types/            # Application data contracts consumed across the frontend
 │   └── package.json          # Frontend dependencies
 ├── state/                    # Persisted configuration and runtime data
-│   ├── config.yaml           # User overrides (auto-created)
+│   ├── config.yaml           # User overrides (auto-created from defaults)
 │   ├── recordings/           # Saved audio snippets served by the backend
 │   └── runtime.sqlite        # SQLite database created at runtime
 └── start-app.*               # Startup scripts for each platform
@@ -148,12 +148,12 @@ Configuration is layered across the backend and the `state/` directory:
 
 - `backend/default-config.yaml` – shipped defaults, expressed in YAML with inline comments that describe every Whisper knob.
 - (Optional) `state/default-config.yaml` – deployment-wide defaults that load after the shipped file.
-- `state/config.yaml` – user overrides that take precedence when present. The backend auto-creates this file with helpful comments on first launch.
+- `state/config.yaml` – user overrides that take precedence when present. When the file is missing, the backend copies the shipped defaults, preserves the inline notes, and swaps placeholder webhook tokens and passwords for freshly generated secrets.
 
 Override any setting in `state/config.yaml` to keep customisations separate from the shipped defaults.
 
-- Streams: define under `defaultStreams`. Add/remove streams by editing YAML; there is no UI or API to create or delete streams.
-- Pager feeds: define under `pagerWebhooks` to receive token-protected webhook posts from CAD systems.
+- Streams: define under `streams`. Add/remove streams by editing YAML; there is no UI or API to create or delete streams.
+- Pager feeds: define under `streams` with `source: pager` to receive token-protected webhook posts from CAD systems. The generated `state/config.yaml` already includes unique tokens for the sample pager entries.
 - Combined views: define under `combinedStreamViews` to merge activity from multiple streams into a single conversation.
 
 For detailed guidance on tuning transcription latency versus accuracy, see the

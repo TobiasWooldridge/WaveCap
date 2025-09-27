@@ -102,6 +102,7 @@ transcribing multiple radio or pager feeds in real time.
 
 - Install prerequisites (Python 3.10+, Node.js, npm, ffmpeg). The `start-app.sh` or `.ps1` helpers create a virtual environment, install dependencies, build the frontend, and start the FastAPI server; manual steps remain available.
 - Tune defaults in `state/config.yaml`, including sample rate, Whisper model, allowed browser origins, and initial UI settings (theme, transcript tools, export defaults). Configuration is YAML-only.
+- When `state/config.yaml` does not exist, the backend copies the shipped defaults wholesale, rotating pager webhook tokens and shared passwords so every deployment starts with hardened secrets.
 - Define default keyword alerts in `state/config.yaml`. Operators can tweak rules during a session, but those tweaks persist only in memory until the backend restarts.
 - Unauthenticated visitors browse in read-only mode. Use the header sign-in button and shared editor password to unlock transport controls (Start/Stop/Reset), transcript editing, and exports.
 - Stopping the server keeps saved streams and transcripts. Restarting reloads them; operators can still clear history via stream reset.

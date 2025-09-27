@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+import secrets
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
@@ -18,16 +20,49 @@ _CONFIG_SCAFFOLD = (
     "# This file is ignored by source control.\n"
 )
 
+_WEBHOOK_PLACEHOLDER_PATTERN = re.compile(r"^(\s*webhookToken:\s*)(replace-me)\s*$", re.MULTILINE)
+_PASSWORD_PLACEHOLDER_PATTERN = re.compile(r"^(\s*password:\s*)(change-me)\s*$", re.MULTILINE)
+
+
+def _generate_webhook_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def _generate_password() -> str:
+    return secrets.token_urlsafe(18)
+
+
+def _load_default_config_template() -> str:
+    try:
+        return DEFAULT_CONFIG_PATH.read_text()
+    except OSError:  # pragma: no cover - fallback when defaults are missing
+        return _CONFIG_SCAFFOLD
+
+
+def _personalize_config_template(template: str) -> str:
+    def replace_webhook(match: re.Match[str]) -> str:
+        return f"{match.group(1)}{_generate_webhook_token()}"
+
+    def replace_password(match: re.Match[str]) -> str:
+        return f"{match.group(1)}{_generate_password()}"
+
+    updated = _WEBHOOK_PLACEHOLDER_PATTERN.sub(replace_webhook, template)
+    updated = _PASSWORD_PLACEHOLDER_PATTERN.sub(replace_password, updated)
+    return updated
+
 
 def _ensure_user_config_scaffold() -> None:
-    """Create an empty ``state/config.yaml`` scaffold when no overrides exist."""
+    """Create ``state/config.yaml`` when missing, copying defaults and rotating secrets."""
 
     yaml_path = resolve_state_path("config.yaml")
     if yaml_path.exists():
         return
 
     yaml_path.parent.mkdir(parents=True, exist_ok=True)
-    yaml_path.write_text(_CONFIG_SCAFFOLD)
+
+    template = _load_default_config_template()
+    personalised = _personalize_config_template(template)
+    yaml_path.write_text(personalised)
 
 
 def _read_config(path: Path) -> Dict[str, Any]:
