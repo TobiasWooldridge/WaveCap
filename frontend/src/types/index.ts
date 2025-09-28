@@ -93,6 +93,7 @@ export interface Stream {
   ignoreFirstSeconds?: number;
   lastActivityAt?: IsoDateTimeString | null;
   combinedStreamIds?: string[];
+  baseLocation?: BaseLocation | null;
 }
 
 export type StreamUpdate = Pick<Stream, "id"> & Partial<Omit<Stream, "id">>;

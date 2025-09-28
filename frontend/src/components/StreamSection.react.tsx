@@ -295,6 +295,7 @@ const StreamSection: React.FC<StreamSectionProps> = ({
         openPagerMessageIds={openPagerMessageIds}
         onTogglePagerMessage={togglePagerMessageFragments}
         onReviewTranscription={onReviewTranscription}
+        baseLocation={stream.baseLocation ?? null}
       />
     ));
 

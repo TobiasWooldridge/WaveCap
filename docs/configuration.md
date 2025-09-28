@@ -185,6 +185,37 @@ ui:
   links. This helps disambiguate locations without requiring full addresses in
   pager messages.
 
+## Stream-level base location
+
+When different streams cover different regions, set a per-stream base location
+to improve Google Maps results for partial addresses:
+
+```yaml
+streams:
+  - id: broadcastify-2653
+    name: SA SES Radio
+    url: https://broadcastify.cdnstream1.com/2653
+    baseLocation:
+      state: SA
+      country: AU
+  - id: broadcastify-34010
+    name: NSW - Primary Emergency Services
+    url: https://broadcastify.cdnstream1.com/34010
+    baseLocation:
+      state: NSW
+      country: AU
+  - id: sa-ses-pager
+    name: SA SES Pager Gateway
+    source: pager
+    webhookToken: <token>
+    baseLocation:
+      state: SA
+      country: AU
+```
+
+The UI prefers the stream’s `baseLocation` when present; otherwise it falls back
+to the global `ui.baseLocation` if configured.
+
 ## Keyword alerts
 
 Use the `alerts` block to surface high-priority phrases with a banner and optional chime. The defaults ship with

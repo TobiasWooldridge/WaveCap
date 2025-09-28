@@ -42,9 +42,10 @@ transcribing multiple radio or pager feeds in real time.
 - Pager feed messages that share an incident number and arrive within roughly a minute
   collapse into a single grouped thread, showing parsed incident details like the call
   type, location, and alarm level alongside the individual updates.
-  When pager messages include a partial address, the UI appends an optional
-  `ui.baseLocation` (state and/or country) from configuration to Google Maps
-  searches so links and embeds resolve within the expected region.
+  When pager messages include a partial address, the UI appends a base location
+  (state and/or country) to Google Maps searches so links and embeds resolve
+  within the expected region. A per-stream `baseLocation` takes precedence; the
+  global `ui.baseLocation` is used as a fallback.
 - When Whisper returns no text but audio passes silence thresholds, show a "Silence" entry with playback controls. If the clip contains noisy speech Whisper cannot decode, surface it as `[unable to transcribe]` and keep the recording for operators to replay.
 - Segments that loop the same long phrase beyond configured repetition limits are treated as `[unable to transcribe]` entries so the log highlights bursts Whisper could not confidently decode.
 - Suppress hallucinated phrases on barely audible bursts; if a chunk lacks meaningful energy the backend drops Whisper's text entirely so the transcript log stays empty instead of fabricating callouts.

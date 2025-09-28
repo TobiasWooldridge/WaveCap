@@ -193,6 +193,10 @@ class Stream(APIModel):
     webhookToken: Optional[str] = Field(default=None, alias="webhookToken")
     ignoreFirstSeconds: float = Field(default=0.0, alias="ignoreFirstSeconds")
     lastActivityAt: Optional[datetime] = Field(default=None, alias="lastActivityAt")
+    # Optional base location used by the UI to disambiguate partial addresses
+    baseLocation: Optional["BaseLocationConfig"] = Field(
+        default=None, alias="baseLocation"
+    )
 
     @field_validator("createdAt", mode="before")
     @classmethod
@@ -408,6 +412,10 @@ class StreamConfig(APIModel):
     sdrBandwidthHz: Optional[int] = Field(default=None, alias="sdrBandwidthHz")
     # Optional reference to a named prompt in whisper.prompts
     initialPromptName: Optional[str] = Field(default=None, alias="initialPromptName")
+    # Optional base location used by the UI to disambiguate partial addresses
+    baseLocation: Optional["BaseLocationConfig"] = Field(
+        default=None, alias="baseLocation"
+    )
 
     @field_validator("ignoreFirstSeconds")
     @classmethod

@@ -386,6 +386,7 @@ class StreamManager:
                 source=StreamSource.PAGER,
                 webhookToken=stream_config.webhookToken,
                 ignoreFirstSeconds=0.0,
+                baseLocation=stream_config.baseLocation,
             )
             return base.model_copy(
                 update={
@@ -399,6 +400,7 @@ class StreamManager:
                     "pinned": pinned,
                     "status": StreamStatus.TRANSCRIBING,
                     "error": None,
+                    "baseLocation": stream_config.baseLocation,
                 }
             )
 
@@ -423,6 +425,7 @@ class StreamManager:
                 source=StreamSource.AUDIO,
                 webhookToken=None,
                 ignoreFirstSeconds=ignore_seconds,
+                baseLocation=stream_config.baseLocation,
             )
         updates = {
             "name": stream_config.name,
@@ -432,6 +435,7 @@ class StreamManager:
             "ignoreFirstSeconds": ignore_seconds,
             "webhookToken": None,
             "pinned": pinned,
+            "baseLocation": stream_config.baseLocation,
         }
         return existing.model_copy(update=updates)
 
@@ -454,6 +458,7 @@ class StreamManager:
             source=StreamSource.SDR,
             webhookToken=None,
             ignoreFirstSeconds=ignore_seconds,
+            baseLocation=stream_config.baseLocation,
         )
         updates = {
             "name": stream_config.name,
@@ -464,6 +469,7 @@ class StreamManager:
             "webhookToken": None,
             "pinned": pinned,
             "enabled": bool(stream_config.enabled),
+            "baseLocation": stream_config.baseLocation,
         }
         # Register SDR channel spec for this stream
         try:

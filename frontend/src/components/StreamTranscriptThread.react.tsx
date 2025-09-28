@@ -3,7 +3,7 @@ import { Pause, Play } from "lucide-react";
 import type {
   TranscriptionGroup,
 } from "./StreamTranscriptionPanel.logic";
-import type { TranscriptionResult, TranscriptionReviewStatus } from "@types";
+import type { TranscriptionResult, TranscriptionReviewStatus, BaseLocation } from "@types";
 import {
   getNotifiableAlerts,
   isBlankAudioText,
@@ -64,6 +64,7 @@ export interface StreamTranscriptThreadProps {
       reviewer?: string | null;
     },
   ) => Promise<unknown>;
+  baseLocation?: BaseLocation | null;
 }
 
 const StreamTranscriptThread: React.FC<StreamTranscriptThreadProps> = ({
@@ -84,6 +85,7 @@ const StreamTranscriptThread: React.FC<StreamTranscriptThreadProps> = ({
   openPagerMessageIds,
   onTogglePagerMessage,
   onReviewTranscription,
+  baseLocation: streamBaseLocation,
 }) => {
   const renderedRecordings = new Set<string>();
   const audioElements: React.ReactNode[] = [];
@@ -93,13 +95,14 @@ const StreamTranscriptThread: React.FC<StreamTranscriptThreadProps> = ({
   );
   const incidentDetails = incidentSource?.pagerIncident ?? null;
   const { baseLocation } = useUISettings();
+  const effectiveBaseLocation = streamBaseLocation ?? baseLocation;
   const baseLocationSuffix = useMemo(() => {
-    if (!baseLocation) return null;
+    if (!effectiveBaseLocation) return null;
     const parts: string[] = [];
-    if (baseLocation.state) parts.push(baseLocation.state);
-    if (baseLocation.country) parts.push(baseLocation.country);
+    if (effectiveBaseLocation.state) parts.push(effectiveBaseLocation.state);
+    if (effectiveBaseLocation.country) parts.push(effectiveBaseLocation.country);
     return parts.length > 0 ? parts.join(", ") : null;
-  }, [baseLocation]);
+  }, [effectiveBaseLocation]);
   const incidentIdLabel = (() => {
     const value = incidentDetails?.incidentId ?? group.pagerIncidentId ?? null;
     if (typeof value !== "string") return null;
