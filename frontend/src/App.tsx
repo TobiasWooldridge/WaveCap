@@ -945,7 +945,8 @@ function App() {
           });
           const aTitle = getStreamTitle(a);
           const bTitle = getStreamTitle(b);
-          return -collator.compare(aTitle, bTitle);
+          // A–Z ascending order
+          return collator.compare(aTitle, bTitle);
         })();
         if (nameComparison !== 0) return nameComparison;
         const activityDifference =
@@ -985,7 +986,9 @@ function App() {
   const combinedViewsErrorMessage = combinedViewsError?.message ?? null;
 
   const streamSidebarItems = useMemo<StreamSidebarItem[]>(() => {
-    const items: StreamSidebarItem[] = sortedConversations.map((stream) => {
+    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
+    const raw: StreamSidebarItem[] = displayStreams.map((stream) => {
       const latestTranscription = getLatestTranscription(stream);
       const title = getStreamTitle(stream);
       const latestTimestamp = getLatestActivityTimestamp(stream);
@@ -999,11 +1002,7 @@ function App() {
           latestTimestamp > 0 ? (
             <Timestamp
               value={latestTimestamp}
-              timeOptions={{
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false,
-              }}
+              timeOptions={{ hour: "2-digit", minute: "2-digit", hour12: false }}
             />
           ) : null,
         unreadCount: countUnreadTranscriptions(
@@ -1017,8 +1016,36 @@ function App() {
       };
     });
 
+    const items = [...raw].sort((a, b) => {
+      const aPinned = a.isPinned;
+      const bPinned = b.isPinned;
+      if (aPinned !== bPinned) return aPinned ? -1 : 1;
+
+      if (streamSortMode === "name") {
+        const byTitle = collator.compare(a.title, b.title);
+        if (byTitle !== 0) return byTitle;
+        const activityDiff =
+          getLatestActivityTimestamp(b.stream) - getLatestActivityTimestamp(a.stream);
+        if (activityDiff !== 0) return activityDiff;
+        return a.id.localeCompare(b.id);
+      }
+
+      // Sort by latest activity, then fall back to title A–Z
+      const activityDiff =
+        getLatestActivityTimestamp(b.stream) - getLatestActivityTimestamp(a.stream);
+      if (activityDiff !== 0) return activityDiff;
+      const byTitle = collator.compare(a.title, b.title);
+      if (byTitle !== 0) return byTitle;
+      return a.id.localeCompare(b.id);
+    });
+
     return items;
-  }, [lastViewedAtByConversation, selectedStreamId, sortedConversations]);
+  }, [
+    displayStreams,
+    lastViewedAtByConversation,
+    selectedStreamId,
+    streamSortMode,
+  ]);
 
   const selectedStream = useMemo(() => {
     if (!selectedStreamId) {
