@@ -64,6 +64,12 @@ import { useExportSettings } from "./hooks/useExportSettings";
 import { usePagerExport } from "./hooks/usePagerExport";
 import { useCombinedStreamViews } from "./hooks/useCombinedStreamViews";
 import { compareStreamsByName, getStreamTitle } from "./utils/streams";
+import {
+  getStoredLastViewedMap,
+  LAST_VIEWED_STORAGE_KEY,
+  parseLastViewedMapString,
+  storeLastViewedMap,
+} from "./utils/unreadStorage";
 import "./App.scss";
 
 const REVIEW_STATUS_OPTIONS: Array<{
@@ -823,7 +829,7 @@ function App() {
     useState<StandaloneStreamControls | null>(null);
   const [lastViewedAtByConversation, setLastViewedAtByConversation] = useState<
     Record<string, number>
-  >(() => ({}));
+  >(() => getStoredLastViewedMap());
   const [streamSortMode, setStreamSortMode] = useState<StreamSortMode>(() =>
     getStoredStreamSortMode(),
   );
@@ -834,6 +840,40 @@ function App() {
     }
     window.localStorage.setItem(STREAM_SORT_STORAGE_KEY, streamSortMode);
   }, [streamSortMode]);
+
+  // Persist last-viewed timestamps to localStorage whenever they change
+  useEffect(() => {
+    storeLastViewedMap(lastViewedAtByConversation);
+  }, [lastViewedAtByConversation]);
+
+  // Update from other tabs when the storage changes
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== LAST_VIEWED_STORAGE_KEY) {
+        return;
+      }
+      const next = parseLastViewedMapString(event.newValue);
+      setLastViewedAtByConversation((prev) => {
+        // shallow equality check to avoid unnecessary renders
+        const prevKeys = Object.keys(prev);
+        const nextKeys = Object.keys(next);
+        if (prevKeys.length !== nextKeys.length) {
+          return next;
+        }
+        for (const key of prevKeys) {
+          if (prev[key] !== next[key]) {
+            return next;
+          }
+        }
+        return prev;
+      });
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
 
   const sortedConversations = useMemo(() => {
     if (displayStreams.length === 0) {
@@ -1035,7 +1075,7 @@ function App() {
 
       sortedConversations.forEach((stream) => {
         if (!(stream.id in next)) {
-          next[stream.id] = 0;
+          next[stream.id] = getLatestActivityTimestamp(stream);
           changed = true;
         }
       });

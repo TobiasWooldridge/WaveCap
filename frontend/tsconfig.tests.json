@@ -16,6 +16,7 @@
     "src/components/StreamTranscriptionPanel.test.ts",
     "src/utils/playback.ts",
     "src/utils/playback.test.ts",
+    "src/utils/unreadStorage.test.ts",
     "src/hooks/useTranscriptions.ts",
     "src/hooks/useTranscriptions.test.ts",
     "src/types/**/*.ts"

@@ -34,7 +34,7 @@ transcribing multiple radio or pager feeds in real time.
 - Sort the stream sidebar by latest activity or stream name. Streams pinned in configuration files stay at the top regardless of the selected sort mode.
 - Open each stream's conversation view with search, time-range filters, and "Go to timestamp" controls to review recent traffic.
 - Read system log entries that mark recording and transcription start or stop events, as well as upstream connection interruptions and recoveries.
-- See stream status and unread badges in the sidebar. Start/Stop controls are removed; enable/disable streams via `state/config.yaml`.
+- See stream status and unread badges in the sidebar. Unread counts persist per browser session via localStorage so refreshes don’t reset them. Start/Stop controls are removed; enable/disable streams via `state/config.yaml`.
 - Controls that trigger backend actions disable their buttons and show a spinner while the backend processes the request, preventing duplicate submissions.
 - Panels that may take time to populate display loading spinners until data arrives so operators understand the UI is still working.
 - Check aggregate counters for transcript volume, confidence, and recent activity.
