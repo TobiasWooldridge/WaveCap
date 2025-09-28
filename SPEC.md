@@ -22,6 +22,10 @@ transcribing multiple radio or pager feeds in real time.
 - Rename streams to keep labels accurate; updates propagate instantly to every operator.
 - Skip the first seconds of Broadcastify streams automatically (30 seconds by default, configurable per stream).
 - Define combined stream views in configuration files to surface virtual conversations that merge transcripts from multiple audio or pager sources.
+- Configure named transcription prompts and assign them per-stream. Define
+  `whisper.prompts` once and reference with `initialPromptName` in each stream
+  to tailor biasing by agency or region; streams without a name fall back to
+  the global `whisper.initialPrompt` when provided.
 - Restart streams that stall or pause; status updates instantly for every connected browser. If a remote HTTP stream drops unexpectedly, the backend attempts to reconnect immediately once and then only every ten minutes to avoid hammering the source.
 - Each stream tracks two state fields: an **enabled** flag that records the operator's intent, and a **status** flag that reflects the backend's actual progress (stopped, queued, transcribing, or error). Start/Stop actions flip the enabled flag; the backend keeps trying to make the status match.
 

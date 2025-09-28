@@ -52,6 +52,11 @@ whisper:
   #   other emergency services in South Australia. Priority callouts include
   #   Adelaide, Adelaide fire out, Noarlunga, SITREP, SAPOL, and SES. Spell them
   #   exactly when they are heard on air.
+  # prompts:
+  #   sa_ses: >-
+  #     This is part of an emergency radio conversation between firefighters and
+  #     other emergency services in South Australia. Priority callouts include
+  #     Adelaide, Adelaide fire out, Noarlunga, SITREP, SAPOL, and SES.
   # Front-end filtering keeps speech crisp and level.
   highpassCutoffHz: 250
   lowpassCutoffHz: 3800

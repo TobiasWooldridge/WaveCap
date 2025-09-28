@@ -278,6 +278,24 @@ class StreamManager:
 
     def _create_worker(self, stream: Stream) -> StreamWorker:
         factory = self._worker_factory or StreamWorker
+        # Resolve per-stream initial prompt
+        prompt_override: Optional[str] = None
+        try:
+            stream_cfg = next((s for s in self.config.streams if s.id == stream.id), None)
+        except Exception:
+            stream_cfg = None
+        if stream_cfg and getattr(stream_cfg, "initialPromptName", None):
+            name = (stream_cfg.initialPromptName or "").strip()
+            if name:
+                prompt_override = self.config.whisper.prompts.get(name)
+                if prompt_override is None:
+                    LOGGER.warning(
+                        "Unknown initialPromptName '%s' for stream %s; falling back to global initialPrompt",
+                        name,
+                        stream.id,
+                    )
+        if prompt_override is None:
+            prompt_override = self.config.whisper.initialPrompt
         return factory(
             stream=stream,
             transcriber=self.transcriber,
@@ -289,6 +307,7 @@ class StreamManager:
             on_upstream_disconnect=self._handle_upstream_disconnect,
             on_upstream_reconnect=self._handle_upstream_reconnect,
             config=self.config.whisper,
+            initial_prompt=prompt_override,
         )
 
     async def _ensure_stream_alignment(

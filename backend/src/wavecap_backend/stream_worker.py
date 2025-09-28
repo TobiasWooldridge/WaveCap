@@ -297,6 +297,7 @@ class StreamWorker:
         *,
         config: WhisperConfig,
         transcription_executor: Optional[TranscriptionExecutor] = None,
+        initial_prompt: Optional[str] = None,
     ) -> None:
         self.stream = stream
         self.transcriber = transcriber
@@ -314,6 +315,7 @@ class StreamWorker:
 
         self._upstream_connected = True
         self._pending_reconnect_attempt: Optional[int] = None
+        self._initial_prompt = (initial_prompt or "").strip() or None
 
         self.sample_rate = max(config.sampleRate, 1)
         max_chunk_seconds = max(float(config.chunkLength), 1.0)
@@ -367,7 +369,7 @@ class StreamWorker:
         )
         self._hallucination_phrases = self._prepare_hallucination_phrases(
             config.silenceHallucinationPhrases,
-            config.initialPrompt,
+            self._initial_prompt or config.initialPrompt,
         )
 
         deemphasis_seconds = (
@@ -860,7 +862,9 @@ class StreamWorker:
             if blocking_method is not None:
                 try:
                     result = await executor.run(
-                        lambda: blocking_method(audio, sample_rate, language)
+                        lambda: blocking_method(
+                            audio, sample_rate, language, initial_prompt=self._initial_prompt
+                        )
                     )
                 except NotImplementedError:
                     self._blocking_supported = False
@@ -869,7 +873,9 @@ class StreamWorker:
                     return result
             else:
                 self._blocking_supported = False
-        return await self.transcriber.transcribe(audio, sample_rate, language)
+        return await self.transcriber.transcribe(
+            audio, sample_rate, language, initial_prompt=self._initial_prompt
+        )
 
     async def _transcribe_chunk(self, chunk: PreparedChunk) -> None:
         if chunk.samples.size == 0:

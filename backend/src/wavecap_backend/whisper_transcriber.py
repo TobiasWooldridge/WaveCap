@@ -41,12 +41,22 @@ class TranscriptionResultBundle:
 
 class AbstractTranscriber:
     async def transcribe(
-        self, audio: np.ndarray, sample_rate: int, language: Optional[str]
+        self,
+        audio: np.ndarray,
+        sample_rate: int,
+        language: Optional[str],
+        *,
+        initial_prompt: Optional[str] = None,
     ) -> TranscriptionResultBundle:
         raise NotImplementedError
 
     def transcribe_blocking(
-        self, audio: np.ndarray, sample_rate: int, language: Optional[str]
+        self,
+        audio: np.ndarray,
+        sample_rate: int,
+        language: Optional[str],
+        *,
+        initial_prompt: Optional[str] = None,
     ) -> TranscriptionResultBundle:
         raise NotImplementedError
 
@@ -206,23 +216,40 @@ class WhisperTranscriber(AbstractTranscriber):
         return self._transcribe_param_support
 
     async def transcribe(
-        self, audio: np.ndarray, sample_rate: int, language: Optional[str]
+        self,
+        audio: np.ndarray,
+        sample_rate: int,
+        language: Optional[str],
+        *,
+        initial_prompt: Optional[str] = None,
     ) -> TranscriptionResultBundle:
         return await asyncio.to_thread(
-            self.transcribe_blocking, audio, sample_rate, language
+            self.transcribe_blocking, audio, sample_rate, language, initial_prompt=initial_prompt
         )
 
     def transcribe_blocking(
-        self, audio: np.ndarray, sample_rate: int, language: Optional[str]
+        self,
+        audio: np.ndarray,
+        sample_rate: int,
+        language: Optional[str],
+        *,
+        initial_prompt: Optional[str] = None,
     ) -> TranscriptionResultBundle:
         with self._semaphore:
             model = self._ensure_model_blocking()
             LOGGER.debug("Running Whisper inference on %s samples", audio.shape[0])
-            segments, info = self._run_model_transcription(model, audio, language)
+            segments, info = self._run_model_transcription(
+                model, audio, language, override_initial_prompt=initial_prompt
+            )
         return self._build_result_bundle(segments, info)
 
     def _run_model_transcription(
-        self, model: WhisperModel, audio: np.ndarray, language: Optional[str]
+        self,
+        model: WhisperModel,
+        audio: np.ndarray,
+        language: Optional[str],
+        *,
+        override_initial_prompt: Optional[str] = None,
     ) -> Tuple[List[Any], Any]:
         supported_params, accepts_var_kwargs = self._get_transcribe_param_support(model)
         kwargs: dict[str, Any] = {
@@ -241,8 +268,9 @@ class WhisperTranscriber(AbstractTranscriber):
             LOGGER.debug(
                 "Skipping unsupported faster-whisper parameter 'temperature_increment_on_fallback'."
             )
-        if self.config.initialPrompt:
-            kwargs["initial_prompt"] = self.config.initialPrompt
+        effective_prompt = override_initial_prompt or self.config.initialPrompt
+        if effective_prompt:
+            kwargs["initial_prompt"] = effective_prompt
         segment_iter, transcription_info = model.transcribe(audio, **kwargs)
         return list(segment_iter), transcription_info
 
@@ -283,12 +311,22 @@ class PassthroughTranscriber(AbstractTranscriber):
         self.text = text
 
     async def transcribe(
-        self, audio: np.ndarray, sample_rate: int, language: Optional[str]
+        self,
+        audio: np.ndarray,
+        sample_rate: int,
+        language: Optional[str],
+        *,
+        initial_prompt: Optional[str] = None,
     ) -> TranscriptionResultBundle:
         return TranscriptionResultBundle(self.text, [], language)
 
     def transcribe_blocking(
-        self, audio: np.ndarray, sample_rate: int, language: Optional[str]
+        self,
+        audio: np.ndarray,
+        sample_rate: int,
+        language: Optional[str],
+        *,
+        initial_prompt: Optional[str] = None,
     ) -> TranscriptionResultBundle:
         return TranscriptionResultBundle(self.text, [], language)
 

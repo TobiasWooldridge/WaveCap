@@ -352,12 +352,31 @@ toward consistent phrasing without forcing every token:
   judged independently. Enabling it can help long-form narration but risks
   cementing earlier mistakes in dispatch contexts.
 - `initialPrompt`: Optional priming string injected at the start of each job.
-  Use it to list frequently misheard locations or agency-specific jargon. The
-  shipping configuration reminds Whisper about “Adelaide fire out”,
-  “Noarlunga”, and “SITREP”, improving the odds of seeing them verbatim while
-  the post-processor only normalises “SITREP” when the decoded word is almost
-  an exact match, preventing the correction from firing repeatedly on similar
-  syllables.
+  Use it to list frequently misheard locations or agency-specific jargon.
+- `prompts`: Optional mapping of named prompts you can reference from streams.
+  When a stream sets `initialPromptName`, that named prompt is used for that
+  stream; otherwise the global `initialPrompt` (if any) applies.
+
+Example:
+
+```yaml
+whisper:
+  # Global fallback (used if a stream does not specify a named prompt)
+  initialPrompt: >-
+    This is an emergency radio conversation.
+  prompts:
+    sa_ses: >-
+      This is part of an emergency radio conversation between firefighters and
+      other emergency services in South Australia. Priority callouts include
+      Adelaide, Adelaide fire out, Noarlunga, SITREP, SAPOL, and SES.
+
+streams:
+  - id: broadcastify-2653
+    name: SA SES Radio
+    url: https://broadcastify.cdnstream1.com/2653
+    enabled: true
+    initialPromptName: sa_ses
+```
 
 ### 9. Condition radio audio up front
 

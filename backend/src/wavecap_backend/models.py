@@ -305,6 +305,8 @@ class WhisperConfig(APIModel):
         default=False, alias="conditionOnPreviousText"
     )
     initialPrompt: Optional[str] = Field(default=None, alias="initialPrompt")
+    # Named prompt presets that can be referenced by streams
+    prompts: Dict[str, str] = Field(default_factory=dict, alias="prompts")
     blankAudioMinDurationSeconds: Optional[float] = Field(
         default=None, alias="blankAudioMinDurationSeconds"
     )
@@ -388,6 +390,8 @@ class StreamConfig(APIModel):
     sdrFrequencyHz: Optional[int] = Field(default=None, alias="sdrFrequencyHz")
     sdrMode: Optional[str] = Field(default="nfm", alias="sdrMode")
     sdrBandwidthHz: Optional[int] = Field(default=None, alias="sdrBandwidthHz")
+    # Optional reference to a named prompt in whisper.prompts
+    initialPromptName: Optional[str] = Field(default=None, alias="initialPromptName")
 
     @field_validator("ignoreFirstSeconds")
     @classmethod
