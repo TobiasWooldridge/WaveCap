@@ -57,13 +57,14 @@ import { Timestamp } from "./components/primitives/Timestamp.react";
 import { TimeInterval } from "./components/primitives/TimeInterval.react";
 import Button from "./components/primitives/Button.react";
 import ButtonGroup from "./components/primitives/ButtonGroup.react";
+import InlineText from "./components/primitives/InlineText.react";
 import { useResponsiveLayout } from "./hooks/useResponsiveLayout";
 import { useKeywordAlerts } from "./hooks/useKeywordAlerts";
 import { useStreamSelection } from "./hooks/useStreamSelection";
 import { useExportSettings } from "./hooks/useExportSettings";
 import { usePagerExport } from "./hooks/usePagerExport";
 import { useCombinedStreamViews } from "./hooks/useCombinedStreamViews";
-import { compareStreamsByName, getStreamTitle } from "./utils/streams";
+import { compareStreamsByName, getStreamTitle, getSdrFrequencyHz, formatFrequency } from "./utils/streams";
 import {
   getStoredLastViewedMap,
   LAST_VIEWED_STORAGE_KEY,
@@ -1012,6 +1013,15 @@ function App() {
     () => (selectedStream?.source ?? "audio") === "combined",
     [selectedStream],
   );
+  const selectedStreamIsSdr = useMemo(
+    () => (selectedStream?.source ?? "audio") === "sdr",
+    [selectedStream],
+  );
+  const selectedSdrFrequencyLabel = useMemo(() => {
+    if (!selectedStream || !selectedStreamIsSdr) return null;
+    const hz = getSdrFrequencyHz(selectedStream);
+    return hz ? formatFrequency(hz) : null;
+  }, [selectedStream, selectedStreamIsSdr]);
   const selectedCombinedMetadata = selectedStream
     ? combinedViewMap.get(selectedStream.id) ?? null
     : null;
@@ -1464,18 +1474,29 @@ function App() {
                                 <span className="mx-1">·</span>
                                 <span>Pager feed</span>
                                 {selectedStreamWebhookPath && (
-                                  <span className="ms-2 d-inline-flex align-items-center gap-1">
+                                  <InlineText as="span" className="ms-2" gap={1}>
                                     <span>Webhook</span>
                                     <code
                                       className="conversation-panel__meta-code"
-                                      title={
-                                        selectedStreamWebhookUrl ?? undefined
-                                      }
+                                      title={selectedStreamWebhookUrl ?? undefined}
                                     >
                                       {selectedStreamWebhookPath}
                                     </code>
-                                  </span>
+                                  </InlineText>
                                 )}
+                              </>
+                            ) : selectedStreamIsSdr ? (
+                              <>
+                                <span className="mx-1">·</span>
+                                <span>SDR</span>
+                                {selectedSdrFrequencyLabel ? (
+                                  <InlineText as="span" className="ms-2" gap={1}>
+                                    <span>Frequency</span>
+                                    <code className="conversation-panel__meta-code">
+                                      {selectedSdrFrequencyLabel}
+                                    </code>
+                                  </InlineText>
+                                ) : null}
                               </>
                             ) : (
                               <>
@@ -1491,17 +1512,17 @@ function App() {
                               </>
                             )}
                             {selectedStreamIsCombined && combinedMemberList ? (
-                              <span className="ms-2 d-inline-flex align-items-center gap-1">
+                              <InlineText as="span" className="ms-2" gap={1}>
                                 <span>Includes</span>
                                 <span>{combinedMemberList}</span>
-                              </span>
+                              </InlineText>
                             ) : null}
                             {selectedStreamIsCombined &&
                             selectedCombinedMissing.length > 0 ? (
-                              <span className="ms-2 text-danger d-inline-flex align-items-center gap-1">
+                              <InlineText as="span" className="ms-2 text-danger" gap={1}>
                                 <AlertTriangle size={14} />
                                 Missing {selectedCombinedMissing.join(", ")}
-                              </span>
+                              </InlineText>
                             ) : null}
                             {selectedStreamLatestTimestamp ? (
                               <span className="ms-1">

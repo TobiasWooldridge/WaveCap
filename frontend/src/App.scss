@@ -96,9 +96,16 @@
 
 .conversation-panel__meta {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 0.35rem;
   flex-wrap: wrap;
+}
+
+/* Ensure inline code chips in the header align neatly with surrounding text */
+.conversation-panel__meta-code {
+  vertical-align: baseline;
+  line-height: 1.25;
+  padding-block: 0; /* avoid bottom protrusion below baseline */
 }
 
 .conversation-panel__actions {

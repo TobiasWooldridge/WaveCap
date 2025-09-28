@@ -175,7 +175,7 @@ const StreamSidebar = ({
                     gap={2}
                     className="stream-sidebar__item-content"
                   >
-                    <Flex align="center" gap={2} className="stream-sidebar__item-heading">
+                    <Flex align="baseline" gap={2} className="stream-sidebar__item-heading">
                       {item.isPinned ? (
                         <span
                           className="stream-sidebar__pin"

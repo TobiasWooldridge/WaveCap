@@ -221,7 +221,9 @@
 }
 
 /* Icon variant that inherits status colors */
-.stream-status-icon {
+/* Restrict icon nudge to the sidebar layout so other places (e.g., conversation header)
+   keep a natural baseline alignment. */
+.stream-sidebar .stream-status-icon {
   margin-top: 0.2rem;
   flex-shrink: 0;
 }
