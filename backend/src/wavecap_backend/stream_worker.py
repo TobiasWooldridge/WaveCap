@@ -38,6 +38,8 @@ from .models import (
     TranscriptionSegment,
     WhisperConfig,
 )
+from .models import StreamSource
+from .sdr import get_sdr_manager
 from .state_paths import RECORDINGS_DIR
 from .stream_defaults import resolve_ignore_first_seconds
 from .transcription_postprocessor import PhraseCanonicalizer
@@ -597,6 +599,23 @@ class StreamWorker:
         self._upstream_connected = True
         self._pending_reconnect_attempt = None
         try:
+            # SDR sources: read PCM from the SDR manager instead of ffmpeg
+            if self.stream.source == StreamSource.SDR:
+                mgr = get_sdr_manager()
+                spec = mgr.get_stream_spec(self.stream.id)
+                if spec is None:
+                    raise RuntimeError(f"SDR spec not registered for stream {self.stream.id}")
+                channel = await mgr.open_channel(spec, self.sample_rate)
+                try:
+                    while not self._stop_event.is_set():
+                        chunk = await channel.read(max_wait_seconds=0.5)
+                        if chunk:
+                            await self._ingest_pcm_bytes(chunk)
+                    await self._flush_pending_chunks()
+                finally:
+                    await channel.close()
+                return
+
             while not self._stop_event.is_set():
                 if self._worker_failure is not None:
                     worker_failure = self._worker_failure

@@ -26,6 +26,25 @@ docker build -t wavecap .
 docker run -p 8000:8000 -v $(pwd)/state:/app/state wavecap
 ```
 
+If you plan to use an SDR (e.g., SDRplay RSPdx), you have two options:
+
+- Host install: install SoapySDR and your device plugin on the host, then expose USB devices to the container (already configured in `docker-compose.yml`).
+- In-container install: the Dockerfile installs SoapySDR core, tools, and Python bindings. To also bundle the SDRplay API and SoapySDRPlay3 plugin, pass build args in Compose:
+
+  ```yaml
+  build:
+    context: .
+    args:
+      SDRPLAY_API_DEB_URL: "<vendor .deb URL>"
+      SOAPY_SDRPLAY3_DEB_URL: "<vendor .deb URL>"
+  ```
+
+  Obtain the correct .deb URLs from the SDRplay downloads page for Debian Bookworm/amd64. Alternatively, install them on the host and just use USB passthrough.
+
+Define a device under `sdr.devices` in your config and enable an SDR stream (for example, the included Marine VHF Ch 16 example).
+
+Note: the SDRplay Soapy module (`SoapySDRPlay3`) depends on the proprietary SDRplay API; follow SDRplay’s installation guide on the host and ensure the libraries are discoverable inside the container if you install them there as well.
+
 ### Windows
 ```powershell
 pwsh -File start-app.ps1

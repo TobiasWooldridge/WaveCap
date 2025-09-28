@@ -107,9 +107,9 @@ const resolveStreamKind = (
   const source = stream.source ?? "audio";
   if (source === "pager") return "pager";
   if (source === "combined") return "combined";
+  if (source === "sdr") return "sdr";
   const url = String(stream.url || "");
   if (/^https?:\/\//i.test(url)) return "web";
-  if (source === "audio") return "sdr";
   return "audio";
 };
 

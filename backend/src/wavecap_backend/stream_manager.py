@@ -302,7 +302,7 @@ class StreamManager:
             stream = self.streams.get(stream_id)
             if not stream:
                 return
-            if stream.source != StreamSource.AUDIO:
+            if stream.source == StreamSource.PAGER:
                 if not stream.enabled:
                     stream.enabled = True
                     should_save = True
@@ -416,6 +416,52 @@ class StreamManager:
         }
         return existing.model_copy(update=updates)
 
+    def _build_sdr_stream_from_config(self, stream_config: StreamConfig, existing: Optional[Stream]) -> Stream:
+        # Build a synthetic URL if not provided already
+        url = (stream_config.url or f"sdr://{stream_config.sdrDeviceId}/{int(stream_config.sdrFrequencyHz or 0)}").strip()
+        pinned = bool(stream_config.pinned)
+        language = (stream_config.language or "").strip() or None
+        ignore_seconds = resolve_ignore_first_seconds(StreamSource.SDR, url, stream_config.ignoreFirstSeconds)
+        base = existing or Stream(
+            id=stream_config.id,
+            name=stream_config.name,
+            url=url,
+            status=StreamStatus.STOPPED,
+            enabled=bool(stream_config.enabled),
+            pinned=pinned,
+            createdAt=utcnow(),
+            language=language,
+            transcriptions=[],
+            source=StreamSource.SDR,
+            webhookToken=None,
+            ignoreFirstSeconds=ignore_seconds,
+        )
+        updates = {
+            "name": stream_config.name,
+            "url": url,
+            "language": language,
+            "source": StreamSource.SDR,
+            "ignoreFirstSeconds": ignore_seconds,
+            "webhookToken": None,
+            "pinned": pinned,
+            "enabled": bool(stream_config.enabled),
+        }
+        # Register SDR channel spec for this stream
+        try:
+            from .sdr import get_sdr_manager, SdrChannelSpec
+
+            spec = SdrChannelSpec(
+                stream_id=stream_config.id,
+                device_id=str(stream_config.sdrDeviceId),
+                frequency_hz=int(stream_config.sdrFrequencyHz or 0),
+                mode=str(stream_config.sdrMode or "nfm"),
+                bandwidth_hz=(int(stream_config.sdrBandwidthHz) if stream_config.sdrBandwidthHz else None),
+            )
+            get_sdr_manager().register_stream_spec(spec)
+        except Exception as exc:  # pragma: no cover - optional
+            LOGGER.warning("Failed to register SDR stream %s: %s", stream_config.id, exc)
+        return base.model_copy(update=updates)
+
     async def initialize(self) -> None:
         await self._executor.start()
         persisted_streams = {
@@ -446,23 +492,23 @@ class StreamManager:
                 await self._delete_stream(existing.id)
                 self._delete_recordings(existing.id)
                 existing = None
-            stream = self._build_stream_from_config(stream_config, existing)
+            if stream_config.source == StreamSource.PAGER:
+                stream = self._build_stream_from_config(stream_config, existing)
+            elif stream_config.source == StreamSource.SDR:
+                stream = self._build_sdr_stream_from_config(stream_config, existing)
+            else:
+                stream = self._build_stream_from_config(stream_config, existing)
             await self._save_stream(stream)
             streams.append(stream)
         streams_to_activate: List[Stream] = []
         for stream in streams:
             await self._apply_default_preroll(stream)
-            if (
-                stream.source == StreamSource.PAGER
-                and stream.status != StreamStatus.ERROR
-            ):
+            if (stream.source == StreamSource.PAGER and stream.status != StreamStatus.ERROR):
                 stream.enabled = True
                 if stream.status != StreamStatus.TRANSCRIBING:
                     stream.status = StreamStatus.TRANSCRIBING
                     await self._save_stream(stream)
-            elif (
-                stream.source == StreamSource.AUDIO
-            ):
+            elif (stream.source in (StreamSource.AUDIO, StreamSource.SDR)):
                 if stream.enabled:
                     if stream.error:
                         stream.error = None
@@ -489,10 +535,7 @@ class StreamManager:
             self.streams[stream.id] = stream
         await self._broadcast_streams(include_transcriptions=True)
         if streams_to_activate:
-            LOGGER.info(
-                "Synchronizing %d audio stream(s) with enabled state",
-                len(streams_to_activate),
-            )
+            LOGGER.info("Synchronizing %d stream(s) with enabled state", len(streams_to_activate))
             resumed_streams: List[Stream] = []
             for stream in streams_to_activate:
                 try:
@@ -543,8 +586,8 @@ class StreamManager:
 
             if request.language is not None:
                 normalized_language = request.language.strip() if request.language else ""
-                if stream.source != StreamSource.AUDIO and normalized_language:
-                    raise ValueError("Language can only be set for audio streams")
+                if stream.source == StreamSource.PAGER and normalized_language:
+                    raise ValueError("Language cannot be set for pager streams")
                 next_language = normalized_language or None
                 if stream.language != next_language:
                     stream.language = next_language
@@ -582,7 +625,7 @@ class StreamManager:
             if not stream:
                 raise ValueError("Stream not found")
             stream.enabled = True
-            if stream.source != StreamSource.AUDIO:
+            if stream.source == StreamSource.PAGER:
                 LOGGER.info(
                     "Start requested for non-audio stream %s; ignoring", stream_id
                 )
@@ -609,7 +652,7 @@ class StreamManager:
         needs_alignment = False
         async with self._lock:
             stream = self.streams.get(stream_id)
-            if stream and stream.source != StreamSource.AUDIO:
+            if stream and stream.source == StreamSource.PAGER:
                 LOGGER.info(
                     "Stop requested for non-audio stream %s; ignoring", stream_id
                 )

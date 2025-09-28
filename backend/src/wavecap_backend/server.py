@@ -67,6 +67,7 @@ from .whisper_transcriber import (
     PassthroughTranscriber,
     WhisperTranscriber,
 )
+from .sdr import get_sdr_manager, SdrChannelSpec
 
 TRANSCRIBER_ENV_FLAG = "WAVECAP_USE_PASSTHROUGH_TRANSCRIBER"
 
@@ -98,6 +99,12 @@ class AppState:
         self.transcriber = _create_transcriber(config)
         self.stream_manager = StreamManager(config, self.database, self.transcriber)
         self.fixture_set = fixture_set.strip() if fixture_set else ""
+        # Configure SDR devices (if any) early so workers can open channels
+        sdr_cfg = config.sdr
+        if sdr_cfg and sdr_cfg.devices:
+            mgr = get_sdr_manager()
+            for dev in sdr_cfg.devices:
+                mgr.configure_device(dev.id, dev.soapy, dev.sampleRateHz, dev.gainDb)
 
     async def shutdown(self) -> None:
         await self.stream_manager.shutdown()

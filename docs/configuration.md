@@ -203,6 +203,42 @@ Add multiple phrases to catch variations such as `"pan-pan"` and `"pan pan"`. Wh
 the Settings dialog in the UI also exposes a **Keyword alerts** section. From there you can toggle individual rules,
 adjust the phrases, and choose whether each rule plays a chime or only shows a banner. Updates made in the UI apply immediately for all connected browsers and persist until the backend restarts, but they are not written back to `state/config.yaml`. Edit the file directly when you need permanent changes.
 
+## SDR devices and streams
+
+WaveCap can ingest audio directly from a local SDR when available on the host machine. Devices are addressed via SoapySDR; for the SDRplay RSPdx install the SDRplay API and the `SoapySDRPlay3` module on the host or in the container, then define a device and one or more SDR-backed streams.
+
+1) Register devices in a top-level `sdr.devices` list:
+
+```yaml
+sdr:
+  devices:
+    - id: rspdx
+      soapy: "driver=sdrplay"   # SoapySDR device string
+      sampleRateHz: 240000       # IQ rate; 240 kS/s works well for voice
+      # gainDb: 40               # Optional fixed gain
+```
+
+2) Add streams with `source: sdr` and a tuned frequency:
+
+```yaml
+streams:
+  - id: marine-ch16-sdr
+    name: Marine VHF Ch 16 (SDR)
+    source: sdr
+    sdrDeviceId: rspdx
+    sdrFrequencyHz: 156800000
+    enabled: false
+```
+
+- `sdrDeviceId`: Must match a defined device under `sdr.devices`.
+- `sdrFrequencyHz`: Absolute RF frequency to tune.
+- Optional fields for future expansion: `sdrMode` (defaults to `nfm`), `sdrBandwidthHz`.
+
+Notes:
+- SDR streams behave like regular audio streams in the UI and support `language` and `ignoreFirstSeconds` (default 0 for SDR).
+- Multiple SDR streams on the same device are supported when the channels lie within the configured sample-rate span; the device is tuned to the average and each channel is mixed down and demodulated independently.
+- When SoapySDR or the required plugin is not available, SDR streams will fail to start and report an error in the UI.
+
 ## Tuning Whisper transcription
 
 The `whisper` object controls how OpenAI Whisper (via `@xenova/whisper`) processes audio. Use the following guidance to balance accuracy, latency, and resource usage.

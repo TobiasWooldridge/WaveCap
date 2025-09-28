@@ -95,6 +95,25 @@ streams:
     source: pager
     webhookToken: replace-me
 
+  # Example SDR stream for Marine VHF Channel 16 (156.800 MHz). Disabled by
+  # default; enable after verifying the SDR plugin is available.
+  - id: marine-ch16-sdr
+    name: Marine VHF Ch 16 (SDR)
+    source: sdr
+    sdrDeviceId: rspdx
+    sdrFrequencyHz: 156800000
+    enabled: false
+
+# Local SDR devices for on-hardware capture (optional). Configure a SoapySDR
+# device that can be used by streams with source: sdr. The SDRplay RSPdx is
+# supported via the SoapySDRPlay3 module when installed on the host.
+sdr:
+  devices:
+    - id: rspdx
+      soapy: "driver=sdrplay"
+      sampleRateHz: 240000   # 240 kS/s keeps CPU low and covers nearby channels
+      # gainDb: 40           # Optional fixed gain; leave unset to use device defaults
+
 combinedStreamViews:
   - id: aus-emergency-overview
     name: SA SES Radio+pager

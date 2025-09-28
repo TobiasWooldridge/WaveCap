@@ -39,6 +39,7 @@ class StreamSource(str, Enum):
 
     AUDIO = "audio"
     PAGER = "pager"
+    SDR = "sdr"
 
 
 class AccessRole(str, Enum):
@@ -382,6 +383,11 @@ class StreamConfig(APIModel):
     language: Optional[str] = None
     webhookToken: Optional[str] = Field(default=None, alias="webhookToken")
     ignoreFirstSeconds: float = Field(default=0.0, alias="ignoreFirstSeconds")
+    # SDR-specific configuration. Only used when source == "sdr".
+    sdrDeviceId: Optional[str] = Field(default=None, alias="sdrDeviceId")
+    sdrFrequencyHz: Optional[int] = Field(default=None, alias="sdrFrequencyHz")
+    sdrMode: Optional[str] = Field(default="nfm", alias="sdrMode")
+    sdrBandwidthHz: Optional[int] = Field(default=None, alias="sdrBandwidthHz")
 
     @field_validator("ignoreFirstSeconds")
     @classmethod
@@ -402,6 +408,16 @@ class StreamConfig(APIModel):
                 raise ValueError("Pager streams require a webhookToken")
             if self.language is not None:
                 raise ValueError("Pager streams do not support language settings")
+        elif self.source == StreamSource.SDR:
+            if self.webhookToken is not None:
+                raise ValueError("SDR streams must not define webhookToken")
+            if self.sdrDeviceId is None or not str(self.sdrDeviceId).strip():
+                raise ValueError("SDR streams require sdrDeviceId")
+            if self.sdrFrequencyHz is None or int(self.sdrFrequencyHz) <= 0:
+                raise ValueError("SDR streams require a positive sdrFrequencyHz")
+            # Build a synthetic URL if missing so persistence stays simple
+            if not self.url or not self.url.strip():
+                self.url = f"sdr://{self.sdrDeviceId}/{int(self.sdrFrequencyHz)}"
         return self
 
 
@@ -474,6 +490,25 @@ class AppConfig(APIModel):
     )
     ui: UISettingsConfig = UISettingsConfig()
     access: AccessControlConfig = AccessControlConfig()
+    # Optional SDR device registry
+    sdr: Optional["SDRSystemConfig"] = None
+
+
+class SDRDeviceConfig(APIModel):
+    """Defines an SDR device available to the backend."""
+
+    id: str
+    # SoapySDR device string, e.g. "driver=sdrplay" or "driver=rtlsdr"
+    soapy: str
+    # Base sample rate used for IQ capture (e.g. 240000). 240k allows integer
+    # decimation to 16kHz audio for speech with light CPU usage.
+    sampleRateHz: int = Field(default=240000, alias="sampleRateHz")
+    # Optional gain setting in dB; leave unset to use device defaults/AGC
+    gainDb: Optional[float] = Field(default=None, alias="gainDb")
+
+
+class SDRSystemConfig(APIModel):
+    devices: List[SDRDeviceConfig] = Field(default_factory=list)
 
 
 class UpdateAlertsRequest(AlertsConfig):

@@ -121,6 +121,13 @@ def _merge_configs(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, 
         )
     if "ui" in base or "ui" in override:
         merged["ui"] = {**base.get("ui", {}), **override.get("ui", {})}
+    if "sdr" in base or "sdr" in override:
+        # Shallow-merge SDR device registry; 'devices' list is replace-on-override
+        sdr_base = dict(base.get("sdr", {}) or {})
+        sdr_override = dict(override.get("sdr", {}) or {})
+        if "devices" in sdr_override:
+            sdr_base["devices"] = list(sdr_override.get("devices") or [])
+        merged["sdr"] = sdr_base
 
     override_streams = None
     if "streams" in override:

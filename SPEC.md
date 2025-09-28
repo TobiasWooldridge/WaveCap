@@ -8,14 +8,14 @@ transcribing multiple radio or pager feeds in real time.
 - Stay simple enough for scanner hobbyists to run at home without custom scripts.
 
 ## Product Snapshot
-- Ships as one FastAPI service that serves the API and web app; install Python 3.10+, Node.js/npm, and ffmpeg, or use the provided Dockerfile/Compose setup.
+- Ships as one FastAPI service that serves the API and web app; install Python 3.10+, Node.js/npm, and ffmpeg, or use the provided Dockerfile/Compose setup. Optional SDR capture is available via SoapySDR (e.g., SDRplay RSPdx with the SoapySDRPlay3 plugin).
 - Runs on one machine or small server; every browser session connects to the same state through HTTP and WebSocket endpoints.
 - Keeps Whisper inference off the FastAPI event loop by routing transcription jobs through a shared thread-based executor, which is the stepping stone toward hosting workers in a separate service.
 - Stores configuration in JSON so admins can preload stream URLs, names, language defaults, and UI preferences before sharing the app.
 
 ## Primary Workflows
 ### 1. Preparing Streams
-- Open the app to see each stream with its name, URL, and status badge.
+- Open the app to see each stream with its name, URL, and status badge. Streams can be backed by HTTP audio, local SDR channels, or tokenised pager feeds.
 - Add an audio stream with a URL, optional name, and optional language. The backend validates the entry, acknowledges it, and saves it for all users.
 - Create a pager feed when no audio exists; the UI issues a webhook URL and token so CAD systems can post messages directly.
 - Remove unused streams; the update syncs to every user and persists on disk.

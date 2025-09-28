@@ -1,10 +1,32 @@
 services:
   wavecap:
-    build: .
+    build:
+      context: .
+      # Uncomment and set these if you want the image to bundle the SDRplay
+      # API and SoapySDRPlay3 plugin. Otherwise, install them on the host and
+      # just pass through USB devices.
+      # args:
+      #   SDRPLAY_API_DEB_URL: "https://download.sdrplay.com/SDRplay/APIx.x/Linux/arm64/sdrplay-api_arm64.deb"
+      #   SOAPY_SDRPLAY3_DEB_URL: "https://download.sdrplay.com/Soapy/SoapySDRPlay3_x.x.x-bookworm_amd64.deb"
     ports:
       - "8000:8000"
     volumes:
       - ./state:/app/state
+      # Reuse host SDRplay install by mounting common module/library locations.
+      # Adjust/remove entries that don't exist on your host; they are read-only.
+      - /usr/local/lib/SoapySDR/modules0.8:/host-sdr/modules0.8-local:ro
+      - /usr/lib/x86_64-linux-gnu/SoapySDR/modules0.8:/host-sdr/modules0.8-gnu:ro
+      # Mount SDRplay API libs so the SDRplay plugin can dlopen them
+      - /usr/local/lib/libsdrplay_api.so.3:/host-sdr/sdrplay-lib/libsdrplay_api.so.3:ro
+      - /usr/local/lib/libsdrplay_api.so:/host-sdr/sdrplay-lib/libsdrplay_api.so:ro
     environment:
       - WAVECAP_PROJECT_ROOT=/app
+      # Make host-installed SDRplay plugin/libraries visible inside the container.
+      # These paths are searched by SoapySDR when set; harmless if empty dirs are mounted.
+      - SOAPY_SDR_PLUGIN_PATH=/host-sdr/modules0.8-local:/host-sdr/modules0.8-gnu
+      - LD_LIBRARY_PATH=/host-sdr/sdrplay-lib
+    # Expose USB devices for SDR access. On Linux this is typically sufficient
+    # for SoapySDR to reach the SDR hardware from inside the container.
+    devices:
+      - "/dev/bus/usb:/dev/bus/usb"
     restart: unless-stopped
