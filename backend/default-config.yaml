@@ -117,6 +117,9 @@ streams:
     source: sdr
     sdrDeviceId: rspdx
     sdrFrequencyHz: 156800000
+    sdrMode: nfm
+    sdrBandwidthHz: 15000
+    sdrSquelchDbFs: -65
     enabled: false
 
 # Local SDR devices for on-hardware capture (optional). Configure a SoapySDR
@@ -128,6 +131,11 @@ sdr:
       soapy: "driver=sdrplay"
       sampleRateHz: 240000   # 240 kS/s keeps CPU low and covers nearby channels
       # gainDb: 40           # Optional fixed gain; leave unset to use device defaults
+      # gainMode: auto       # 'auto' enables device AGC when supported
+      # rfBandwidthHz: 200000 # Hardware IF bandwidth; leave unset for driver default
+      # antenna: "RX"        # Optional antenna selection
+      # ppmCorrection: 0.0   # Optional frequency correction in parts-per-million
+      # loOffsetHz: 250000   # Optional LO offset to dodge DC spike
 
 combinedStreamViews:
   - id: aus-emergency-overview
@@ -162,5 +170,6 @@ access:
   defaultRole: read_only
   tokenTtlMinutes: 1440
   credentials:
-    - password: change-me
+    -
+      password: change-me
       role: editor

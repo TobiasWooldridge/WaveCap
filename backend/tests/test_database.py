@@ -140,14 +140,13 @@ async def test_ignore_first_seconds_persistence(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_stream_enabled_not_persisted(tmp_path):
+async def test_stream_enabled_round_trips(tmp_path):
     db = StreamDatabase(tmp_path / "runtime.sqlite")
     stream = _make_stream(enabled=True)
     await db.save_stream(stream)
 
     loaded = await db.load_streams()
-    # Enabled state is not persisted; database returns default False
-    assert loaded[0].enabled is False
+    assert loaded[0].enabled is True
 
     stream.enabled = False
     await db.save_stream(stream)

@@ -478,6 +478,7 @@ class StreamManager:
                 frequency_hz=int(stream_config.sdrFrequencyHz or 0),
                 mode=str(stream_config.sdrMode or "nfm"),
                 bandwidth_hz=(int(stream_config.sdrBandwidthHz) if stream_config.sdrBandwidthHz else None),
+                squelch_dbfs=(float(stream_config.sdrSquelchDbFs) if stream_config.sdrSquelchDbFs is not None else None),
             )
             get_sdr_manager().register_stream_spec(spec)
         except Exception as exc:  # pragma: no cover - optional
@@ -631,16 +632,46 @@ class StreamManager:
         stream_id: str,
         trigger: Optional[SystemEventTrigger] = None,
     ) -> None:
-        # Enabling streams is managed via configuration, not at runtime.
-        raise ValueError("Enable streams via configuration (config.yaml), not the UI")
+        trigger = trigger or SystemEventTrigger.user_request()
+        async with self._lock:
+            stream = self.streams.get(stream_id)
+            if stream is None:
+                raise ValueError(f"Stream {stream_id} not found")
+            if stream.source == StreamSource.PAGER:
+                raise ValueError("Pager streams start automatically when enabled in configuration")
+            if stream.enabled:
+                # Already enabled; ensure worker alignment without mutating persistence twice.
+                pass
+            else:
+                stream.enabled = True
+                stream.error = None
+                await self._save_stream(stream)
+                for cfg in self.config.streams:
+                    if cfg.id == stream_id:
+                        cfg.enabled = True
+                        break
+        await self._ensure_stream_alignment(stream_id, trigger)
 
     async def stop_stream(
         self,
         stream_id: str,
         trigger: Optional[SystemEventTrigger] = None,
     ) -> None:
-        # Disabling streams is managed via configuration, not at runtime.
-        raise ValueError("Disable streams via configuration (config.yaml), not the UI")
+        trigger = trigger or SystemEventTrigger.user_request()
+        async with self._lock:
+            stream = self.streams.get(stream_id)
+            if stream is None:
+                raise ValueError(f"Stream {stream_id} not found")
+            if stream.source == StreamSource.PAGER:
+                raise ValueError("Pager streams stop automatically when disabled in configuration")
+            if stream.enabled:
+                stream.enabled = False
+                await self._save_stream(stream)
+                for cfg in self.config.streams:
+                    if cfg.id == stream_id:
+                        cfg.enabled = False
+                        break
+        await self._ensure_stream_alignment(stream_id, trigger)
 
     async def reset_stream(self, stream_id: str) -> None:
         # Stop worker if running, but do not change enabled state or persist transient status

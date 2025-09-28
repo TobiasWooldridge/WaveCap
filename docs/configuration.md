@@ -141,7 +141,8 @@ access:
   defaultRole: read_only
   tokenTtlMinutes: 1440
   credentials:
-    - password: change-me
+    -
+      password: change-me
       role: editor
 ```
 
@@ -263,7 +264,12 @@ sdr:
     - id: rspdx
       soapy: "driver=sdrplay"   # SoapySDR device string
       sampleRateHz: 240000       # IQ rate; 240 kS/s works well for voice
-      # gainDb: 40               # Optional fixed gain
+      # gainDb: 40               # Optional fixed gain (dB)
+      # gainMode: auto           # 'auto' enables device AGC when supported
+      # rfBandwidthHz: 200000    # Optional hardware RF/IF bandwidth
+      # antenna: "RX"            # Optional antenna selection
+      # ppmCorrection: -0.8      # Optional frequency correction (ppm)
+      # loOffsetHz: 250000       # Optional LO offset used when tuning
 ```
 
 2) Add streams with `source: sdr` and a tuned frequency:
@@ -275,12 +281,22 @@ streams:
     source: sdr
     sdrDeviceId: rspdx
     sdrFrequencyHz: 156800000
+    sdrMode: nfm
+    sdrBandwidthHz: 15000
+    sdrSquelchDbFs: -65
     enabled: false
 ```
 
 - `sdrDeviceId`: Must match a defined device under `sdr.devices`.
 - `sdrFrequencyHz`: Absolute RF frequency to tune.
-- Optional fields for future expansion: `sdrMode` (defaults to `nfm`), `sdrBandwidthHz`.
+- Optional fields:
+  - `sdrMode`: Demodulation mode (`nfm`, `wfm`, or `am`).
+  - `sdrBandwidthHz`: Complex channel filter width prior to demodulation. Leave unset to pull default values for each mode.
+  - `sdrSquelchDbFs`: Audio squelch threshold in dBFS (≤ 0). Suppresses low-level noise when no signal is present.
+
+### Inspecting SDR health
+
+Call `GET /api/sdr/status` to review currently configured devices, their tuning state, IQ levels, and per-stream audio statistics. The endpoint returns both active devices (including RMS/peak measurements, center frequency, and squelch state) and configured-but-idle devices so you can verify SoapySDR detected the hardware.
 
 Notes:
 - SDR streams behave like regular audio streams in the UI and support `language` and `ignoreFirstSeconds` (default 0 for SDR).

@@ -104,7 +104,17 @@ class AppState:
         if sdr_cfg and sdr_cfg.devices:
             mgr = get_sdr_manager()
             for dev in sdr_cfg.devices:
-                mgr.configure_device(dev.id, dev.soapy, dev.sampleRateHz, dev.gainDb)
+                mgr.configure_device(
+                    dev.id,
+                    dev.soapy,
+                    dev.sampleRateHz,
+                    dev.gainDb,
+                    gain_mode=dev.gainMode,
+                    rf_bandwidth_hz=dev.rfBandwidthHz,
+                    antenna=dev.antenna,
+                    ppm_correction=dev.ppmCorrection,
+                    lo_offset_hz=dev.loOffsetHz,
+                )
 
     async def shutdown(self) -> None:
         await self.stream_manager.shutdown()
@@ -749,7 +759,7 @@ def create_app() -> FastAPI:
         stream = state.stream_manager.streams.get(stream_id)
         if not stream:
             raise HTTPException(status_code=404, detail="Stream not found")
-        if stream.source != StreamSource.AUDIO:
+        if stream.source not in (StreamSource.AUDIO, StreamSource.SDR):
             raise HTTPException(
                 status_code=400, detail="Stream does not provide live audio"
             )
@@ -767,6 +777,15 @@ def create_app() -> FastAPI:
 
         headers = {"Cache-Control": "no-store"}
         return StreamingResponse(iterator, media_type="audio/wav", headers=headers)
+
+    @app.get("/api/sdr/status")
+    async def sdr_status(state: AppState = Depends(get_state)) -> dict:
+        manager = get_sdr_manager()
+        try:
+            return await manager.get_status()
+        except Exception as exc:  # pragma: no cover - defensive
+            LOGGER.error("Failed to read SDR status: %s", exc)
+            raise HTTPException(status_code=500, detail="Unable to read SDR status") from exc
 
     @app.websocket("/ws")
     async def websocket_endpoint(

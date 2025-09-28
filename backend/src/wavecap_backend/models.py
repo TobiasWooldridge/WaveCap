@@ -415,6 +415,7 @@ class StreamConfig(APIModel):
     sdrFrequencyHz: Optional[int] = Field(default=None, alias="sdrFrequencyHz")
     sdrMode: Optional[str] = Field(default="nfm", alias="sdrMode")
     sdrBandwidthHz: Optional[int] = Field(default=None, alias="sdrBandwidthHz")
+    sdrSquelchDbFs: Optional[float] = Field(default=None, alias="sdrSquelchDbFs")
     # Optional reference to a named prompt in whisper.prompts
     initialPromptName: Optional[str] = Field(default=None, alias="initialPromptName")
     # Optional base location used by the UI to disambiguate partial addresses
@@ -448,6 +449,15 @@ class StreamConfig(APIModel):
                 raise ValueError("SDR streams require sdrDeviceId")
             if self.sdrFrequencyHz is None or int(self.sdrFrequencyHz) <= 0:
                 raise ValueError("SDR streams require a positive sdrFrequencyHz")
+            if self.sdrMode is not None:
+                mode = str(self.sdrMode).strip().lower()
+                if mode not in {"nfm", "wfm", "am"}:
+                    raise ValueError("Unsupported sdrMode; expected one of: nfm, wfm, am")
+                self.sdrMode = mode
+            if self.sdrBandwidthHz is not None and int(self.sdrBandwidthHz) <= 0:
+                raise ValueError("sdrBandwidthHz must be positive when provided")
+            if self.sdrSquelchDbFs is not None and float(self.sdrSquelchDbFs) > 0:
+                raise ValueError("sdrSquelchDbFs must be <= 0 dBFS when provided")
             # Build a synthetic URL if missing so persistence stays simple
             if not self.url or not self.url.strip():
                 self.url = f"sdr://{self.sdrDeviceId}/{int(self.sdrFrequencyHz)}"
@@ -538,6 +548,28 @@ class SDRDeviceConfig(APIModel):
     sampleRateHz: int = Field(default=240000, alias="sampleRateHz")
     # Optional gain setting in dB; leave unset to use device defaults/AGC
     gainDb: Optional[float] = Field(default=None, alias="gainDb")
+    # Optional discrete gain mode ("auto" or "manual")
+    gainMode: Optional[str] = Field(default=None, alias="gainMode")
+    # Expose hardware RF/IF bandwidth configuration when supported
+    rfBandwidthHz: Optional[float] = Field(default=None, alias="rfBandwidthHz")
+    antenna: Optional[str] = Field(default=None, alias="antenna")
+    ppmCorrection: Optional[float] = Field(default=None, alias="ppmCorrection")
+    loOffsetHz: Optional[float] = Field(default=None, alias="loOffsetHz")
+
+    @model_validator(mode="after")
+    def _validate_device(self) -> "SDRDeviceConfig":
+        if self.sampleRateHz <= 0:
+            raise ValueError("sampleRateHz must be positive")
+        if self.gainMode is not None:
+            normalised = str(self.gainMode).strip().lower()
+            if normalised not in {"auto", "manual", ""}:
+                raise ValueError("gainMode must be 'auto' or 'manual'")
+            self.gainMode = normalised or None
+        if self.rfBandwidthHz is not None and float(self.rfBandwidthHz) <= 0:
+            raise ValueError("rfBandwidthHz must be positive when provided")
+        if self.loOffsetHz is not None and float(self.loOffsetHz) == 0:
+            self.loOffsetHz = 0.0
+        return self
 
 
 class SDRSystemConfig(APIModel):

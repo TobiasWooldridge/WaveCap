@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import re
 import struct
@@ -873,9 +874,16 @@ class StreamWorker:
                     return result
             else:
                 self._blocking_supported = False
-        return await self.transcriber.transcribe(
-            audio, sample_rate, language, initial_prompt=self._initial_prompt
-        )
+        transcribe = self.transcriber.transcribe
+        signature = inspect.signature(transcribe)
+        if "initial_prompt" in signature.parameters:
+            return await transcribe(
+                audio,
+                sample_rate,
+                language,
+                initial_prompt=self._initial_prompt,
+            )
+        return await transcribe(audio, sample_rate, language)
 
     async def _transcribe_chunk(self, chunk: PreparedChunk) -> None:
         if chunk.samples.size == 0:
@@ -999,7 +1007,12 @@ class StreamWorker:
         recording_file: Optional[Path] = None
         samples_to_write = trimmed_samples if trimmed_samples.size > 0 else chunk.samples
         if samples_to_write.size > 0:
-            recording_file = await self._write_recording(samples_to_write)
+            if text == BLANK_AUDIO_TOKEN:
+                peak = float(np.max(np.abs(samples_to_write))) if samples_to_write.size else 0.0
+                if peak > 0.0:
+                    recording_file = await self._write_recording(samples_to_write)
+            else:
+                recording_file = await self._write_recording(samples_to_write)
         duration = float(
             effective_duration
             if effective_duration > 0
