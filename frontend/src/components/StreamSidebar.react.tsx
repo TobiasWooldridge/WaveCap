@@ -160,10 +160,7 @@ const StreamSidebar = ({
               aria-current={item.isActive ? "page" : undefined}
             >
               <Flex align="start" gap={3} className="stream-sidebar__item-layout">
-                <StreamStatusIndicator
-                  stream={item.stream}
-                  className="d-inline-flex align-items-start"
-                />
+                <StreamStatusIndicator stream={item.stream} />
                 <Flex
                   className="stream-sidebar__item-main"
                   justify="between"

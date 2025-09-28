@@ -182,7 +182,7 @@ export const TranscriptMessageRow: React.FC<TranscriptMessageRowProps> = ({
     >
       <div className="transcript-message__avatar" aria-hidden="true">
         {stream ? (
-          <StreamStatusIndicator stream={stream} className="d-inline-flex align-items-center" />
+          <StreamStatusIndicator stream={stream} className="d-inline-flex align-items-baseline" />
         ) : (
           <Radio size={18} />
         )}

@@ -2,6 +2,7 @@ import { Play, Square, Radio, AlertCircle, Clock, Star } from "lucide-react";
 import { Stream, type StreamCommandState } from "@types";
 import Spinner from "./primitives/Spinner.react";
 import Button from "./primitives/Button.react";
+import InlineText from "./primitives/InlineText.react";
 import Flex from "./primitives/Flex.react";
 import "./StreamDirectoryPanel.scss";
 
@@ -122,24 +123,27 @@ export const StreamDirectoryPanel = ({
                           </span>
                         ) : null}
                         <h3 className="stream-directory__title">{stream.name}</h3>
-                        <span
-                          className={`badge d-inline-flex align-items-center gap-2 stream-directory__status ${getStatusBadgeClass(variant)}`}
+                        <InlineText
+                          gap={2}
+                          className={`badge stream-directory__status ${getStatusBadgeClass(variant)}`}
                         >
                           {renderStatusIcon(variant)}
                           <span className="stream-directory__status-label text-capitalize">
                             {stream.status}
                           </span>
-                        </span>
+                        </InlineText>
                       </Flex>
-                      <a
+                      <InlineText
+                        as="a"
                         href={stream.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="d-inline-flex align-items-center gap-1 text-decoration-none link-primary stream-directory__link"
+                        gap={1}
+                        className="text-decoration-none link-primary stream-directory__link"
                         title={stream.url}
                       >
                         {stream.url}
-                      </a>
+                      </InlineText>
                       <div className="text-body-secondary stream-directory__meta">
                         {stream.transcriptions?.length || 0} transcriptions
                       </div>

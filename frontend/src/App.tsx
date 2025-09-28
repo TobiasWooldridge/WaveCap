@@ -1461,7 +1461,6 @@ function App() {
                             <StreamStatusIndicator
                               stream={selectedStream}
                               showText
-                              className="d-inline-flex align-items-center gap-2"
                               textClassName="text-capitalize"
                             />
                             {selectedStreamIsCombined ? (
@@ -1474,7 +1473,7 @@ function App() {
                                 <span className="mx-1">·</span>
                                 <span>Pager feed</span>
                                 {selectedStreamWebhookPath && (
-                                  <InlineText as="span" className="ms-2" gap={1}>
+                                  <InlineText marginStart={2} gap={1}>
                                     <span>Webhook</span>
                                     <code
                                       className="conversation-panel__meta-code"
@@ -1490,7 +1489,7 @@ function App() {
                                 <span className="mx-1">·</span>
                                 <span>SDR</span>
                                 {selectedSdrFrequencyLabel ? (
-                                  <InlineText as="span" className="ms-2" gap={1}>
+                                  <InlineText marginStart={2} gap={1}>
                                     <span>Frequency</span>
                                     <code className="conversation-panel__meta-code">
                                       {selectedSdrFrequencyLabel}
@@ -1512,18 +1511,18 @@ function App() {
                               </>
                             )}
                             {selectedStreamIsCombined && combinedMemberList ? (
-                              <InlineText as="span" className="ms-2" gap={1}>
+                              <InlineText marginStart={2} gap={1}>
                                 <span>Includes</span>
                                 <span>{combinedMemberList}</span>
                               </InlineText>
                             ) : null}
                             {selectedStreamIsCombined &&
                             selectedCombinedMissing.length > 0 ? (
-                              <InlineText as="span" className="ms-2 text-danger" gap={1}>
+                              <InlineText marginStart={2} className="text-danger" gap={1}>
                                 <AlertTriangle size={14} />
                                 Missing {selectedCombinedMissing.join(", ")}
                               </InlineText>
-                            ) : null}
+                              ) : null}
                             {selectedStreamLatestTimestamp ? (
                               <span className="ms-1">
                                 · Last activity {" "}

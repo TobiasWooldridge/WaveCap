@@ -1,5 +1,6 @@
 import clsx from "clsx";
 import { Bell, Globe, Layers, Radio } from "lucide-react";
+import InlineText from "./primitives/InlineText.react";
 import type { Stream, TranscriptionResult } from "@types";
 
 type StreamStatusVariant = "active" | "queued" | "error" | "idle";
@@ -215,10 +216,11 @@ const StreamStatusIndicator = ({
   const kind = resolveStreamKind(stream);
 
   return (
-    <span
+    <InlineText
       className={clsx("stream-status-indicator", className)}
       title={tooltip}
       aria-label={ariaLabel}
+      gap={2}
     >
       {/* Icon colored by status, representing stream kind */}
       {kind === "pager" ? (
@@ -251,7 +253,7 @@ const StreamStatusIndicator = ({
           {resolvedLabel}
         </span>
       ) : null}
-    </span>
+    </InlineText>
   );
 };
 
