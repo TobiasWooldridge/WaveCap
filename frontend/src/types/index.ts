@@ -212,6 +212,7 @@ export interface UISettingsConfig {
   colorCodingEnabled?: boolean;
   transcriptCorrectionEnabled?: boolean;
   reviewExportStatuses?: TranscriptionReviewStatus[];
+  baseLocation?: BaseLocation | null;
 }
 
 export interface AppConfig {
@@ -221,6 +222,11 @@ export interface AppConfig {
   logging?: LoggingConfig;
   alerts?: AlertsConfig;
   ui?: UISettingsConfig;
+}
+
+export interface BaseLocation {
+  state?: string | null;
+  country?: string | null;
 }
 
 export interface CombinedStreamView {

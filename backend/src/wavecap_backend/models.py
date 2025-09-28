@@ -373,6 +373,22 @@ class UISettingsConfig(APIModel):
         ],
         alias="reviewExportStatuses",
     )
+    # Optional base location used to disambiguate partial addresses in the UI
+    baseLocation: Optional["BaseLocationConfig"] = Field(
+        default=None, alias="baseLocation"
+    )
+
+
+class BaseLocationConfig(APIModel):
+    """Represents a regional hint for address lookups.
+
+    When pager incidents include an incomplete street address, the frontend can
+    append these fields to the Google Maps query so results resolve within the
+    intended region.
+    """
+
+    state: Optional[str] = None
+    country: Optional[str] = None
 
 
 class StreamConfig(APIModel):

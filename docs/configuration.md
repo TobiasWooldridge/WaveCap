@@ -168,12 +168,22 @@ ui:
   reviewExportStatuses:
     - corrected
     - verified
+  # Optional regional hint appended to partial addresses when building
+  # Google Maps links/embeds in the UI. Useful when pager messages omit
+  # the state or country.
+  # baseLocation:
+  #   state: SA
+  #   country: AU
 ```
 
 - `themeMode`: Choose between `light`, `dark`, or `system` to match the operating system.
 - `colorCodingEnabled`: Turn on transcript confidence colouring by default.
 - `transcriptCorrectionEnabled`: Reveal review/editing controls on first load.
 - `reviewExportStatuses`: Pre-select the review states included in the ZIP export.
+- `baseLocation` (optional): Provide `state` and/or `country` so the UI can
+  append them to incomplete addresses when constructing Google Maps embeds and
+  links. This helps disambiguate locations without requiring full addresses in
+  pager messages.
 
 ## Keyword alerts
 

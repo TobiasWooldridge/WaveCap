@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Pause, Play } from "lucide-react";
 import type {
   TranscriptionGroup,
@@ -19,6 +19,7 @@ import { condensePagerTranscriptions } from "../utils/pagerMessages";
 import { PagerTranscriptGroup } from "./PagerTranscriptGroup.react";
 import { TranscriptionReviewControls } from "./TranscriptionReviewControls.react";
 import AudioElement from "./primitives/AudioElement.react";
+import { useUISettings } from "../contexts/UISettingsContext";
 
 type PlayAllHandler = (
   streamId: string,
@@ -91,6 +92,14 @@ const StreamTranscriptThread: React.FC<StreamTranscriptThreadProps> = ({
     (item) => item.pagerIncident?.incidentId,
   );
   const incidentDetails = incidentSource?.pagerIncident ?? null;
+  const { baseLocation } = useUISettings();
+  const baseLocationSuffix = useMemo(() => {
+    if (!baseLocation) return null;
+    const parts: string[] = [];
+    if (baseLocation.state) parts.push(baseLocation.state);
+    if (baseLocation.country) parts.push(baseLocation.country);
+    return parts.length > 0 ? parts.join(", ") : null;
+  }, [baseLocation]);
   const incidentIdLabel = (() => {
     const value = incidentDetails?.incidentId ?? group.pagerIncidentId ?? null;
     if (typeof value !== "string") return null;
@@ -112,6 +121,9 @@ const StreamTranscriptThread: React.FC<StreamTranscriptThreadProps> = ({
     if (incidentDetails.address) parts.push(incidentDetails.address);
     if (incidentDetails.map && !parts.includes(incidentDetails.map)) {
       parts.push(`Map ${incidentDetails.map}`);
+    }
+    if (baseLocationSuffix) {
+      parts.push(baseLocationSuffix);
     }
     return parts.length > 0 ? parts.join(", ") : null;
   })();

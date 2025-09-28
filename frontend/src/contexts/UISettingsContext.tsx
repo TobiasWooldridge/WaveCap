@@ -11,6 +11,7 @@ import type {
   ThemeMode,
   TranscriptionReviewStatus,
   UISettingsConfig,
+  BaseLocation,
 } from "@types";
 
 type LegacyMediaQueryList = MediaQueryList & {
@@ -31,6 +32,7 @@ interface UISettingsContextValue {
   transcriptCorrectionEnabled: boolean;
   setTranscriptCorrectionEnabled: (enabled: boolean) => void;
   defaultReviewExportStatuses: TranscriptionReviewStatus[];
+  baseLocation: BaseLocation | null;
 }
 
 const THEME_STORAGE_KEY = "wavecap-theme-mode";
@@ -128,6 +130,7 @@ export const UISettingsProvider = ({ children }: { children: ReactNode }) => {
     useState<TranscriptionReviewStatus[]>(() => [
       ...FALLBACK_REVIEW_EXPORT_STATUSES,
     ]);
+  const [baseLocation, setBaseLocation] = useState<BaseLocation | null>(null);
   const [uiDefaultsApplied, setUiDefaultsApplied] = useState(false);
 
   useEffect(() => {
@@ -313,6 +316,20 @@ export const UISettingsProvider = ({ children }: { children: ReactNode }) => {
             setDefaultReviewExportStatuses(validStatuses);
           }
         }
+
+        // Optional base location for Google Maps queries
+        const cfgBase = (data as UISettingsConfig).baseLocation as
+          | BaseLocation
+          | null
+          | undefined;
+        if (cfgBase && typeof cfgBase === "object") {
+          const state = typeof cfgBase.state === "string" ? cfgBase.state.trim() : null;
+          const country =
+            typeof cfgBase.country === "string" ? cfgBase.country.trim() : null;
+          if ((state && state.length > 0) || (country && country.length > 0)) {
+            setBaseLocation({ state: state || undefined, country: country || undefined });
+          }
+        }
       } catch (error) {
         console.warn("Unable to load UI configuration", error);
       } finally {
@@ -358,6 +375,7 @@ export const UISettingsProvider = ({ children }: { children: ReactNode }) => {
       transcriptCorrectionEnabled,
       setTranscriptCorrectionEnabled,
       defaultReviewExportStatuses,
+      baseLocation,
     }),
     [
       themeMode,
@@ -368,6 +386,7 @@ export const UISettingsProvider = ({ children }: { children: ReactNode }) => {
       transcriptCorrectionEnabled,
       setTranscriptCorrectionEnabled,
       defaultReviewExportStatuses,
+      baseLocation,
     ],
   );
 

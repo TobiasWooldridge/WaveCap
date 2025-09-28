@@ -82,6 +82,12 @@ ui:
   reviewExportStatuses:
     - corrected
     - verified
+  # Optional base location used to disambiguate partial addresses when building
+  # Google Maps links/embeds in the UI. If pager messages omit the state or
+  # country, the frontend appends these values to the search query.
+  # baseLocation:
+  #   state: SA
+  #   country: AU
 
 streams:
   - id: broadcastify-2653
