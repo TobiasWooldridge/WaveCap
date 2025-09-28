@@ -66,4 +66,6 @@ echo "Launching backend server..."
 HOST=$(python -c "from wavecap_backend.config import load_config; print(load_config().server.host)")
 PORT=$(python -c "from wavecap_backend.config import load_config; print(load_config().server.port)")
 echo "Backend listening on ${HOST}:${PORT}"
-uvicorn wavecap_backend.server:create_app --factory --host "$HOST" --port "$PORT"
+
+# Replace the shell with uvicorn so it receives signals directly (Ctrl+C, SIGTERM)
+exec uvicorn wavecap_backend.server:create_app --factory --host "$HOST" --port "$PORT"
