@@ -316,6 +316,13 @@ const StreamTranscriptThread: React.FC<StreamTranscriptThreadProps> = ({
     ? "transcript-thread__content transcript-thread__content--pager"
     : "transcript-thread__content";
 
+  // Only render the header map when not using the pager detail view.
+  // Compute a narrowed reference so TypeScript knows it's non-null in JSX.
+  const headerLocationUrls =
+    incidentLocationUrls && !(streamIsPager && pagerMessages.length > 0)
+      ? incidentLocationUrls
+      : null;
+
   return (
     <article
       className={`transcript-thread${groupHasAlerts ? " transcript-thread--alert" : ""}`}
@@ -357,17 +364,17 @@ const StreamTranscriptThread: React.FC<StreamTranscriptThreadProps> = ({
             {incidentNarrative ? (
               <div className="transcript-thread__incident-narrative">{incidentNarrative}</div>
             ) : null}
-            {incidentLocationUrls ? (
+            {headerLocationUrls ? (
               <div className="transcript-thread__incident-map">
                 <iframe
                   className="transcript-thread__incident-map-frame"
-                  src={incidentLocationUrls.embed}
+                  src={headerLocationUrls.embed}
                   title="Incident location"
                   aria-label="Incident map"
                 />
                 <a
                   className="transcript-thread__incident-map-link"
-                  href={incidentLocationUrls.link}
+                  href={headerLocationUrls.link}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
