@@ -627,6 +627,23 @@
   width: 100%;
 }
 
+.transcript-thread__incident-map {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.transcript-thread__incident-map-frame {
+  width: 100%;
+  height: 20rem;
+  border: 0;
+  border-radius: 0.5rem;
+}
+
+.transcript-thread__incident-map-link {
+  font-size: 0.85rem;
+}
+
 /* Compact pager table */
 .pager-table {
   width: 100%;
@@ -679,6 +696,12 @@
   color: rgb(var(--app-insight-strong-rgb));
 }
 .pager-table__map-link:hover { text-decoration: none; }
+
+/* When the map icon appears before the address text */
+.pager-table__map-link--leading {
+  margin-left: 0;
+  margin-right: 0.35rem;
+}
 
 .pager-table__row { cursor: pointer; }
 .pager-table__row:hover { background: rgba(var(--app-surface-strong-rgb, 246, 249, 252), 0.6); }

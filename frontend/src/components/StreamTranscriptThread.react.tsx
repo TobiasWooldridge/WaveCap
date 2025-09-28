@@ -95,7 +95,7 @@ const StreamTranscriptThread: React.FC<StreamTranscriptThreadProps> = ({
     (item) => item.pagerIncident?.incidentId,
   );
   const incidentDetails = incidentSource?.pagerIncident ?? null;
-  const { baseLocation } = useUISettings();
+  const { baseLocation, googleMapsApiKey } = useUISettings();
   const effectiveBaseLocation = streamBaseLocation ?? baseLocation;
   const baseLocationSuffix = useMemo(() => {
     if (!effectiveBaseLocation) return null;
@@ -135,8 +135,11 @@ const StreamTranscriptThread: React.FC<StreamTranscriptThreadProps> = ({
   const incidentLocationUrls = incidentLocationQuery
     ? (() => {
         const encodedQuery = encodeURIComponent(incidentLocationQuery);
+        const embed = googleMapsApiKey
+          ? `https://www.google.com/maps/embed/v1/search?key=${googleMapsApiKey}&q=${encodedQuery}&zoom=15`
+          : `https://maps.google.com/maps?hl=en&q=${encodedQuery}&ie=UTF8&output=embed`;
         return {
-          embed: `https://maps.google.com/maps?hl=en&q=${encodedQuery}&ie=UTF8&output=embed`,
+          embed,
           link: `https://maps.google.com/maps?hl=en&q=${encodedQuery}&ie=UTF8&z=15`,
         } as const;
       })()

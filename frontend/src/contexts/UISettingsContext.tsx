@@ -33,6 +33,7 @@ interface UISettingsContextValue {
   setTranscriptCorrectionEnabled: (enabled: boolean) => void;
   defaultReviewExportStatuses: TranscriptionReviewStatus[];
   baseLocation: BaseLocation | null;
+  googleMapsApiKey: string | null;
 }
 
 const THEME_STORAGE_KEY = "wavecap-theme-mode";
@@ -131,6 +132,7 @@ export const UISettingsProvider = ({ children }: { children: ReactNode }) => {
       ...FALLBACK_REVIEW_EXPORT_STATUSES,
     ]);
   const [baseLocation, setBaseLocation] = useState<BaseLocation | null>(null);
+  const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string | null>(null);
   const [uiDefaultsApplied, setUiDefaultsApplied] = useState(false);
 
   useEffect(() => {
@@ -330,6 +332,12 @@ export const UISettingsProvider = ({ children }: { children: ReactNode }) => {
             setBaseLocation({ state: state || undefined, country: country || undefined });
           }
         }
+
+        // Optional Google Maps API key for richer embeds
+        const key = (data as UISettingsConfig).googleMapsApiKey;
+        if (typeof key === "string" && key.trim().length > 0) {
+          setGoogleMapsApiKey(key.trim());
+        }
       } catch (error) {
         console.warn("Unable to load UI configuration", error);
       } finally {
@@ -376,6 +384,7 @@ export const UISettingsProvider = ({ children }: { children: ReactNode }) => {
       setTranscriptCorrectionEnabled,
       defaultReviewExportStatuses,
       baseLocation,
+      googleMapsApiKey,
     }),
     [
       themeMode,
@@ -387,6 +396,7 @@ export const UISettingsProvider = ({ children }: { children: ReactNode }) => {
       setTranscriptCorrectionEnabled,
       defaultReviewExportStatuses,
       baseLocation,
+      googleMapsApiKey,
     ],
   );
 

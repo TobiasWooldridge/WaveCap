@@ -168,6 +168,10 @@ ui:
   reviewExportStatuses:
     - corrected
     - verified
+  # Optional API key for richer Google Maps embeds shown in pager views.
+  # When unset, the UI falls back to a basic public embed. Create a key with
+  # the Google Maps Embed API enabled and restrict it to your site origin.
+  # googleMapsApiKey: YOUR_EMBED_API_KEY
   # Optional regional hint appended to partial addresses when building
   # Google Maps links/embeds in the UI. Useful when pager messages omit
   # the state or country.
@@ -184,6 +188,9 @@ ui:
   append them to incomplete addresses when constructing Google Maps embeds and
   links. This helps disambiguate locations without requiring full addresses in
   pager messages.
+- `googleMapsApiKey` (optional): Supply a Google Maps Embed API key to enable
+  the richer, authenticated map preview inside the pager address dialog. When
+  omitted, the UI uses a basic public embed which may lack some features.
 
 ## Stream-level base location
 

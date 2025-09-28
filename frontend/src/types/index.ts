@@ -213,6 +213,7 @@ export interface UISettingsConfig {
   colorCodingEnabled?: boolean;
   transcriptCorrectionEnabled?: boolean;
   reviewExportStatuses?: TranscriptionReviewStatus[];
+  googleMapsApiKey?: string;
   baseLocation?: BaseLocation | null;
 }
 

@@ -88,9 +88,11 @@ transcribing multiple radio or pager feeds in real time.
   table with columns for time, category + narrative, address (with a Maps link),
   alarm level, priority, talkgroup, units, and alerts. Each row expands to
   reveal details and the original fragments on demand.
-- When pager incidents include an address or map grid, the details view shows
-  a direct link to open the location in Google Maps, placed next to the
-  address in the pager list (and may embed a compact preview when space allows).
+- When pager incidents include an address or map grid, the pager list places a
+  Google Maps icon at the start of the Address column. Clicking it opens a
+  dialog with an embedded map and an optional "Open in Google Maps" link. When
+  `ui.googleMapsApiKey` is configured, the dialog uses the richer Google Maps
+  Embed API; otherwise it falls back to a basic public embed.
 - Export reviewed transcripts as a ZIP with audio via header controls, choosing corrected, verified, or pending items.
 - Export pager feeds as ZIP archives from the settings modal; downloads include JSONL pager messages and incident details.
 - `python -m wavecap_backend.tools.export_transcriptions --output-dir <path>` builds a fine-tuning dataset with JSONL metadata, optional audio copies, and notebook guidance.

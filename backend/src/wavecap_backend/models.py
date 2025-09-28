@@ -381,6 +381,11 @@ class UISettingsConfig(APIModel):
     baseLocation: Optional["BaseLocationConfig"] = Field(
         default=None, alias="baseLocation"
     )
+    # Optional Google Maps Embed API key used for richer map previews.
+    # When unset, the frontend falls back to a basic, unauthenticated embed URL.
+    googleMapsApiKey: Optional[str] = Field(
+        default=None, alias="googleMapsApiKey"
+    )
 
 
 class BaseLocationConfig(APIModel):

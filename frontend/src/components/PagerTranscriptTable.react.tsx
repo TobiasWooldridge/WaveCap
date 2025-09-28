@@ -1,10 +1,12 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, MapPin } from "lucide-react";
 import { type CondensedPagerMessage } from "../utils/pagerMessages";
 import { getNotifiableAlerts } from "../utils/transcriptions";
 import { Timestamp } from "./primitives/Timestamp.react";
 import { TimeInterval } from "./primitives/TimeInterval.react";
 import { AlertChips } from "./chips/AlertChips.react";
+import Dialog from "./primitives/Dialog.react";
+import { useUISettings } from "../contexts/UISettingsContext";
 
 export interface PagerTranscriptTableProps {
   groupId: string;
@@ -29,8 +31,29 @@ export const PagerTranscriptTable: React.FC<PagerTranscriptTableProps> = ({
   openMessageIds,
   onToggleMessage,
   incidentLocationUrls,
+  incidentLocationQuery,
 }) => {
   if (!messages || messages.length === 0) return null;
+
+  const { googleMapsApiKey } = useUISettings();
+  const [mapOpen, setMapOpen] = useState<boolean>(false);
+
+  const searchQuery = incidentLocationQuery ?? null;
+  const mapEmbedUrl = useMemo(() => {
+    if (!searchQuery) return null;
+    const encoded = encodeURIComponent(searchQuery);
+    if (googleMapsApiKey) {
+      return `https://www.google.com/maps/embed/v1/search?key=${googleMapsApiKey}&q=${encoded}&zoom=15`;
+    }
+    return `https://maps.google.com/maps?hl=en&q=${encoded}&ie=UTF8&output=embed`;
+  }, [searchQuery, googleMapsApiKey]);
+
+  const mapLinkUrl = useMemo(() => {
+    if (incidentLocationUrls?.link) return incidentLocationUrls.link;
+    if (!searchQuery) return null;
+    const encoded = encodeURIComponent(searchQuery);
+    return `https://maps.google.com/maps?hl=en&q=${encoded}&ie=UTF8&z=15`;
+  }, [incidentLocationUrls, searchQuery]);
 
   return (
     <div className="transcript-thread__pager-group" key={`${groupId}-pager`}>      
@@ -84,7 +107,7 @@ export const PagerTranscriptTable: React.FC<PagerTranscriptTableProps> = ({
               (fragment) => elementMap.get(fragment.id) ?? [],
             );
 
-            const mapLink = index === 0 ? incidentLocationUrls?.link : undefined;
+            const showMapIcon = index === 0 && Boolean(searchQuery);
 
             return (
               <React.Fragment key={message.id}>
@@ -107,19 +130,23 @@ export const PagerTranscriptTable: React.FC<PagerTranscriptTableProps> = ({
                     {summaryDisplay}
                   </td>
                   <td className="pager-table__cell pager-table__cell--address" title={address ?? undefined}>
-                    {address ?? "—"}
-                    {mapLink ? (
+                    {showMapIcon ? (
                       <a
-                        href={mapLink}
-                        className="pager-table__map-link"
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        onClick={(e) => e.stopPropagation()}
-                        title="Open in Google Maps"
+                        href={mapLinkUrl ?? '#'}
+                        className="pager-table__map-link pager-table__map-link--leading"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setMapOpen(true);
+                        }}
+                        title={mapLinkUrl ? "View location map" : undefined}
+                        aria-haspopup="dialog"
+                        aria-expanded={mapOpen ? true : false}
                       >
                         <MapPin size={12} />
                       </a>
                     ) : null}
+                    {address ?? "—"}
                   </td>
                   <td className="pager-table__cell pager-table__cell--alarm">{alarm ?? "—"}</td>
                   <td className="pager-table__cell pager-table__cell--priority">{priority ?? "—"}</td>
@@ -180,6 +207,37 @@ export const PagerTranscriptTable: React.FC<PagerTranscriptTableProps> = ({
           })}
         </tbody>
       </table>
+      <Dialog
+        open={mapOpen}
+        onClose={() => setMapOpen(false)}
+        title="Incident location"
+        id={`${groupId}-map-dialog`}
+        dialogClassName="standalone-tool-dialog"
+        bodyClassName="standalone-tool-dialog__body"
+      >
+        {mapEmbedUrl ? (
+          <div className="transcript-thread__incident-map" style={{ width: "100%" }}>
+            <iframe
+              className="transcript-thread__incident-map-frame"
+              src={mapEmbedUrl}
+              title="Incident location"
+              aria-label="Incident map"
+            />
+            {mapLinkUrl ? (
+              <a
+                className="transcript-thread__incident-map-link"
+                href={mapLinkUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open in Google Maps
+              </a>
+            ) : null}
+          </div>
+        ) : (
+          <div className="text-body-secondary">Location not available.</div>
+        )}
+      </Dialog>
     </div>
   );
 };

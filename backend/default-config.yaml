@@ -82,6 +82,10 @@ ui:
   reviewExportStatuses:
     - corrected
     - verified
+  # Optional API key for richer Google Maps embeds in the UI. When unset,
+  # the app uses a basic public embed. Generate a key with Maps Embed API
+  # enabled and restrict it to your site origin.
+  # googleMapsApiKey: ""
   # Optional base location used to disambiguate partial addresses when building
   # Google Maps links/embeds in the UI. If pager messages omit the state or
   # country, the frontend appends these values to the search query.
