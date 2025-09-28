@@ -46,6 +46,10 @@ transcribing multiple radio or pager feeds in real time.
   (state and/or country) to Google Maps searches so links and embeds resolve
   within the expected region. A per-stream `baseLocation` takes precedence; the
   global `ui.baseLocation` is used as a fallback.
+- Timestamps in transcript and pager views include a relative interval after the
+  absolute time (e.g., “5 minutes ago”, “3 hours ago”, “yesterday”). The UI supports
+  a condensed form where space is limited (e.g., “5m ago”). Future timestamps are
+  shown symmetrically (e.g., “in 5 minutes”, “tomorrow”).
 - When Whisper returns no text but audio passes silence thresholds, show a "Silence" entry with playback controls. If the clip contains noisy speech Whisper cannot decode, surface it as `[unable to transcribe]` and keep the recording for operators to replay.
 - Segments that loop the same long phrase beyond configured repetition limits are treated as `[unable to transcribe]` entries so the log highlights bursts Whisper could not confidently decode.
 - Suppress hallucinated phrases on barely audible bursts; if a chunk lacks meaningful energy the backend drops Whisper's text entirely so the transcript log stays empty instead of fabricating callouts.

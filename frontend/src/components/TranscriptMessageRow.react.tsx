@@ -6,6 +6,7 @@ import { getRecordingElementId } from "./StreamTranscriptionPanel.logic";
 import Button from "./primitives/Button.react";
 import AudioElement from "./primitives/AudioElement.react";
 import { Timestamp } from "./primitives/Timestamp.react";
+import { TimeInterval } from "./primitives/TimeInterval.react";
 import { TranscriptionSegmentChips } from "./TranscriptionSegmentChips.react";
 import { AlertChips } from "./chips/AlertChips.react";
 import StreamStatusIndicator from "./StreamStatusIndicator.react";
@@ -190,12 +191,19 @@ export const TranscriptMessageRow: React.FC<TranscriptMessageRowProps> = ({
         <header className="transcript-message__header">
           <span className="transcript-message__channel">{streamName}</span>
           {transcription.timestamp ? (
-            <Timestamp
-              value={transcription.timestamp}
-              className="transcript-message__timestamp"
-              showDate
-              dateClassName="ms-1"
-            />
+            <>
+              <Timestamp
+                value={transcription.timestamp}
+                className="transcript-message__timestamp"
+                showDate
+                dateClassName="ms-1"
+              />
+              <TimeInterval
+                value={transcription.timestamp}
+                className="ms-1 transcript-message__timestamp"
+                condensed
+              />
+            </>
           ) : (
             <span className="transcript-message__timestamp">Unknown timestamp</span>
           )}

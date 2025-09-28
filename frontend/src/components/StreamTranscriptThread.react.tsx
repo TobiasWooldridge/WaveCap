@@ -12,6 +12,7 @@ import {
 import { getRecordingElementId } from "./StreamTranscriptionPanel.logic";
 import Button from "./primitives/Button.react";
 import { Timestamp } from "./primitives/Timestamp.react";
+import { TimeInterval } from "./primitives/TimeInterval.react";
 import { AlertChips } from "./chips/AlertChips.react";
 import { SystemEventChip } from "./chips/SystemEventChip.react";
 import { TranscriptionSegmentChips } from "./TranscriptionSegmentChips.react";
@@ -334,7 +335,14 @@ const StreamTranscriptThread: React.FC<StreamTranscriptThreadProps> = ({
       <div className="transcript-thread__body">
         <header className="transcript-thread__header">
           {group.startTimestamp ? (
-            <Timestamp value={group.startTimestamp} className="transcript-thread__time" />
+            <>
+              <Timestamp value={group.startTimestamp} className="transcript-thread__time" />
+              <TimeInterval
+                value={group.startTimestamp}
+                className="ms-1 transcript-thread__time"
+                condensed
+              />
+            </>
           ) : (
             <span className="transcript-thread__time">Unknown</span>
           )}
