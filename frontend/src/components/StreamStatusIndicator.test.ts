@@ -86,3 +86,14 @@ test("resolveStreamStatus surfaces upstream disconnects", () => {
     label: "Upstream disconnected",
   });
 });
+
+test("resolveUpstreamConnectivity treats activity after disconnect as connected", () => {
+  const stream = createStream([
+    // Latest connectivity event is a disconnect
+    createTranscription("d1", "upstream_disconnected", 2000),
+    // But a normal transcription arrived afterwards
+    createTranscription("t1", "transcription", 2500),
+  ]);
+
+  assert.strictEqual(resolveUpstreamConnectivity(stream), true);
+});

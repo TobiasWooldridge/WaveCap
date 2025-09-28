@@ -45,16 +45,54 @@ export const resolveUpstreamConnectivity = (
     ? stream.transcriptions
     : [];
 
-  for (const transcription of transcriptions) {
-    const eventType = transcription?.eventType;
-    if (eventType === "upstream_disconnected") {
-      return false;
+  // Determine the most recent connectivity event by timestamp, independent of
+  // array ordering, and also consider whether normal transcriptions have
+  // arrived after a disconnect (which implies connectivity has been restored
+  // even if the explicit "reconnected" system event hasn't been recorded).
+  let lastDisconnectTs = -Infinity;
+  let lastReconnectTs = -Infinity;
+  let lastNormalTranscriptionTs = -Infinity;
+
+  for (const t of transcriptions) {
+    const ts = new Date(t?.timestamp ?? 0).getTime();
+    if (!Number.isFinite(ts)) continue;
+    const type = t?.eventType ?? "transcription";
+    if (type === "upstream_disconnected") {
+      if (ts > lastDisconnectTs) lastDisconnectTs = ts;
+      continue;
     }
-    if (eventType === "upstream_reconnected") {
-      return true;
+    if (type === "upstream_reconnected") {
+      if (ts > lastReconnectTs) lastReconnectTs = ts;
+      continue;
+    }
+    // Any non-system transcription implies audio activity
+    if (type === "transcription") {
+      if (ts > lastNormalTranscriptionTs) lastNormalTranscriptionTs = ts;
     }
   }
 
+  // If we have an explicit reconnected event after the last disconnect, treat
+  // as connected.
+  if (lastReconnectTs > lastDisconnectTs && lastReconnectTs > -Infinity) {
+    return true;
+  }
+
+  // If the latest connectivity event was a disconnect but we have observed
+  // normal transcriptions afterwards, consider the upstream connected.
+  if (
+    lastDisconnectTs > -Infinity &&
+    lastNormalTranscriptionTs > lastDisconnectTs
+  ) {
+    return true;
+  }
+
+  // If the most recent connectivity event is a disconnect and no activity has
+  // occurred since, treat as disconnected.
+  if (lastDisconnectTs > -Infinity && lastReconnectTs <= lastDisconnectTs) {
+    return false;
+  }
+
+  // No connectivity signals yet
   return null;
 };
 
