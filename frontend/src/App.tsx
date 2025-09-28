@@ -51,6 +51,7 @@ import StreamSidebar, {
   type StreamSidebarItem,
   type StreamSortMode,
 } from "./components/StreamSidebar.react";
+import { buildSidebarComparator } from "./utils/sidebarSort";
 import StreamStatusIndicator from "./components/StreamStatusIndicator.react";
 import Spinner from "./components/primitives/Spinner.react";
 import { Timestamp } from "./components/primitives/Timestamp.react";
@@ -986,8 +987,6 @@ function App() {
   const combinedViewsErrorMessage = combinedViewsError?.message ?? null;
 
   const streamSidebarItems = useMemo<StreamSidebarItem[]>(() => {
-    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
-
     const raw: StreamSidebarItem[] = displayStreams.map((stream) => {
       const latestTranscription = getLatestTranscription(stream);
       const title = getStreamTitle(stream);
@@ -1016,28 +1015,8 @@ function App() {
       };
     });
 
-    const items = [...raw].sort((a, b) => {
-      const aPinned = a.isPinned;
-      const bPinned = b.isPinned;
-      if (aPinned !== bPinned) return aPinned ? -1 : 1;
-
-      if (streamSortMode === "name") {
-        const byTitle = collator.compare(a.title, b.title);
-        if (byTitle !== 0) return byTitle;
-        const activityDiff =
-          getLatestActivityTimestamp(b.stream) - getLatestActivityTimestamp(a.stream);
-        if (activityDiff !== 0) return activityDiff;
-        return a.id.localeCompare(b.id);
-      }
-
-      // Sort by latest activity, then fall back to title A–Z
-      const activityDiff =
-        getLatestActivityTimestamp(b.stream) - getLatestActivityTimestamp(a.stream);
-      if (activityDiff !== 0) return activityDiff;
-      const byTitle = collator.compare(a.title, b.title);
-      if (byTitle !== 0) return byTitle;
-      return a.id.localeCompare(b.id);
-    });
+    const comparator = buildSidebarComparator(streamSortMode);
+    const items = [...raw].sort(comparator);
 
     return items;
   }, [

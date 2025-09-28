@@ -1,7 +1,8 @@
 .transcript-segment {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   text-align: left;
-  padding: 0.15rem 0.25rem;
+  padding: 0.12rem 0.25rem;
   border-radius: 0.75rem;
   border: 1px solid rgba(var(--transcript-segment-surface-border-rgb), 0.65);
   cursor: pointer;
@@ -24,6 +25,8 @@
 }
 
 .transcript-segment__time {
+  display: inline-flex;
+  align-items: center;
   font-size: 0.7rem;
   font-family: 'Inter', system-ui, sans-serif;
   background-color: rgba(var(--transcript-segment-time-rgb), 0.8);
@@ -80,7 +83,7 @@
   background-color: rgb(var(--app-surface-subtle-rgb));
   border: 1px dashed var(--bs-border-color);
   border-radius: 0.75rem;
-  padding: 0.25rem 0.75rem;
+  padding: 0.2rem 0.75rem;
 }
 
 .transcript-boundary__time {

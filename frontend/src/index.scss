@@ -55,7 +55,6 @@ body {
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   background-color: var(--bs-body-bg);
   color: var(--bs-body-color);
-  transition: background-color 0.3s ease, color 0.3s ease;
   overflow: hidden;
   margin: 0;
 }
@@ -860,4 +859,3 @@ a:hover {
 .transition-colors {
   transition: background-color 0.2s ease, color 0.2s ease;
 }
-
