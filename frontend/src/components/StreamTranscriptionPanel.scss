@@ -707,7 +707,8 @@
 
 .pager-table__map-link {
   margin-left: 0.35rem;
-  color: rgb(var(--app-insight-strong-rgb));
+  /* Use the standard link color for consistency */
+  color: var(--bs-link-color);
 }
 .pager-table__map-link:hover { text-decoration: none; }
 

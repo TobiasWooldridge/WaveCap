@@ -167,7 +167,26 @@ export const PagerTranscriptTable: React.FC<PagerTranscriptTableProps> = ({
                         <MapPin size={12} />
                       </a>
                     ) : null}
-                    {address ?? "—"}
+                    {address ? (
+                      canOpenMap ? (
+                        <a
+                          href={mapLinkUrl ?? '#'}
+                          className="pager-table__map-link"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setMapOpen(true);
+                          }}
+                          title={mapLinkUrl ? "View location map" : undefined}
+                        >
+                          {address}
+                        </a>
+                      ) : (
+                        address
+                      )
+                    ) : (
+                      "—"
+                    )}
                   </td>
                   <td className="pager-table__cell pager-table__cell--alarm">{alarm ?? "—"}</td>
                   <td className="pager-table__cell pager-table__cell--priority">{priority ?? "—"}</td>
@@ -231,10 +250,11 @@ export const PagerTranscriptTable: React.FC<PagerTranscriptTableProps> = ({
       <Dialog
         open={mapOpen}
         onClose={() => setMapOpen(false)}
-        title="Incident location"
+        title=""
         id={`${groupId}-map-dialog`}
         fullscreen
         overlayClassName="app-modal--map-fullscreen"
+        headerClassName="app-modal__header--hidden"
         bodyClassName="map-dialog__body"
       >
         {mapEmbedUrl ? (
@@ -245,16 +265,6 @@ export const PagerTranscriptTable: React.FC<PagerTranscriptTableProps> = ({
               title="Incident location"
               aria-label="Incident map"
             />
-            {mapLinkUrl ? (
-              <a
-                className="transcript-thread__incident-map-link"
-                href={mapLinkUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Open in Google Maps
-              </a>
-            ) : null}
           </div>
         ) : (
           <div className="text-body-secondary">Location not available.</div>
