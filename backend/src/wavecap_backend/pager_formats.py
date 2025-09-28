@@ -277,7 +277,9 @@ def _parse_cfs_flex_raw_message(raw_message: str) -> dict[str, Any]:
 
     talkgroup_match = re.search(r"TG\s*([^,]+)", message_body, flags=re.IGNORECASE)
     if talkgroup_match:
-        parsed["talkgroup"] = talkgroup_match.group(1).strip()
+        # Trim trailing punctuation like "." occasionally present at end-of-line.
+        parsed_value = talkgroup_match.group(1).strip().rstrip(".,;:")
+        parsed["talkgroup"] = parsed_value
 
     narrative_match = re.search(r"==\s*([^:,]+)", message_body)
     if narrative_match:
