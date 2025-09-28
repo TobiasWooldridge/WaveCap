@@ -55,6 +55,7 @@ import { buildSidebarComparator } from "./utils/sidebarSort";
 import StreamStatusIndicator from "./components/StreamStatusIndicator.react";
 import Spinner from "./components/primitives/Spinner.react";
 import { Timestamp } from "./components/primitives/Timestamp.react";
+import { TimeInterval } from "./components/primitives/TimeInterval.react";
 import Button from "./components/primitives/Button.react";
 import ButtonGroup from "./components/primitives/ButtonGroup.react";
 import { useResponsiveLayout } from "./hooks/useResponsiveLayout";
@@ -1563,16 +1564,12 @@ function App() {
                             {selectedStreamIsCombined ? (
                               <>
                                 <span className="mx-1">·</span>
-                                <span className="badge text-bg-primary-subtle text-primary-emphasis text-uppercase fw-semibold">
-                                  Combined view
-                                </span>
+                                <span>Combined view</span>
                               </>
                             ) : selectedStreamIsPager ? (
                               <>
                                 <span className="mx-1">·</span>
-                                <span className="badge text-bg-info-subtle text-info-emphasis text-uppercase fw-semibold">
-                                  Pager feed
-                                </span>
+                                <span>Pager feed</span>
                                 {selectedStreamWebhookPath && (
                                   <span className="ms-2 d-inline-flex align-items-center gap-1">
                                     <span>Webhook</span>
@@ -1619,6 +1616,11 @@ function App() {
                                 <Timestamp
                                   value={selectedStreamLatestTimestamp}
                                   mode="datetime"
+                                />
+                                <TimeInterval
+                                  value={selectedStreamLatestTimestamp}
+                                  condensed
+                                  className="ms-1"
                                 />
                               </span>
                             ) : null}
