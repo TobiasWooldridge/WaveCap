@@ -644,6 +644,20 @@
   font-size: 0.85rem;
 }
 
+/* Expand the embedded map to fill fullscreen dialogs */
+.app-modal__dialog--fullscreen .map-dialog__body {
+  height: 100%;
+}
+.app-modal__dialog--fullscreen .map-dialog__body .transcript-thread__incident-map {
+  flex: 1;
+  min-height: 0;
+}
+.app-modal__dialog--fullscreen .map-dialog__body .transcript-thread__incident-map-frame {
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+}
+
 /* Compact pager table */
 .pager-table {
   width: 100%;

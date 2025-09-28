@@ -107,7 +107,8 @@ export const PagerTranscriptTable: React.FC<PagerTranscriptTableProps> = ({
               (fragment) => elementMap.get(fragment.id) ?? [],
             );
 
-            const showMapIcon = index === 0 && Boolean(searchQuery);
+            const canOpenMap = Boolean(searchQuery);
+            const showMapIcon = index === 0 && canOpenMap;
 
             return (
               <React.Fragment key={message.id}>
@@ -129,7 +130,27 @@ export const PagerTranscriptTable: React.FC<PagerTranscriptTableProps> = ({
                   <td className="pager-table__cell pager-table__cell--summary" title={summaryDisplay}>
                     {summaryDisplay}
                   </td>
-                  <td className="pager-table__cell pager-table__cell--address" title={address ?? undefined}>
+                  <td
+                    className="pager-table__cell pager-table__cell--address"
+                    title={address ?? undefined}
+                    onClick={(e) => {
+                      if (!canOpenMap) return;
+                      e.stopPropagation();
+                      setMapOpen(true);
+                    }}
+                    onKeyDown={(e) => {
+                      if (!canOpenMap) return;
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setMapOpen(true);
+                      }
+                    }}
+                    role={canOpenMap ? "button" : undefined}
+                    tabIndex={canOpenMap ? 0 : -1}
+                    aria-haspopup={canOpenMap ? "dialog" : undefined}
+                    aria-expanded={canOpenMap ? (mapOpen ? true : false) : undefined}
+                  >
                     {showMapIcon ? (
                       <a
                         href={mapLinkUrl ?? '#'}
@@ -140,8 +161,8 @@ export const PagerTranscriptTable: React.FC<PagerTranscriptTableProps> = ({
                           setMapOpen(true);
                         }}
                         title={mapLinkUrl ? "View location map" : undefined}
-                        aria-haspopup="dialog"
-                        aria-expanded={mapOpen ? true : false}
+                        aria-hidden
+                        tabIndex={-1}
                       >
                         <MapPin size={12} />
                       </a>
@@ -212,8 +233,9 @@ export const PagerTranscriptTable: React.FC<PagerTranscriptTableProps> = ({
         onClose={() => setMapOpen(false)}
         title="Incident location"
         id={`${groupId}-map-dialog`}
-        dialogClassName="standalone-tool-dialog"
-        bodyClassName="standalone-tool-dialog__body"
+        fullscreen
+        overlayClassName="app-modal--map-fullscreen"
+        bodyClassName="map-dialog__body"
       >
         {mapEmbedUrl ? (
           <div className="transcript-thread__incident-map" style={{ width: "100%" }}>

@@ -8,6 +8,8 @@ export interface DialogProps {
   title: React.ReactNode;
   id?: string;
   titleId?: string;
+  fullscreen?: boolean;
+  overlayClassName?: string;
   dialogClassName?: string;
   headerClassName?: string;
   bodyClassName?: string;
@@ -21,6 +23,8 @@ const Dialog: React.FC<DialogProps> = ({
   title,
   id,
   titleId,
+  fullscreen,
+  overlayClassName,
   dialogClassName,
   headerClassName,
   bodyClassName,
@@ -33,9 +37,21 @@ const Dialog: React.FC<DialogProps> = ({
   if (!open) return null;
 
   return (
-    <div className="app-modal" role="presentation" onClick={onClose}>
+    <div
+      className={["app-modal", fullscreen ? "app-modal--fullscreen" : "", overlayClassName ?? ""]
+        .filter(Boolean)
+        .join(" ")}
+      role="presentation"
+      onClick={onClose}
+    >
       <div
-        className={["app-modal__dialog", dialogClassName ?? ""].filter(Boolean).join(" ")}
+        className={[
+          "app-modal__dialog",
+          fullscreen ? "app-modal__dialog--fullscreen" : "",
+          dialogClassName ?? "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
         role="dialog"
         aria-modal="true"
         aria-labelledby={resolvedTitleId}
@@ -71,4 +87,3 @@ const Dialog: React.FC<DialogProps> = ({
 };
 
 export default Dialog;
-
