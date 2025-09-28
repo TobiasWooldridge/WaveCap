@@ -26,15 +26,15 @@ transcribing multiple radio or pager feeds in real time.
   `whisper.prompts` once and reference with `initialPromptName` in each stream
   to tailor biasing by agency or region; streams without a name fall back to
   the global `whisper.initialPrompt` when provided.
-- Restart streams that stall or pause; status updates instantly for every connected browser. If a remote HTTP stream drops unexpectedly, the backend attempts to reconnect immediately once and then only every ten minutes to avoid hammering the source.
-- Each stream tracks two state fields: an **enabled** flag that records the operator's intent, and a **status** flag that reflects the backend's actual progress (stopped, queued, transcribing, or error). Start/Stop actions flip the enabled flag; the backend keeps trying to make the status match.
+- Restart behavior is automatic when configured streams are enabled; status updates instantly for every connected browser. If a remote HTTP stream drops unexpectedly, the backend attempts to reconnect immediately once and then only every ten minutes to avoid hammering the source.
+- Each stream exposes two state fields in the API: an **enabled** flag that comes exclusively from configuration (`state/config.yaml`) and a runtime **status** flag that reflects the backend's current progress (stopped, queued, transcribing, or error). The UI does not toggle enabled/disabled; it only reflects the configured streams.
 
 ### 2. Monitoring Live Traffic
 - Use the stream list to spot transcribing, queued, stopped, or error states. Queued means the stream was enabled and is waiting for the backend to catch up. If Whisper concurrency is full, recording continues and transcripts arrive once a slot opens.
 - Sort the stream sidebar by latest activity or stream name. Streams pinned in configuration files stay at the top regardless of the selected sort mode.
 - Open each stream's conversation view with search, time-range filters, and "Go to timestamp" controls to review recent traffic.
 - Read system log entries that mark recording and transcription start or stop events, as well as upstream connection interruptions and recoveries.
-- See stream status and unread badges in the sidebar, and trigger Start or Stop from the conversation header.
+- See stream status and unread badges in the sidebar. Start/Stop controls are removed; enable/disable streams via `state/config.yaml`.
 - Controls that trigger backend actions disable their buttons and show a spinner while the backend processes the request, preventing duplicate submissions.
 - Panels that may take time to populate display loading spinners until data arrives so operators understand the UI is still working.
 - Check aggregate counters for transcript volume, confidence, and recent activity.

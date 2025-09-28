@@ -9,7 +9,6 @@ import {
 } from "react";
 import {
   Play,
-  Square,
   RotateCcw,
   AlertTriangle,
   Pause,
@@ -332,8 +331,6 @@ function App() {
   const {
     isConnected: wsConnected,
     lastMessage,
-    startTranscription: wsStartTranscription,
-    stopTranscription: wsStopTranscription,
     resetStream: wsResetStream,
     updateStream: wsUpdateStream,
   } = useWebSocket("/ws", { token, onUnauthorized: requestLogin });
@@ -612,95 +609,7 @@ function App() {
     ],
   );
 
-  const handleStartTranscription = useCallback(
-    async (streamId: string) => {
-      if (!requireEditor("start transcriptions")) {
-        return;
-      }
-      const target = streams?.find((stream) => stream.id === streamId);
-      if (target && isPagerStream(target)) {
-        showToast({
-          variant: "info",
-          message: "Pager feeds receive updates through their webhook.",
-        });
-        return;
-      }
-      setStreamCommandState(streamId, "starting");
-      try {
-        const result = await wsStartTranscription(streamId);
-        if (!result.success) {
-          reportCommandFailure(result.action, result.message);
-          return;
-        }
-        const nextStatus =
-          target?.source === "pager"
-            ? ("transcribing" as const)
-            : ("queued" as const);
-        optimisticallyUpdateStream(streamId, {
-          status: nextStatus,
-          enabled: true,
-          error: null,
-        });
-      } catch (error) {
-        console.error("Failed to start transcription:", error);
-        reportCommandFailure("start_transcription");
-      } finally {
-        setStreamCommandState(streamId, null);
-      }
-    },
-    [
-      optimisticallyUpdateStream,
-      reportCommandFailure,
-      requireEditor,
-      showToast,
-      streams,
-      setStreamCommandState,
-      wsStartTranscription,
-    ],
-  );
-
-  const handleStopTranscription = useCallback(
-    async (streamId: string) => {
-      if (!requireEditor("stop transcriptions")) {
-        return;
-      }
-      const target = streams?.find((stream) => stream.id === streamId);
-      if (target && isPagerStream(target)) {
-        showToast({
-          variant: "info",
-          message: "Pager feeds receive updates through their webhook.",
-        });
-        return;
-      }
-      setStreamCommandState(streamId, "stopping");
-      try {
-        const result = await wsStopTranscription(streamId);
-        if (!result.success) {
-          reportCommandFailure(result.action, result.message);
-          return;
-        }
-        optimisticallyUpdateStream(streamId, {
-          status: "stopped",
-          enabled: false,
-          error: null,
-        });
-      } catch (error) {
-        console.error("Failed to stop transcription:", error);
-        reportCommandFailure("stop_transcription");
-      } finally {
-        setStreamCommandState(streamId, null);
-      }
-    },
-    [
-      optimisticallyUpdateStream,
-      reportCommandFailure,
-      requireEditor,
-      showToast,
-      streams,
-      setStreamCommandState,
-      wsStopTranscription,
-    ],
-  );
+  // Start/Stop are not controlled by UI anymore.
 
   const handleResetStream = useCallback(
     async (streamId: string) => {
@@ -1218,63 +1127,7 @@ function App() {
     );
   }
 
-  if (
-    !isReadOnly &&
-    selectedStream &&
-    !selectedStreamIsPager &&
-    !selectedStreamIsCombined
-  ) {
-    const isEnabled = selectedStream.enabled;
-    const pendingCommand = pendingStreamCommands[selectedStream.id];
-    const isStarting = pendingCommand === "starting";
-    const isStopping = pendingCommand === "stopping";
-    const buttonDisabled = Boolean(pendingCommand);
-    conversationActionButtons.push(
-      <Button
-        key="transcription-toggle"
-        size="sm"
-        use={isEnabled ? "danger" : "success"}
-        disabled={buttonDisabled}
-        aria-busy={buttonDisabled}
-        startContent={
-          isStopping ? (
-            <Spinner
-              size="sm"
-              variant="light"
-              label="Stopping transcription"
-            />
-          ) : isStarting ? (
-            <Spinner
-              size="sm"
-              variant="light"
-              label="Starting transcription"
-            />
-          ) : isEnabled ? (
-            <Square size={14} />
-          ) : (
-            <Play size={14} />
-          )
-        }
-        onClick={() => {
-          if (isEnabled) {
-            void handleStopTranscription(selectedStream.id);
-          } else {
-            void handleStartTranscription(selectedStream.id);
-          }
-        }}
-      >
-        <span className="conversation-panel__action-label">
-          {isStopping
-            ? "Stopping…"
-            : isStarting
-              ? "Starting…"
-              : isEnabled
-                ? "Stop"
-                : "Start"}
-        </span>
-      </Button>,
-    );
-  }
+  // Start/Stop controls are disabled; streams are managed via config.yaml
 
   if (!isReadOnly && selectedStream && !selectedStreamIsCombined) {
     const pendingCommand = pendingStreamCommands[selectedStream.id];

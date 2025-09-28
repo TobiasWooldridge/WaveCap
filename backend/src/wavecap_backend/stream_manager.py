@@ -316,21 +316,19 @@ class StreamManager:
         worker_to_start: Optional[StreamWorker] = None
         worker_to_stop: Optional[StreamWorker] = None
         should_broadcast = False
-        should_save = False
         async with self._lock:
             stream = self.streams.get(stream_id)
             if not stream:
                 return
             if stream.source == StreamSource.PAGER:
-                if not stream.enabled:
-                    stream.enabled = True
-                    should_save = True
-                if stream.status != StreamStatus.TRANSCRIBING:
+                # Pager streams only run when enabled in config; do not persist state.
+                if stream.enabled and stream.status != StreamStatus.TRANSCRIBING:
                     stream.status = StreamStatus.TRANSCRIBING
-                    should_save = True
                     should_broadcast = True
-                if should_save:
-                    await self._save_stream(stream)
+                elif not stream.enabled and stream.status != StreamStatus.STOPPED:
+                    stream.status = StreamStatus.STOPPED
+                    stream.error = None
+                    should_broadcast = True
                 return
 
             if stream.enabled:
@@ -341,11 +339,9 @@ class StreamManager:
                     stream.status = StreamStatus.QUEUED
                     stream.error = None
                     should_broadcast = True
-                    should_save = True
                 elif stream.status == StreamStatus.STOPPED:
                     stream.status = StreamStatus.QUEUED
                     should_broadcast = True
-                    should_save = True
             else:
                 worker = self.workers.pop(stream_id, None)
                 if worker:
@@ -355,10 +351,7 @@ class StreamManager:
                     stream.status = StreamStatus.STOPPED
                     stream.error = None
                     should_broadcast = True
-                    should_save = True
-
-            if should_save:
-                await self._save_stream(stream)
+            # No persistence of transient status/enabled changes
 
         if worker_to_start:
             worker_to_start.start()
@@ -373,12 +366,14 @@ class StreamManager:
         pinned = bool(stream_config.pinned)
         if stream_config.source == StreamSource.PAGER:
             url = (stream_config.url or f"/api/pager-feeds/{stream_config.id}").strip()
+            enabled = bool(stream_config.enabled)
+            status = StreamStatus.TRANSCRIBING if enabled else StreamStatus.STOPPED
             base = existing or Stream(
                 id=stream_config.id,
                 name=stream_config.name,
                 url=url,
-                status=StreamStatus.TRANSCRIBING,
-                enabled=True,
+                status=status,
+                enabled=enabled,
                 pinned=pinned,
                 createdAt=utcnow(),
                 language=None,
@@ -396,9 +391,9 @@ class StreamManager:
                     "webhookToken": stream_config.webhookToken,
                     "ignoreFirstSeconds": 0.0,
                     "language": None,
-                    "enabled": True,
+                    "enabled": enabled,
                     "pinned": pinned,
-                    "status": StreamStatus.TRANSCRIBING,
+                    "status": status,
                     "error": None,
                     "baseLocation": stream_config.baseLocation,
                 }
@@ -435,6 +430,8 @@ class StreamManager:
             "ignoreFirstSeconds": ignore_seconds,
             "webhookToken": None,
             "pinned": pinned,
+            # Ensure enabled state reflects configuration even when a DB record exists
+            "enabled": bool(stream_config.enabled),
             "baseLocation": stream_config.baseLocation,
         }
         return existing.model_copy(update=updates)
@@ -528,22 +525,14 @@ class StreamManager:
         streams_to_activate: List[Stream] = []
         for stream in streams:
             await self._apply_default_preroll(stream)
-            if (stream.source == StreamSource.PAGER and stream.status != StreamStatus.ERROR):
-                stream.enabled = True
-                if stream.status != StreamStatus.TRANSCRIBING:
-                    stream.status = StreamStatus.TRANSCRIBING
-                    await self._save_stream(stream)
-            elif (stream.source in (StreamSource.AUDIO, StreamSource.SDR)):
+            if (stream.source in (StreamSource.AUDIO, StreamSource.SDR)):
                 if stream.enabled:
                     if stream.error:
+                        # Clear ephemeral errors but do not persist to DB
                         stream.error = None
-                        await self._save_stream(stream)
                     streams_to_activate.append(stream)
                 elif stream.status != StreamStatus.STOPPED:
                     stream.status = StreamStatus.STOPPED
-                    if stream.error:
-                        stream.error = None
-                    await self._save_stream(stream)
             transcriptions = await self._load_recent_transcriptions(stream.id, limit=100)
             stream.transcriptions = transcriptions
             if transcriptions:
@@ -642,85 +631,40 @@ class StreamManager:
         stream_id: str,
         trigger: Optional[SystemEventTrigger] = None,
     ) -> None:
-        trigger = trigger or SystemEventTrigger.user_request()
-        needs_alignment = False
-        should_broadcast = False
-        async with self._lock:
-            stream = self.streams.get(stream_id)
-            if not stream:
-                raise ValueError("Stream not found")
-            stream.enabled = True
-            if stream.source == StreamSource.PAGER:
-                LOGGER.info(
-                    "Start requested for non-audio stream %s; ignoring", stream_id
-                )
-                stream.status = StreamStatus.TRANSCRIBING
-                stream.error = None
-                should_broadcast = True
-            else:
-                needs_alignment = True
-            await self._save_stream(stream)
-        if needs_alignment:
-            await self._ensure_stream_alignment(stream_id, trigger)
-        if should_broadcast:
-            await self._broadcast_streams()
+        # Enabling streams is managed via configuration, not at runtime.
+        raise ValueError("Enable streams via configuration (config.yaml), not the UI")
 
     async def stop_stream(
         self,
         stream_id: str,
         trigger: Optional[SystemEventTrigger] = None,
     ) -> None:
-        trigger = trigger or SystemEventTrigger.user_request()
-        worker: Optional[StreamWorker] = None
-        should_broadcast = False
-        was_transcribing = False
-        needs_alignment = False
-        async with self._lock:
-            stream = self.streams.get(stream_id)
-            if stream and stream.source == StreamSource.PAGER:
-                LOGGER.info(
-                    "Stop requested for non-audio stream %s; ignoring", stream_id
-                )
-                stream.status = StreamStatus.TRANSCRIBING
-                stream.error = None
-                await self._save_stream(stream)
-                should_broadcast = True
-                stream = None
-            else:
-                worker = self.workers.pop(stream_id, None)
-                if stream:
-                    was_transcribing = stream.status == StreamStatus.TRANSCRIBING
-                    stream.enabled = False
-                    stream.status = StreamStatus.STOPPED
-                    stream.error = None
-                    needs_alignment = True
-                    await self._save_stream(stream)
-                    should_broadcast = True
-            if worker and was_transcribing:
-                self._stop_triggers[stream_id] = trigger
-        if worker:
-            await worker.stop()
-        if needs_alignment:
-            await self._ensure_stream_alignment(stream_id, trigger)
-        if should_broadcast:
-            await self._broadcast_streams()
+        # Disabling streams is managed via configuration, not at runtime.
+        raise ValueError("Disable streams via configuration (config.yaml), not the UI")
 
     async def reset_stream(self, stream_id: str) -> None:
-        await self.stop_stream(stream_id)
-        stream = self.streams.get(stream_id)
-        if not stream:
-            return
-        stream.transcriptions.clear()
-        await self._delete_stream(stream_id)
-        self._last_event_timestamps.pop(stream_id, None)
-        stream.status = (
-            StreamStatus.TRANSCRIBING
-            if stream.source == StreamSource.PAGER
-            else StreamStatus.STOPPED
-        )
-        stream.error = None
-        stream.createdAt = utcnow()
-        await self._save_stream(stream)
+        # Stop worker if running, but do not change enabled state or persist transient status
+        worker: Optional[StreamWorker] = None
+        async with self._lock:
+            worker = self.workers.pop(stream_id, None)
+            stream = self.streams.get(stream_id)
+            if not stream:
+                return
+            stream.transcriptions.clear()
+            await self._delete_stream(stream_id)
+            self._last_event_timestamps.pop(stream_id, None)
+            # Reset createdAt to now to match semantics of clearing history
+            stream.createdAt = utcnow()
+            # Keep status aligned with type but do not persist
+            stream.status = (
+                StreamStatus.TRANSCRIBING
+                if (stream.source == StreamSource.PAGER and stream.enabled)
+                else StreamStatus.STOPPED
+            )
+            stream.error = None
+            await self._save_stream(stream)
+        if worker:
+            await worker.stop()
         self._delete_recordings(stream_id)
         await self._broadcast_streams(include_transcriptions=True)
 
@@ -988,7 +932,6 @@ class StreamManager:
                     event_lock = asyncio.Lock()
                     self._event_locks[stream.id] = event_lock
                 await event_lock.acquire()
-        await self._save_stream(stream)
         await self._broadcast_streams()
         if event_details and event_lock:
             event_type, message, trigger_reason = event_details
@@ -1125,15 +1068,7 @@ class StreamManager:
                     "Failed to record shutdown stop event for stream %s",
                     stream.id,
                 )
-        if audio_streams:
-            async with self._lock:
-                for stream in audio_streams:
-                    current = self.streams.get(stream.id)
-                    if not current:
-                        continue
-                    current.status = StreamStatus.TRANSCRIBING
-                    current.error = None
-                    await self._save_stream(current)
+        # Do not persist transient statuses during shutdown.
         if self._owns_executor:
             await self._executor.close()
 

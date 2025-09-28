@@ -133,7 +133,7 @@ All of the commands above set the `WAVECAP_FIXTURES` environment variable to `sc
 
 ## Features
 
-- **Multiple Stream Support** – manage multiple audio streams defined in YAML; control Start/Stop/Reset in the UI.
+- **Multiple Stream Support** – manage multiple audio streams defined in YAML; enable/disable via configuration and Reset from the UI.
 - **Real-time Transcription** – live transcription updates delivered over WebSocket.
 - **SQLite Persistence** – streams and transcripts survive restarts; recordings are saved as WAV files.
 - **Multi-user Awareness** – any number of browsers can monitor the same control plane.

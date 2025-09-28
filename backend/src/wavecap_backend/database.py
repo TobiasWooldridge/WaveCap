@@ -37,6 +37,7 @@ class StreamRecord(SQLModel, table=True):
     id: str = Field(primary_key=True)
     name: str
     url: str
+    # Historical schema kept for compatibility; status/enabled no longer authoritative
     status: StreamStatus = Field(sa_column=Column("status", String, nullable=False))
     enabled: Optional[bool] = Field(
         default=None, sa_column=Column("enabled", Boolean, nullable=True)
@@ -209,8 +210,10 @@ class StreamDatabase:
                 record = StreamRecord(id=stream.id)
             record.name = stream.name
             record.url = stream.url
-            record.status = StreamStatus(stream.status)
-            record.enabled = bool(stream.enabled)
+            # Persist a neutral status so schema constraints are satisfied.
+            # Runtime status/enabled are config- and memory-derived and not stored.
+            record.status = StreamStatus.STOPPED
+            record.enabled = None
             record.pinned = bool(stream.pinned)
             record.createdAt = stream.createdAt
             record.language = stream.language
@@ -458,9 +461,8 @@ class StreamDatabase:
             return [self._record_to_transcription(record) for record in records]
 
     def _record_to_stream(self, record: StreamRecord) -> Stream:
-        enabled = record.enabled
-        if enabled is None:
-            enabled = record.status != StreamStatus.STOPPED
+        # Database no longer dictates enabled state; default to False.
+        enabled = bool(record.enabled) if record.enabled is not None else False
         return Stream(
             id=record.id,
             name=record.name,

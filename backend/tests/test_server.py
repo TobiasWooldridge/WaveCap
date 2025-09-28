@@ -85,9 +85,8 @@ def test_stream_management_api(make_test_client):
         response = client.get("/api/streams")
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 1
-        assert data[0]["name"] == "Example"
-        assert data[0]["enabled"] is False
+        # Disabled streams are not returned from the API list
+        assert len(data) == 0
 
         patch = client.patch(
             "/api/streams/example-audio",
@@ -103,18 +102,10 @@ def test_live_audio_stream_uses_active_worker(make_test_client):
         id="example-audio",
         name="Example",
         url="http://example.com/audio",
-        enabled=False,
+        enabled=True,
     )
     with make_test_client(streams=[audio_stream]) as client:
-        headers = login_headers(client)
-        inactive_response = client.get("/api/streams/example-audio/live")
-        assert inactive_response.status_code == 409
-
-        start = client.post(
-            "/api/streams/example-audio/start", headers=headers
-        )
-        assert start.status_code == 202
-
+        _ = login_headers(client)
         live_response = client.get("/api/streams/example-audio/live")
         assert live_response.status_code == 200
         assert live_response.headers["content-type"].startswith("audio/wav")
@@ -260,7 +251,7 @@ def test_export_pager_feed_zip(make_test_client):
             assert len(records) == 1
 
 
-def test_websocket_command_ack(make_test_client):
+def test_websocket_command_ack_or_error(make_test_client):
     audio_stream = StreamConfig(
         id="live-audio",
         name="Live",
@@ -279,15 +270,15 @@ def test_websocket_command_ack(make_test_client):
                     "requestId": request_id,
                 }
             )
-            received_ack = False
+            # Expect an error response because start/stop via UI is disabled
+            got_error = False
             for _ in range(5):
                 message = websocket.receive_json()
-                if message.get("type") == "ack":
-                    assert message["requestId"] == request_id
-                    assert message["action"] == "start_transcription"
-                    received_ack = True
+                if message.get("type") == "error":
+                    assert "configuration" in message.get("message", "").lower()
+                    got_error = True
                     break
-            assert received_ack, "Expected ack response for start_transcription command"
+            assert got_error, "Expected error response for start_transcription command"
 
 
 def test_recording_files_served(make_test_client):
@@ -304,13 +295,13 @@ def test_recording_files_served(make_test_client):
                 recording.unlink()
 
 
-def test_server_restart_preserves_stream_states(make_test_client):
+def test_stream_list_filters_disabled(make_test_client):
     streams = [
         StreamConfig(
             id="one",
             name="One",
             url="http://example.com/one",
-            enabled=False,
+            enabled=True,
         ),
         StreamConfig(
             id="two",
@@ -320,25 +311,8 @@ def test_server_restart_preserves_stream_states(make_test_client):
         ),
     ]
 
-    with make_test_client(streams=streams) as first_client:
-        headers = login_headers(first_client)
-        first_client.post("/api/streams/one/start", headers=headers)
-        first_client.post("/api/streams/two/start", headers=headers)
-        first_client.post("/api/streams/two/stop", headers=headers)
-
-        before_restart = first_client.get("/api/streams").json()
-        statuses = {stream["id"]: stream["status"] for stream in before_restart}
-        enabled = {stream["id"]: stream["enabled"] for stream in before_restart}
-        assert statuses["one"] == StreamStatus.TRANSCRIBING
-        assert statuses["two"] == StreamStatus.STOPPED
-        assert enabled["one"] is True
-        assert enabled["two"] is False
-
-    with make_test_client(streams=streams) as second_client:
-        after_restart = second_client.get("/api/streams").json()
-        statuses = {stream["id"]: stream["status"] for stream in after_restart}
-        enabled = {stream["id"]: stream["enabled"] for stream in after_restart}
-        assert statuses["one"] == StreamStatus.TRANSCRIBING
-        assert statuses["two"] == StreamStatus.STOPPED
-        assert enabled["one"] is True
-        assert enabled["two"] is False
+    with make_test_client(streams=streams) as client:
+        data = client.get("/api/streams").json()
+        ids = {s["id"] for s in data}
+        assert "one" in ids
+        assert "two" not in ids

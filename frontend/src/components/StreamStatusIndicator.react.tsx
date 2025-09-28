@@ -100,27 +100,73 @@ export const resolveUpstreamConnectivity = (
 export const resolveStreamStatus = (
   stream: Stream,
 ): StreamStatusResolution => {
+  const kind = resolveStreamKind(stream);
+
+  // Pager feeds do not have an upstream; they are event-driven
+  if (kind === "pager") {
+    const hasMessages = Array.isArray(stream.transcriptions)
+      && stream.transcriptions.some((t) => (t?.eventType ?? "transcription") === "transcription");
+    if (!stream.enabled) {
+      return { variant: "idle", label: "Pager updates stopped" };
+    }
+    if (stream.status === "error") {
+      return { variant: "error", label: "Pager feed error" };
+    }
+    if (hasMessages || stream.status === "transcribing") {
+      return { variant: "active", label: "Receiving pager updates" };
+    }
+    return { variant: "idle", label: "Waiting for pager updates" };
+  }
+
+  // Combined view has no upstream; derive from status only
+  if (kind === "combined") {
+    if (stream.status === "error") {
+      return { variant: "error", label: "Combined view issues" };
+    }
+    if (stream.status === "queued") {
+      return { variant: "queued", label: "Aggregating activity" };
+    }
+    if (stream.status === "transcribing") {
+      return { variant: "active", label: "Aggregating activity" };
+    }
+    return { variant: "idle", label: "No recent activity" };
+  }
+
+  // For web audio streams, show connectivity details when we have signals
   if (!stream.enabled) {
     return { variant: "idle", label: "Transcription stopped" };
   }
-
+  if (stream.status === "error") {
+    return { variant: "error", label: "Stream error" };
+  }
   if (stream.status === "queued") {
     return { variant: "queued", label: "Queued for transcription" };
   }
 
-  if (stream.status === "error") {
-    return { variant: "error", label: "Stream error" };
-  }
-
   const connectivity = resolveUpstreamConnectivity(stream);
   if (connectivity === false) {
+    // If we have never observed any normal transcription or explicit reconnect
+    // events, treat initial failures as "Connecting" rather than "Disconnected".
+    const transcriptions = Array.isArray(stream.transcriptions)
+      ? stream.transcriptions
+      : [];
+    let sawReconnect = false;
+    let sawNormal = false;
+    for (const t of transcriptions) {
+      const type = t?.eventType ?? "transcription";
+      if (type === "upstream_reconnected") sawReconnect = true;
+      if (type === "transcription") sawNormal = true;
+      if (sawReconnect || sawNormal) break;
+    }
+    if (!sawReconnect && !sawNormal) {
+      return { variant: "queued", label: "Connecting to stream" };
+    }
     return { variant: "error", label: "Upstream disconnected" };
   }
-
   if (connectivity === true || stream.status === "transcribing") {
     return { variant: "active", label: "Live transcription" };
   }
-
+  // No connectivity signals yet
   return { variant: "idle", label: "Awaiting audio" };
 };
 

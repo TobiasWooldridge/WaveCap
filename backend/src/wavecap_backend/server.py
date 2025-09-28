@@ -450,7 +450,8 @@ def create_app() -> FastAPI:
         include_transcriptions: bool = Query(True, alias="includeTranscriptions"),
         max_transcriptions: int | None = Query(None, alias="maxTranscriptions", ge=0),
     ) -> list[Stream]:
-        streams = state.stream_manager.get_streams()
+        # Only return streams that are present and enabled in configuration
+        streams = [s for s in state.stream_manager.get_streams() if s.enabled]
         if not include_transcriptions:
             return [
                 stream.model_copy(update={"transcriptions": []}) for stream in streams
@@ -493,11 +494,11 @@ def create_app() -> FastAPI:
         state: AppState = Depends(get_state),
         _: AccessRole = Depends(require_editor_role),
     ) -> Response:
-        try:
-            await state.stream_manager.start_stream(stream_id)
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        return Response(status_code=202)
+        # Runtime enable is not allowed; configuration controls enabled state.
+        raise HTTPException(
+            status_code=405,
+            detail="Enable streams via configuration (config.yaml); UI start is disabled",
+        )
 
     @app.post("/api/streams/{stream_id}/stop")
     async def stop_stream(
@@ -505,11 +506,11 @@ def create_app() -> FastAPI:
         state: AppState = Depends(get_state),
         _: AccessRole = Depends(require_editor_role),
     ) -> Response:
-        try:
-            await state.stream_manager.stop_stream(stream_id)
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        return Response(status_code=202)
+        # Runtime disable is not allowed; configuration controls enabled state.
+        raise HTTPException(
+            status_code=405,
+            detail="Disable streams via configuration (config.yaml); UI stop is disabled",
+        )
 
     @app.post("/api/streams/{stream_id}/reset")
     async def reset_stream(
