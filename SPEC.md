@@ -80,11 +80,13 @@ transcribing multiple radio or pager feeds in real time.
   The original raw FLEX line is preserved and accessible under the
   collapsible "View raw message" panel for each incident.
 - Pager streams condense fragments that arrive within a few seconds into a
-  single structured summary while keeping the original fragments available for
-  review on demand.
-- When pager incidents include an address or map grid, the transcript details
-  embed a small map preview with a direct link to open the location in Google
-  Maps.
+  single structured summary. The UI presents these as a compact, scrollable
+  table with columns for time, category + narrative, address (with a Maps link),
+  alarm level, priority, talkgroup, units, and alerts. Each row expands to
+  reveal details and the original fragments on demand.
+- When pager incidents include an address or map grid, the details view shows
+  a direct link to open the location in Google Maps, placed next to the
+  address in the pager list (and may embed a compact preview when space allows).
 - Export reviewed transcripts as a ZIP with audio via header controls, choosing corrected, verified, or pending items.
 - Export pager feeds as ZIP archives from the settings modal; downloads include JSONL pager messages and incident details.
 - `python -m wavecap_backend.tools.export_transcriptions --output-dir <path>` builds a fine-tuning dataset with JSONL metadata, optional audio copies, and notebook guidance.

@@ -135,10 +135,18 @@ def _parse_cfs_flex(payload: Mapping[str, Any]) -> PagerWebhookRequest:
         else None
     )
 
+    # Prefer explicit payload sender/priority; fall back to values gleaned from FLEX
+    # Preserve historical behaviour: do not set sender to avoid prefixing the
+    # assembled message line. (Sender can be surfaced later if needed.)
+    sender = None
+    priority = _optional_string(payload.get("priority")) or _optional_string(
+        parsed_raw.get("priority")
+    )
+
     return PagerWebhookRequest(
         message=summary,
-        sender=None,
-        priority=None,
+        sender=sender,
+        priority=priority,
         timestamp=timestamp,
         details=details or None,
         incident=incident,
@@ -239,8 +247,11 @@ def _parse_cfs_flex_raw_message(raw_message: str) -> dict[str, Any]:
             parsed["timestamp"] = normalised_timestamp
 
     message_body = parts[-1] if parts else text
-    if message_body.upper().startswith("MFS:"):
-        message_body = message_body[4:].strip()
+    # Capture a sender prefix like "MFS:", "CFS:", "SAPOL:", etc., then strip it
+    sender_match = re.match(r"^([A-Z]{2,}):\s*(.*)$", message_body)
+    if sender_match:
+        parsed["sender"] = sender_match.group(1).strip()
+        message_body = sender_match.group(2).strip()
 
     inc_match = re.search(r"\bINC\d+\b", message_body)
     if inc_match:
@@ -258,7 +269,10 @@ def _parse_cfs_flex_raw_message(raw_message: str) -> dict[str, Any]:
         if call_type:
             parsed["call_type"] = call_type
 
-    alarm_match = re.search(r"ALARM LEVEL:\s*([0-9]+)", message_body, flags=re.IGNORECASE)
+    # Support variants like "ALARM LEVEL: 1", "ALARM: 1", or "ALARM LVL 1"
+    alarm_match = re.search(
+        r"ALARM(?:\s+LEVEL|\s+LVL)?\s*[:]?\s*([0-9]+)", message_body, flags=re.IGNORECASE
+    )
     remainder_after_alarm = ""
     if alarm_match:
         parsed["alarm"] = alarm_match.group(1)
@@ -271,23 +285,51 @@ def _parse_cfs_flex_raw_message(raw_message: str) -> dict[str, Any]:
     if address:
         parsed["address"] = address
 
-    map_match = re.search(r"MAP:\s*([^,]+)", message_body, flags=re.IGNORECASE)
+    # Accept "MAP:", "MAP GRID:", or "MAP -" formats
+    map_match = re.search(
+        r"MAP(?:\s+GRID)?\s*[:\-]?\s*([^,]+)", message_body, flags=re.IGNORECASE
+    )
     if map_match:
         parsed["map"] = map_match.group(1).strip()
 
-    talkgroup_match = re.search(r"TG\s*([^,]+)", message_body, flags=re.IGNORECASE)
+    # Capture TG or TALKGROUP
+    talkgroup_match = re.search(
+        r"(?:TG|TALKGROUP)\s*([^,]+)", message_body, flags=re.IGNORECASE
+    )
     if talkgroup_match:
         # Trim trailing punctuation like "." occasionally present at end-of-line.
         parsed_value = talkgroup_match.group(1).strip().rstrip(".,;:")
         parsed["talkgroup"] = parsed_value
 
-    narrative_match = re.search(r"==\s*([^:,]+)", message_body)
+    # Narrative appears prefixed by "==" or "Narrative:" in some templates
+    narrative_match = re.search(
+        r"(?:==\s*|NARR(?:ATIVE)?\s*[:=]\s*)([^:,]+)", message_body, flags=re.IGNORECASE
+    )
     if narrative_match:
         parsed["narrative"] = narrative_match.group(1).strip()
 
-    units_match = re.search(r":\s*([A-Z]{2,}\d+(?:\s+[A-Z]{2,}\d+)*)\s*:", message_body)
+    # Units may be embedded between colons ": LCH14A SHM03 ... :" or as "Units: ..."
+    units_match = re.search(
+        r":\s*([A-Z]{2,}[A-Z0-9]*(?:[\s,\-/]+[A-Z]{2,}[A-Z0-9]*)*)\s*:",
+        message_body,
+    )
     if units_match:
         parsed["units"] = " ".join(units_match.group(1).split())
+    else:
+        units_label_match = re.search(
+            r"UNITS?\s*[:=]\s*([A-Z]{2,}[A-Z0-9]*(?:[\s,\-/]+[A-Z]{2,}[A-Z0-9]*)*)",
+            message_body,
+            flags=re.IGNORECASE,
+        )
+        if units_label_match:
+            parsed["units"] = " ".join(units_label_match.group(1).split())
+
+    # Heuristic: attempt to capture priority tokens like "Priority: MAJOR"
+    priority_match = re.search(
+        r"PRIORITY\s*[:=]\s*([A-Za-z0-9]+)", message_body, flags=re.IGNORECASE
+    )
+    if priority_match:
+        parsed["priority"] = priority_match.group(1).strip()
 
     return parsed
 

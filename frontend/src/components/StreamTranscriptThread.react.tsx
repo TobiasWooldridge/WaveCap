@@ -16,7 +16,7 @@ import { AlertChips } from "./chips/AlertChips.react";
 import { SystemEventChip } from "./chips/SystemEventChip.react";
 import { TranscriptionSegmentChips } from "./TranscriptionSegmentChips.react";
 import { condensePagerTranscriptions } from "../utils/pagerMessages";
-import { PagerTranscriptGroup } from "./PagerTranscriptGroup.react";
+import { PagerTranscriptTable } from "./PagerTranscriptTable.react";
 import { TranscriptionReviewControls } from "./TranscriptionReviewControls.react";
 import AudioElement from "./primitives/AudioElement.react";
 import { useUISettings } from "../contexts/UISettingsContext";
@@ -293,7 +293,7 @@ const StreamTranscriptThread: React.FC<StreamTranscriptThreadProps> = ({
   const pagerContent =
     pagerMessages.length > 0
       ? [
-          <PagerTranscriptGroup
+          <PagerTranscriptTable
             key={`${group.id}-pager`}
             groupId={group.id}
             messages={pagerMessages}
@@ -323,6 +323,10 @@ const StreamTranscriptThread: React.FC<StreamTranscriptThreadProps> = ({
       ? incidentLocationUrls
       : null;
 
+  // When rendering the compact pager table, keep only a short header
+  // (incident id + call type). Suppress address/meta/narrative.
+  const useCompactPagerHeader = streamIsPager && pagerMessages.length > 0;
+
   return (
     <article
       className={`transcript-thread${groupHasAlerts ? " transcript-thread--alert" : ""}`}
@@ -342,7 +346,7 @@ const StreamTranscriptThread: React.FC<StreamTranscriptThreadProps> = ({
           ) : null}
         </header>
 
-        {incidentIdLabel || incidentCallType || incidentMetaParts.length > 0 || incidentNarrative ? (
+        {incidentIdLabel || incidentCallType || (!useCompactPagerHeader && (incidentMetaParts.length > 0 || incidentNarrative)) ? (
           <div className="transcript-thread__incident-summary">
             {incidentIdLabel || incidentCallType ? (
               <div className="transcript-thread__incident">
@@ -354,14 +358,14 @@ const StreamTranscriptThread: React.FC<StreamTranscriptThreadProps> = ({
                 ) : null}
               </div>
             ) : null}
-            {incidentMetaParts.length > 0 ? (
+            {!useCompactPagerHeader && incidentMetaParts.length > 0 ? (
               <div className="transcript-thread__incident-meta">
                 {incidentMetaParts.map((part, index) => (
                   <span key={`${group.id}-incident-meta-${index}`}>{part}</span>
                 ))}
               </div>
             ) : null}
-            {incidentNarrative ? (
+            {!useCompactPagerHeader && incidentNarrative ? (
               <div className="transcript-thread__incident-narrative">{incidentNarrative}</div>
             ) : null}
             {headerLocationUrls ? (
