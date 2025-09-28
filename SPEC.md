@@ -76,8 +76,9 @@ transcribing multiple radio or pager feeds in real time.
   structured CAD payloads that the backend will normalise into readable
   transcripts before they appear in the UI.
 - CFS Flex submissions extract incident numbers, call types, map grids,
-  talkgroups, narratives, and responding units from the raw FLEX string while
-  preserving the original pager line in the transcript details.
+  talkgroups, narratives, and responding units from the raw FLEX string.
+  The original raw FLEX line is preserved and accessible under the
+  collapsible "View raw message" panel for each incident.
 - Pager streams condense fragments that arrive within a few seconds into a
   single structured summary while keeping the original fragments available for
   review on demand.

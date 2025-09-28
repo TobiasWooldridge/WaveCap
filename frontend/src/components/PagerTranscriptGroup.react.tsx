@@ -65,7 +65,30 @@ export const PagerTranscriptGroup: React.FC<PagerTranscriptGroupProps> = ({
           message.fragments.length === 1 ? "fragment" : "fragments"
         }`;
 
-        const detailFields = message.fields.filter((field) => field.key !== "raw_message");
+        const allowedDetailKeys = new Set([
+          "map",
+          "talkgroup",
+          "address",
+          "alarm_level",
+          "priority",
+          "narrative",
+          "units",
+        ]);
+        const detailFields = message.fields.filter(
+          (field) => field.key !== "raw_message" && allowedDetailKeys.has(field.key),
+        );
+
+        // Dedupe raw FLEX lines from notes: only show them in the collapsible section.
+        const rawField = message.fields.find((f) => f.key === "raw_message");
+        const rawValues = new Set<string>((rawField?.values ?? []).map((v) => v.trim()));
+        const rawLikePattern = /^(?:FLEX|ZCZC)\|/i;
+        const cleanedNotes = message.notes.filter((note) => {
+          const trimmed = note.trim();
+          if (!trimmed) return false;
+          if (rawValues.has(trimmed)) return false;
+          if (rawLikePattern.test(trimmed)) return false;
+          return true;
+        });
 
         const mapSection = shouldShowIncidentMap && incidentLocationUrls ? (
           <div className="pager-transcript__map" key="map">
@@ -91,11 +114,11 @@ export const PagerTranscriptGroup: React.FC<PagerTranscriptGroupProps> = ({
           </div>
         ) : null;
 
-        const notesSection = message.notes.length > 0 ? (
+        const notesSection = cleanedNotes.length > 0 ? (
           <div className="pager-transcript__notes-card" key="notes">
             <div className="pager-transcript__notes-title">Notes</div>
             <ul className="pager-transcript__notes">
-              {message.notes.map((note, i) => (
+              {cleanedNotes.map((note, i) => (
                 <li key={`${message.id}-note-${i}`}>{note}</li>
               ))}
             </ul>
@@ -201,4 +224,3 @@ export const PagerTranscriptGroup: React.FC<PagerTranscriptGroupProps> = ({
 };
 
 export default PagerTranscriptGroup;
-
