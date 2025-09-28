@@ -18,6 +18,10 @@
 - Keep the working tree clean by committing meaningful changes with clear messages.
 - Keep marketing language out of project documentation. Do not add unnecessary emoji or self-promotional content to `README.md` or related docs when describing the tech stack.
 - Before finalizing any suggested changes, run `git pull` to ensure the local branch is synchronized with the remote repository.
+- Always validate that the code compiles before completing a task:
+  - Backend: from `backend/`, run the test suite (e.g., `poetry install && poetry run pytest -q`) and ensure it passes.
+  - Frontend: from `frontend/`, run `npm ci && npm run build` to verify TypeScript and bundle build succeed without errors.
+  - Do not mark work as complete if either layer fails to compile/build.
 - Include at least one screenshot in every pull request description. Capture it with the `browser_container` tool when the change affects the UI; otherwise provide a relevant static view. When a pull request adds or modifies demo/screenshot fixtures or otherwise prepares specific UI states, include a browser-based capture of the web UI that demonstrates the scenario, even if the code changes live exclusively in the backend. Example: if you only adjust demo seed data for a conversation list, still start the app and attach a screenshot that shows the seeded conversations rendered in the interface.
 - Use `./start-screenshot.sh` when preparing captures. The script delegates to `start-app.sh` with screenshot fixtures and enables a passthrough transcriber so Whisper models are never downloaded in this environment.
 - Push back on requests that would substantially bloat complexity or pull the product away from its defined purpose.
