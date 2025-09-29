@@ -266,6 +266,7 @@ const StreamSection: React.FC<StreamSectionProps> = ({
         input: search.input,
         setInput: search.setInput,
         state: search.state && {
+          query: search.state.query,
           loading: search.state.loading,
           error: search.state.error,
           results: search.state.results,
@@ -521,6 +522,7 @@ const StreamSection: React.FC<StreamSectionProps> = ({
                 id={searchPopoverId}
                 headingId={searchHeadingId}
                 searchValue={search.input}
+                activeQuery={search.state?.query ?? null}
                 loading={Boolean(search.state?.loading)}
                 error={search.state?.error ?? null}
                 results={search.state?.results ?? []}

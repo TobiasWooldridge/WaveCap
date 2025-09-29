@@ -32,6 +32,7 @@ export interface UseStandaloneControlsOptions {
     input: string;
     setInput: (value: string) => void;
     state: {
+      query: string;
       loading: boolean;
       error: string | null;
       results: TranscriptionResult[];
@@ -228,6 +229,7 @@ export const useStandaloneControls = (options: UseStandaloneControlsOptions): St
               <SearchPanel
                 variant="dialog"
                 searchValue={search.input}
+                activeQuery={search.state?.query ?? null}
                 loading={Boolean(search.state?.loading)}
                 error={search.state?.error ?? null}
                 results={search.state?.results ?? []}

@@ -3,12 +3,14 @@ import { Clock, Loader2, Search, X } from "lucide-react";
 import type { TranscriptionResult } from "@types";
 import Button from "./primitives/Button.react";
 import { Timestamp } from "./primitives/Timestamp.react";
+import { TimeInterval } from "./primitives/TimeInterval.react";
 
 export interface SearchPanelProps {
   variant?: "popover" | "dialog";
   id?: string;
   headingId?: string;
   searchValue: string;
+  activeQuery?: string | null;
   loading: boolean;
   error: string | null;
   results: TranscriptionResult[];
@@ -24,6 +26,7 @@ const SearchPanel: React.FC<SearchPanelProps> = ({
   id,
   headingId,
   searchValue,
+  activeQuery,
   loading,
   error,
   results,
@@ -35,6 +38,8 @@ const SearchPanel: React.FC<SearchPanelProps> = ({
 }) => {
   const isPopover = variant === "popover";
   const titleId = headingId ?? (id ? `${id}-heading` : undefined);
+  const hasExecutedSearch = Boolean(activeQuery);
+  const resultCount = hasExecutedSearch ? results.length : null;
   const containerClassName = [
     "transcript-stream__search-popover",
     isPopover
@@ -101,13 +106,14 @@ const SearchPanel: React.FC<SearchPanelProps> = ({
         </div>
       </form>
 
-      {searchValue || results.length > 0 || loading || error ? (
+      {hasExecutedSearch || loading || error ? (
         <div className="transcript-stream__search-results">
           <div className="transcript-stream__search-summary">
             <div className="fw-semibold text-body">
-              {searchValue ? (
+              {hasExecutedSearch ? (
                 <>
-                  Results for “{searchValue}” ({results.length})
+                  Results for “{activeQuery}”
+                  {typeof resultCount === "number" ? ` (${resultCount})` : ""}
                 </>
               ) : (
                 "Search"
@@ -137,14 +143,7 @@ const SearchPanel: React.FC<SearchPanelProps> = ({
                 >
                   <div className="d-flex align-items-start justify-content-between gap-3">
                     <div className="flex-grow-1">
-                      <div className="d-flex align-items-center gap-2 text-xs text-ink-subtle mb-1">
-                        <Clock className="w-3 h-3 text-neutral" />
-                        {result.timestamp ? (
-                          <Timestamp value={result.timestamp} mode="datetime" />
-                        ) : (
-                          <span>Unknown time</span>
-                        )}
-                      </div>
+                      <SearchResultTime result={result} />
                       <div>{result.text}</div>
                     </div>
                     <div className="d-flex flex-column align-items-end gap-1 text-xs">
@@ -165,6 +164,74 @@ const SearchPanel: React.FC<SearchPanelProps> = ({
       ) : (
         <div className="text-xs text-ink-subtle">Search saved transcripts by keyword.</div>
       )}
+    </div>
+  );
+};
+
+interface SearchResultTimeProps {
+  result: TranscriptionResult;
+}
+
+const formatDurationLabel = (seconds: number): string => {
+  const totalSeconds = Math.max(0, Math.round(seconds));
+  if (totalSeconds === 0) {
+    return "<1s";
+  }
+
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const remainingSeconds = totalSeconds % 60;
+
+  const parts: string[] = [];
+  if (hours > 0) {
+    parts.push(`${hours}h`);
+  }
+  if (minutes > 0) {
+    parts.push(`${minutes}m`);
+  }
+  if (remainingSeconds > 0 || parts.length === 0) {
+    parts.push(`${remainingSeconds}s`);
+  }
+
+  return parts.join(" ");
+};
+
+const SearchResultTime: React.FC<SearchResultTimeProps> = ({ result }) => {
+  const { timestamp, duration } = result;
+
+  if (!timestamp) {
+    return (
+      <div className="transcript-stream__search-result-time">
+        <Clock className="w-3 h-3 text-neutral" />
+        <span>Unknown time</span>
+      </div>
+    );
+  }
+
+  const startDate = new Date(timestamp);
+  if (Number.isNaN(startDate.getTime())) {
+    return (
+      <div className="transcript-stream__search-result-time">
+        <Clock className="w-3 h-3 text-neutral" />
+        <span>Unknown time</span>
+      </div>
+    );
+  }
+
+  const hasDuration = typeof duration === "number" && duration > 0;
+  const durationLabel = hasDuration ? formatDurationLabel(duration as number) : null;
+
+  return (
+    <div className="transcript-stream__search-result-time">
+      <Clock className="w-3 h-3 text-neutral" />
+      <Timestamp value={startDate} mode="datetime" className="fw-semibold text-ink" />
+      <span className="transcript-stream__search-result-separator" aria-hidden="true">
+        •
+      </span>
+      <TimeInterval value={startDate} className="transcript-stream__search-result-interval" />
+      {durationLabel ? (
+        <span className="transcript-stream__search-result-duration">{durationLabel}</span>
+      ) : null}
     </div>
   );
 };
