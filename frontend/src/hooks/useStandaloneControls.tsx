@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, type MutableRefObject } from "react";
 import { BarChart3, CalendarClock, Download, Loader2, Search } from "lucide-react";
 import type { ReactNode } from "react";
 import Button from "../components/primitives/Button.react";
@@ -9,7 +9,7 @@ import StandaloneStatsDialog from "../components/dialogs/StandaloneStatsDialog.r
 import SearchPanel from "../components/SearchPanel.react";
 import type { StandaloneStreamControls } from "../components/streamControls";
 import { toDatetimeLocalValue } from "../utils/datetime";
-import type { TranscriptionResult } from "@types";
+import type { Stream, TranscriptionResult } from "@types";
 import { calculatePerformanceMetrics } from "./usePerformance";
 
 export type StandaloneTool = "search" | "jump" | "stats";
@@ -18,6 +18,8 @@ const sanitizeStreamId = (streamId: string) => streamId.replace(/[^a-zA-Z0-9_-]/
 
 export interface UseStandaloneControlsOptions {
   streamId: string;
+  streamName: string;
+  stream: Stream;
   isReadOnly: boolean;
   isPagerStream: boolean;
   isTranscribing: boolean;
@@ -28,6 +30,7 @@ export interface UseStandaloneControlsOptions {
     error: string | null;
     toggle: () => void;
   };
+  recordingAudioRefs: MutableRefObject<Record<string, HTMLAudioElement | null>>;
   search: {
     input: string;
     setInput: (value: string) => void;
@@ -51,6 +54,20 @@ export interface UseStandaloneControlsOptions {
     setJumpWindowValue: (value: number) => void;
     goToTimestamp: (timestamp: string, windowMinutes: number) => void | Promise<void>;
   };
+  transcriptCorrectionEnabled: boolean;
+  playingSegmentId: string | null;
+  onPlaySegment: (
+    recordingUrl: string,
+    startTime: number | undefined,
+    endTime: number | undefined,
+    transcriptionId: string,
+    options?: { recordingStartOffset?: number },
+  ) => void;
+  isSegmentCurrentlyPlaying: (
+    recordingUrl: string,
+    startTime: number,
+    endTime: number,
+  ) => boolean;
   onResetStream: (streamId: string) => void;
   onExportPagerFeed?: () => Promise<void> | void;
   onSelectPagerExportStream?: (streamId: string) => void;
@@ -62,14 +79,21 @@ export interface UseStandaloneControlsOptions {
 export const useStandaloneControls = (options: UseStandaloneControlsOptions): StandaloneStreamControls => {
   const {
     streamId,
+    streamName,
+    stream,
     isReadOnly,
     isPagerStream,
     isTranscribing,
     canListenLive: canListenLiveOverride,
     visibleTranscriptions,
     liveAudio,
+    recordingAudioRefs,
     search,
     focus,
+    transcriptCorrectionEnabled,
+    playingSegmentId,
+    onPlaySegment,
+    isSegmentCurrentlyPlaying,
     onResetStream,
     onExportPagerFeed,
     onSelectPagerExportStream,
@@ -237,6 +261,15 @@ export const useStandaloneControls = (options: UseStandaloneControlsOptions): St
                 onSearch={(value) => void search.search(value)}
                 onClear={() => search.clear()}
                 onClose={closeDialog}
+                transcriptContext={{
+                  streamName,
+                  stream,
+                  transcriptCorrectionEnabled,
+                  playingSegmentId,
+                  onPlaySegment,
+                  isSegmentCurrentlyPlaying,
+                  recordingAudioRefs,
+                }}
                 onViewContext={(timestamp) => {
                   focus.setJumpTimestampValue(toDatetimeLocalValue(timestamp));
                   void focus.goToTimestamp(timestamp, focus.jumpWindowValue);
@@ -289,6 +322,12 @@ export const useStandaloneControls = (options: UseStandaloneControlsOptions): St
       canReset,
       isReadOnly,
       liveAudio,
+      streamName,
+      stream,
+      transcriptCorrectionEnabled,
+      playingSegmentId,
+      onPlaySegment,
+      isSegmentCurrentlyPlaying,
       onResetStream,
       statusLabel,
       statusModifier,

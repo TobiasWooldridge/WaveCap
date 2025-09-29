@@ -239,6 +239,8 @@ const StreamSection: React.FC<StreamSectionProps> = ({
   // Build standalone controls once per render; consumer decides placement
   const standaloneControls = useStandaloneControls({
       streamId: stream.id,
+      streamName: stream.name,
+      stream,
       isReadOnly,
       isPagerStream: streamIsPager,
       isTranscribing,
@@ -261,6 +263,7 @@ const StreamSection: React.FC<StreamSectionProps> = ({
           });
         },
       },
+      recordingAudioRefs,
       canListenLive,
       search: {
         input: search.input,
@@ -285,6 +288,10 @@ const StreamSection: React.FC<StreamSectionProps> = ({
         setJumpWindowValue,
         goToTimestamp: (ts: string, win: number) => void focus.goToTimestamp(ts, win),
       },
+      transcriptCorrectionEnabled,
+      playingSegmentId,
+      onPlaySegment,
+      isSegmentCurrentlyPlaying,
       onResetStream,
       onExportPagerFeed,
       onSelectPagerExportStream,
@@ -534,6 +541,15 @@ const StreamSection: React.FC<StreamSectionProps> = ({
                   setJumpTimestampValue(timestamp);
                   void focus.goToTimestamp(timestamp, jumpWindowValue);
                   setOpenSearch(false);
+                }}
+                transcriptContext={{
+                  streamName: stream.name,
+                  stream,
+                  transcriptCorrectionEnabled,
+                  playingSegmentId,
+                  onPlaySegment,
+                  isSegmentCurrentlyPlaying,
+                  recordingAudioRefs,
                 }}
               />
             ) : null}

@@ -63,11 +63,11 @@
 }
 
 .standalone-tool-dialog {
-  max-width: min(56rem, 100%);
-  width: min(56rem, 100%);
-  max-height: min(80vh, 48rem);
+  max-width: min(80rem, 92vw);
+  width: min(80rem, 92vw);
+  max-height: min(90vh, 68rem);
   gap: 1.25rem;
-  padding: clamp(1.25rem, 1.5vw + 0.75rem, 1.75rem);
+  padding: clamp(1.25rem, 1.5vw + 0.75rem, 1.85rem);
   display: flex;
   flex-direction: column;
 }
