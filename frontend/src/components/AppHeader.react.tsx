@@ -1,10 +1,9 @@
 import { ChangeEvent, MutableRefObject } from "react";
-import { Activity, AlertTriangle, LogIn, LogOut, Menu, Settings, Volume2 } from "lucide-react";
+import { Activity, LogIn, LogOut, Menu, Settings } from "lucide-react";
 import Button from "./primitives/Button.react";
 import Flex from "./primitives/Flex.react";
 import Spinner from "./primitives/Spinner.react";
 import "./AppHeader.scss";
-import { useLiveAudioSession } from "../contexts/LiveAudioContext";
 
 interface AppHeaderProps {
   isMobileViewport: boolean;
@@ -35,15 +34,6 @@ const AppHeader = ({
   onRequestLogin,
   onLogout,
 }: AppHeaderProps) => {
-  const liveAudio = useLiveAudioSession();
-  const liveStream = liveAudio.isListening ? liveAudio.activeStream : null;
-  const liveStreamLabel = liveStream?.name?.trim() || liveStream?.id || "current stream";
-  const liveIndicatorIcon = liveAudio.error ? (
-    <AlertTriangle size={16} />
-  ) : (
-    <Volume2 size={16} />
-  );
-
   return (
     <header className="app-header">
       <div className="app-header__background">
@@ -101,28 +91,6 @@ const AppHeader = ({
                   startContent={<Menu size={18} />}
                 >
                   <span>Streams</span>
-                </Button>
-              ) : null}
-
-              {liveStream ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  use={liveAudio.error ? "danger" : "warning"}
-                  className="app-header__live-indicator"
-                  onClick={() => {
-                    liveAudio.stop();
-                  }}
-                  startContent={liveIndicatorIcon}
-                  title={
-                    liveAudio.error
-                      ? `Live audio error: ${liveAudio.error}`
-                      : `Listening to ${liveStreamLabel}`
-                  }
-                >
-                  <span className="app-header__live-indicator-label">
-                    Listening to {liveStreamLabel}
-                  </span>
                 </Button>
               ) : null}
 
