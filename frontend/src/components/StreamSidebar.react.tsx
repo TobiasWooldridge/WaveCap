@@ -85,8 +85,6 @@ const StreamSidebar = ({
     onSortModeChange(nextValue);
   };
 
-  // Sort label text removed from header as redundant with the dropdown
-
   return (
     <div
       className={`stream-sidebar-drawer ${isMobileSidebarOpen ? "stream-sidebar-drawer--open" : ""}`}
@@ -107,12 +105,6 @@ const StreamSidebar = ({
           </div>
           <Flex align="center" gap={2} wrap="wrap">
             <div className="stream-sidebar__sort-control">
-              <label
-                htmlFor="stream-sidebar-sort"
-                className="stream-sidebar__sort-label small text-body-secondary"
-              >
-                Sort
-              </label>
               <select
                 id="stream-sidebar-sort"
                 className="form-select form-select-sm stream-sidebar__sort-select"
