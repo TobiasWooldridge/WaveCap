@@ -120,7 +120,7 @@ const StreamSidebar = ({
               size="sm"
               use="secondary"
               appearance="outline"
-              className="stream-sidebar__close d-inline-flex align-items-center justify-content-center d-lg-none"
+              className="stream-sidebar__close"
               onClick={onCloseMobileSidebar}
               aria-label="Close stream menu"
             >

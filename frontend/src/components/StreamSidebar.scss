@@ -87,8 +87,11 @@
 }
 
 .stream-sidebar__close {
+  display: none !important;
   padding: 0.35rem;
   border-radius: 0.75rem;
+  align-items: center;
+  justify-content: center;
 }
 
 .stream-sidebar__close:focus-visible {
@@ -292,5 +295,9 @@
   .stream-sidebar__list {
     flex: 1 1 auto;
     max-height: none;
+  }
+
+  .stream-sidebar__close {
+    display: inline-flex !important;
   }
 }
