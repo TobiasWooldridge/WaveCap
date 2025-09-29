@@ -1254,15 +1254,6 @@
     padding: 0.85rem;
   }
 
-  .conversation-panel__mobile-actions-panel {
-    background-color: rgba(var(--app-surface-subtle-rgb), 0.96);
-  }
-
-  .conversation-panel__mobile-actions-grid {
-    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
-    gap: 0.35rem;
-  }
-
   .stream-sidebar,
   .conversation-panel {
     width: 100%;

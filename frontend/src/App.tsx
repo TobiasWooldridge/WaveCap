@@ -15,7 +15,6 @@ import {
   MicOff,
   Clock,
   Menu,
-  SlidersHorizontal,
   LogIn,
   Activity,
   Pencil,
@@ -100,8 +99,6 @@ const DEFAULT_ERROR_MESSAGES: Record<ClientCommandType, string> = {
 };
 
 const DEFAULT_DOCUMENT_TITLE = "WaveCap Transcription";
-const MOBILE_ACTIONS_PANEL_ID = "conversation-mobile-actions-panel";
-
 const STREAM_SORT_STORAGE_KEY = "wavecap-stream-sort-mode";
 const STREAM_SORT_DEFAULT: StreamSortMode = "activity";
 
@@ -422,8 +419,6 @@ function App() {
   const {
     isMobileViewport,
     isMobileSidebarOpen,
-    isMobileActionsOpen,
-    setIsMobileActionsOpen,
     openMobileSidebar,
     closeMobileSidebar,
   } = useResponsiveLayout();
@@ -995,10 +990,6 @@ function App() {
     }
   }, [selectedStream]);
 
-  useEffect(() => {
-    setIsMobileActionsOpen(false);
-  }, [selectedStreamId, setIsMobileActionsOpen]);
-
   const selectedStreamLatestTimestamp = useMemo(
     () => (selectedStream ? getLatestActivityTimestamp(selectedStream) : 0),
     [selectedStream],
@@ -1122,12 +1113,11 @@ function App() {
   const handleSelectStream = useCallback(
     (streamId: string) => {
       selectStream(streamId);
-      setIsMobileActionsOpen(false);
       if (isMobileViewport) {
         closeMobileSidebar();
       }
     },
-    [closeMobileSidebar, isMobileViewport, selectStream, setIsMobileActionsOpen],
+    [closeMobileSidebar, isMobileViewport, selectStream],
   );
 
   const renderConversationStatusBadge = () => {
@@ -1603,64 +1593,21 @@ function App() {
                     </div>
 
                     {selectedStream && hasConversationControls ? (
-                      isMobileViewport ? (
-                        <div className="conversation-panel__mobile-actions">
-                          <div className="conversation-panel__mobile-actions-header">
-                            {standaloneControls ? (
-                              <div className="conversation-panel__mobile-actions-summary">
-                                {renderConversationStatusBadge()}
-                              </div>
-                            ) : null}
-                            <Button
-                              size="sm"
-                              use="secondary"
-                              appearance="outline"
-                              className="conversation-panel__mobile-actions-toggle"
-                              onClick={() => {
-                                setIsMobileActionsOpen((current) => !current);
-                              }}
-                              aria-expanded={isMobileActionsOpen}
-                              aria-controls={MOBILE_ACTIONS_PANEL_ID}
-                              startContent={<SlidersHorizontal size={16} />}
-                            >
-                              <span>
-                                {isMobileActionsOpen
-                                  ? "Hide controls"
-                                  : "Stream controls"}
-                              </span>
-                            </Button>
-                          </div>
-                          <div
-                            id={MOBILE_ACTIONS_PANEL_ID}
-                            className={`conversation-panel__mobile-actions-panel ${
-                              isMobileActionsOpen
-                                ? "conversation-panel__mobile-actions-panel--open"
-                                : ""
-                            }`}
-                            aria-hidden={!isMobileActionsOpen}
-                          >
-                            {(conversationActionButtonGroup ||
-                              conversationToolButtons) && (
-                              <div className="conversation-panel__mobile-actions-grid">
-                                {conversationActionButtonGroup}
-                                {conversationToolButtons}
-                              </div>
-                            )}
-                          </div>
+                      <div
+                        className={`conversation-panel__actions${
+                          isMobileViewport ? " conversation-panel__actions--mobile" : ""
+                        }`}
+                      >
+                        <div className="conversation-panel__primary-actions">
+                          {renderConversationStatusBadge()}
+                          {conversationActionButtonGroup}
                         </div>
-                      ) : (
-                        <div className="conversation-panel__actions">
-                          <div className="conversation-panel__primary-actions">
-                            {renderConversationStatusBadge()}
-                            {conversationActionButtonGroup}
+                        {conversationToolButtons ? (
+                          <div className="conversation-panel__tool-buttons">
+                            {conversationToolButtons}
                           </div>
-                          {conversationToolButtons ? (
-                            <div className="conversation-panel__tool-buttons">
-                              {conversationToolButtons}
-                            </div>
-                          ) : null}
-                        </div>
-                      )
+                        ) : null}
+                      </div>
                     ) : null}
                   </div>
                 </div>

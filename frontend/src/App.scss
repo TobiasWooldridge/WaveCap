@@ -116,6 +116,11 @@
   gap: 0.75rem;
 }
 
+.conversation-panel__actions--mobile {
+  justify-content: center;
+  gap: 0.5rem;
+}
+
 .conversation-panel__primary-actions,
 .conversation-panel__tool-buttons {
   display: flex;
@@ -128,76 +133,17 @@
   margin-left: auto;
 }
 
+.conversation-panel__actions--mobile .conversation-panel__primary-actions,
+.conversation-panel__actions--mobile .conversation-panel__tool-buttons {
+  justify-content: center;
+}
+
+.conversation-panel__actions--mobile .conversation-panel__tool-buttons {
+  margin-left: 0;
+}
+
 .conversation-panel__action-label {
   display: inline;
-}
-
-.conversation-panel__mobile-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.5rem;
-}
-
-.conversation-panel__mobile-actions-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
-.conversation-panel__mobile-actions-summary {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  flex: 1 1 auto;
-}
-
-.conversation-panel__mobile-actions-summary .transcript-stream__status {
-  width: auto;
-  flex: 1 1 auto;
-  justify-content: flex-start;
-}
-
-.conversation-panel__mobile-actions-toggle {
-  align-self: flex-start;
-}
-
-.conversation-panel__mobile-actions-header .conversation-panel__mobile-actions-toggle {
-  margin-left: auto;
-}
-
-.conversation-panel__mobile-actions-panel {
-  display: none;
-  flex-direction: column;
-  gap: 0.5rem;
-  background-color: rgba(var(--app-surface-subtle-rgb), 0.9);
-  border: 1px solid rgba(var(--bs-border-color-rgb, 222, 226, 230), 0.65);
-  border-radius: 0.75rem;
-  padding: clamp(0.5rem, 3vw, 0.75rem);
-}
-
-.conversation-panel__mobile-actions-panel--open {
-  display: flex;
-}
-
-.conversation-panel__mobile-actions-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
-  gap: 0.4rem;
-}
-
-.conversation-panel__mobile-actions-grid .btn-group {
-  width: 100%;
-}
-
-.conversation-panel__mobile-actions-grid > * {
-  width: 100%;
-}
-
-.conversation-panel__mobile-actions-grid .btn {
-  width: 100%;
-  justify-content: center;
 }
 
 .conversation-panel__stats-title {
@@ -381,15 +327,6 @@
 
   .conversation-panel__body {
     gap: 0.5rem;
-  }
-
-  .conversation-panel__mobile-actions-panel {
-    background-color: rgba(var(--app-surface-subtle-rgb), 0.96);
-  }
-
-  .conversation-panel__mobile-actions-grid {
-    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
-    gap: 0.35rem;
   }
 
   .stream-sidebar-backdrop {
