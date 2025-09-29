@@ -544,11 +544,21 @@ def create_app() -> FastAPI:
         limit: int = 100,
         before: Optional[str] = None,
         after: Optional[str] = None,
+        search: Optional[str] = None,
+        order: str = "desc",
     ) -> TranscriptionQueryResponse:
         before_dt = parse_iso8601(before) if before else None
         after_dt = parse_iso8601(after) if after else None
+        normalized_order = order.lower()
+        if normalized_order not in {"asc", "desc"}:
+            raise HTTPException(status_code=400, detail="Invalid order parameter")
         return await state.stream_manager.query_transcriptions(
-            stream_id, limit=limit, before=before_dt, after=after_dt
+            stream_id,
+            limit=limit,
+            before=before_dt,
+            after=after_dt,
+            search=search.strip() if search else None,
+            order=normalized_order,
         )
 
     @app.patch(

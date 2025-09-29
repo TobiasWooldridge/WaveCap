@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import AsyncIterator, List, Optional, Sequence
 
-from sqlalchemy import Boolean, Column, DateTime, Float, Index, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Float, Index, String, Text, func, or_
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlmodel import Field, SQLModel, delete, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -371,6 +371,8 @@ class StreamDatabase:
         limit: int = 100,
         before: Optional[datetime] = None,
         after: Optional[datetime] = None,
+        search: Optional[str] = None,
+        order: str = "desc",
     ) -> tuple[List[TranscriptionResult], bool]:
         statement = select(TranscriptionRecord).where(
             TranscriptionRecord.streamId == stream_id
@@ -380,11 +382,27 @@ class StreamDatabase:
         if after is not None:
             statement = statement.where(TranscriptionRecord.timestamp > after)
 
+        if search:
+            like_term = f"%{search.lower()}%"
+            statement = statement.where(
+                or_(
+                    func.lower(TranscriptionRecord.text).like(like_term),
+                    func.lower(TranscriptionRecord.correctedText).like(like_term),
+                )
+            )
+
         fetch_limit = max(0, limit)
-        order_clause = (
-            TranscriptionRecord.timestamp.desc(),
-            TranscriptionRecord.id.desc(),
-        )
+        normalized_order = order.lower()
+        if normalized_order == "asc":
+            order_clause = (
+                TranscriptionRecord.timestamp.asc(),
+                TranscriptionRecord.id.asc(),
+            )
+        else:
+            order_clause = (
+                TranscriptionRecord.timestamp.desc(),
+                TranscriptionRecord.id.desc(),
+            )
         if fetch_limit == 0:
             statement = statement.order_by(*order_clause).limit(1)
         else:

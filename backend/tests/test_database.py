@@ -70,6 +70,43 @@ async def test_query_transcriptions_filters_by_time(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_query_transcriptions_search_filters_text_and_corrected(tmp_path):
+    db = StreamDatabase(tmp_path / "runtime.sqlite")
+    stream = _make_stream()
+    await db.save_stream(stream)
+
+    base_time = utcnow()
+    horse_hit = _make_transcription(stream.id, base_time)
+    horse_hit.text = "Spotted a horse near the trail"
+
+    corrected_hit = _make_transcription(stream.id, base_time - timedelta(seconds=5))
+    corrected_hit.text = "Initial text"
+    corrected_hit.correctedText = "Mounted patrol on horseback"
+
+    non_match = _make_transcription(stream.id, base_time - timedelta(seconds=10))
+    non_match.text = "Nothing to see here"
+
+    for result in (horse_hit, corrected_hit, non_match):
+        await db.append_transcription(result)
+
+    # Default order returns newest first
+    results_desc, has_more_desc = await db.query_transcriptions(
+        stream.id, limit=10, search="horse"
+    )
+    assert has_more_desc is False
+    assert [item.id for item in results_desc] == [horse_hit.id, corrected_hit.id]
+
+    # Ascending order returns oldest first
+    results_asc, has_more_asc = await db.query_transcriptions(
+        stream.id, limit=10, search="horse", order="asc"
+    )
+    assert has_more_asc is False
+    assert [item.id for item in results_asc] == [corrected_hit.id, horse_hit.id]
+
+    await db.close()
+
+
+@pytest.mark.asyncio
 async def test_update_review_and_export(tmp_path):
     db = StreamDatabase(tmp_path / "runtime.sqlite")
     stream = _make_stream()

@@ -709,17 +709,22 @@ class StreamManager:
         limit: int = 100,
         before: Optional[datetime] = None,
         after: Optional[datetime] = None,
+        search: Optional[str] = None,
+        order: str = "desc",
     ) -> TranscriptionQueryResponse:
-        transcriptions, has_more_before = await self.database.query_transcriptions(
+        transcriptions, has_more = await self.database.query_transcriptions(
             stream_id,
             limit,
             before,
             after,
+            search,
+            order,
         )
+        order_normalized = order.lower()
         return TranscriptionQueryResponse(
             transcriptions=transcriptions,
-            hasMoreAfter=False,
-            hasMoreBefore=has_more_before,
+            hasMoreAfter=has_more if order_normalized == "asc" else False,
+            hasMoreBefore=has_more if order_normalized != "asc" else False,
         )
 
     def iter_live_audio(self, stream_id: str) -> AsyncIterator[bytes]:
