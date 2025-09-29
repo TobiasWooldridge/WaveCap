@@ -34,6 +34,7 @@ transcribing multiple radio or pager feeds in real time.
 - Use the stream list to spot transcribing, queued, stopped, or error states. Queued means the stream was enabled and is waiting for the backend to catch up. If Whisper concurrency is full, recording continues and transcripts arrive once a slot opens.
 - Sort the stream sidebar by latest activity or stream name. Streams pinned in configuration files stay at the top regardless of the selected sort mode.
 - Open each stream's conversation view with search, time-range filters, and "Go to timestamp" controls to review recent traffic.
+- When you open the search tool, the results appear in a wide, modal-style panel that occupies most of the viewport so you can scan long hit lists without juggling cramped popovers.
 - Read system log entries that mark recording and transcription start or stop events, as well as upstream connection interruptions and recoveries.
 - See stream status and unread badges in the sidebar. Unread counts persist per browser session via localStorage so refreshes don’t reset them. Start/Stop controls are removed; enable/disable streams via `state/config.yaml`.
 - Controls that trigger backend actions disable their buttons and show a spinner while the backend processes the request, preventing duplicate submissions.

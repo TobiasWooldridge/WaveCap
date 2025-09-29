@@ -582,7 +582,6 @@ const StreamSection: React.FC<StreamSectionProps> = ({
               transcriptionsCount={focus.state.transcriptions.length}
               loading={focus.state.loading}
               error={focus.state.error}
-              onAddToTimeline={() => history.appendTranscriptions(focus.state?.transcriptions ?? [])}
               onClear={() => focus.clear()}
             >
               {focusPrepared &&

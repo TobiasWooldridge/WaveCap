@@ -9,7 +9,6 @@ export interface FocusContextPanelProps {
   transcriptionsCount: number;
   loading: boolean;
   error: string | null;
-  onAddToTimeline: () => void;
   onClear: () => void;
   children?: React.ReactNode; // content (grouped transcriptions)
 }
@@ -20,7 +19,6 @@ const FocusContextPanel: React.FC<FocusContextPanelProps> = ({
   transcriptionsCount,
   loading,
   error,
-  onAddToTimeline,
   onClear,
   children,
 }) => {
@@ -36,14 +34,6 @@ const FocusContextPanel: React.FC<FocusContextPanelProps> = ({
           ) : null}
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            use="unstyled"
-            onClick={onAddToTimeline}
-            disabled={transcriptionsCount === 0}
-            className="px-2 py-1 text-xs bg-insight text-on-accent rounded hover:bg-insight-strong disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            Add to timeline
-          </Button>
           <Button
             use="unstyled"
             onClick={onClear}
@@ -71,4 +61,3 @@ const FocusContextPanel: React.FC<FocusContextPanelProps> = ({
 };
 
 export default FocusContextPanel;
-

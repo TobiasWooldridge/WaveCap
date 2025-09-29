@@ -63,19 +63,31 @@
 }
 
 .standalone-tool-dialog {
-  max-width: 32rem;
-  width: min(32rem, 100%);
+  max-width: min(56rem, 100%);
+  width: min(56rem, 100%);
+  max-height: min(80vh, 48rem);
   gap: 1.25rem;
-  padding: 1.25rem;
+  padding: clamp(1.25rem, 1.5vw + 0.75rem, 1.75rem);
+  display: flex;
+  flex-direction: column;
 }
 
 .standalone-tool-dialog__body {
   gap: 1rem;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .standalone-tool-dialog__form {
   width: 100%;
   flex: none;
+}
+
+.standalone-tool-dialog__body > .transcript-stream__search-popover {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 @media (max-width: 575.98px) {

@@ -13,7 +13,6 @@ export interface UseStreamTranscriptionsResult {
   state: StreamHistoryState;
   loadEarlier: (before?: string | null) => Promise<void>;
   clear: () => void;
-  appendTranscriptions: (items: TranscriptionResult[]) => void;
 }
 
 export const useStreamTranscriptions = (
@@ -78,15 +77,7 @@ export const useStreamTranscriptions = (
     setState({ transcriptions: [], hasMoreBefore: true, loading: false, error: null });
   }, []);
 
-  const appendTranscriptions = useCallback((items: TranscriptionResult[]) => {
-    if (!items || items.length === 0) return;
-    setState((prev) => ({
-      ...prev,
-      transcriptions: dedupeAndSortTranscriptions([...prev.transcriptions, ...items]),
-    }));
-  }, []);
-
-  return { state, loadEarlier, clear, appendTranscriptions };
+  return { state, loadEarlier, clear };
 };
 
 export default useStreamTranscriptions;

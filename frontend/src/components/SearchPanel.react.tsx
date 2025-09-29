@@ -35,10 +35,18 @@ const SearchPanel: React.FC<SearchPanelProps> = ({
 }) => {
   const isPopover = variant === "popover";
   const titleId = headingId ?? (id ? `${id}-heading` : undefined);
+  const containerClassName = [
+    "transcript-stream__search-popover",
+    isPopover
+      ? "transcript-stream__search-popover--inline"
+      : "transcript-stream__search-popover--dialog",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div
-      className="transcript-stream__search-popover"
+      className={containerClassName}
       id={id}
       role={isPopover ? "dialog" : undefined}
       aria-modal={isPopover ? "false" : undefined}
@@ -162,4 +170,3 @@ const SearchPanel: React.FC<SearchPanelProps> = ({
 };
 
 export default SearchPanel;
-
