@@ -13,22 +13,22 @@ const LiveAudioBanner = () => {
   const liveAudio = useLiveAudioSession();
   const stream = liveAudio.isListening ? liveAudio.activeStream : null;
   const [, setSearchParams] = useSearchParams();
+  const streamId = stream?.id ?? null;
+  const label = stream?.name?.trim() || streamId || "";
+  const handleFocusStream = useCallback(() => {
+    if (!streamId) return;
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set(STREAM_QUERY_PARAM, streamId);
+      return next;
+    });
+  }, [setSearchParams, streamId]);
 
   if (!stream) {
     return null;
   }
 
-  const label = stream.name?.trim() || stream.id;
   const showError = Boolean(liveAudio.error);
-
-  const handleFocusStream = useCallback(() => {
-    if (!stream) return;
-    setSearchParams((current) => {
-      const next = new URLSearchParams(current);
-      next.set(STREAM_QUERY_PARAM, stream.id);
-      return next;
-    });
-  }, [setSearchParams, stream]);
 
   return (
     <div className="live-audio-banner" role="status" aria-live="polite">
