@@ -19,7 +19,7 @@ import { useUISettings } from "../contexts/UISettingsContext";
 import { useStreamTranscriptions } from "../hooks/useStreamTranscriptions";
 import { useStreamSearch } from "../hooks/useStreamSearch";
 import { useStreamFocusWindow } from "../hooks/useStreamFocusWindow";
-import { useLiveAudio } from "../hooks/useLiveAudio";
+import { useLiveAudioSession } from "../contexts/LiveAudioContext";
 import { useStandaloneControls, type StandaloneTool } from "../hooks/useStandaloneControls";
 import { StreamTranscriptList } from "./StreamTranscriptList.react";
 import StreamTranscriptThread from "./StreamTranscriptThread.react";
@@ -35,6 +35,7 @@ import {
   type TranscriptionGroup,
 } from "./StreamTranscriptionPanel.logic";
 import type { StandaloneStreamControls } from "./streamControls";
+import { getStreamTitle } from "../utils/streams";
 
 const INITIAL_HISTORY_WINDOW_MINUTES = 180;
 const INITIAL_HISTORY_WINDOW_MS = INITIAL_HISTORY_WINDOW_MINUTES * 60 * 1000;
@@ -207,8 +208,26 @@ const StreamSection: React.FC<StreamSectionProps> = ({
     : null;
   const earliestTimestamp = hasTranscriptions ? visibleTranscriptions[0].timestamp : null;
 
-  const liveAudio = useLiveAudio(!streamIsPager && isTranscribing);
+  const canListenLive = !streamIsPager && stream.enabled;
   const liveAudioPath = `/api/streams/${encodeURIComponent(stream.id)}/live`;
+  const {
+    isActiveStream,
+    isListening: isLiveSessionListening,
+    listen: listenToStream,
+    stop: stopLiveStream,
+    error: liveSessionError,
+  } = useLiveAudioSession();
+
+  const isLiveStreamActive = isActiveStream(stream.id);
+  const liveListening = isLiveStreamActive && isLiveSessionListening;
+  const liveAudioError = liveListening ? liveSessionError : null;
+  const liveStreamLabel = getStreamTitle(stream);
+
+  useEffect(() => {
+    if (!canListenLive && liveListening) {
+      stopLiveStream();
+    }
+  }, [canListenLive, liveListening, stopLiveStream]);
 
   const canLoadMoreHistory = history.state.hasMoreBefore !== false;
   const pagerWebhookPath = canViewWebhookDetails ? buildPagerWebhookPath(stream) : null;
@@ -225,10 +244,24 @@ const StreamSection: React.FC<StreamSectionProps> = ({
       isTranscribing,
       visibleTranscriptions,
       liveAudio: {
-        isListening: liveAudio.isListening,
-        error: liveAudio.error,
-        toggle: liveAudio.toggle,
+        isListening: liveListening,
+        error: liveAudioError,
+        toggle: () => {
+          if (!canListenLive) return;
+          if (liveListening) {
+            stopLiveStream();
+            return;
+          }
+          listenToStream({
+            id: stream.id,
+            name: liveStreamLabel,
+            baseUrl: liveAudioPath,
+            canListen: canListenLive,
+            url: stream.url ?? null,
+          });
+        },
       },
+      canListenLive,
       search: {
         input: search.input,
         setInput: search.setInput,
@@ -303,7 +336,7 @@ const StreamSection: React.FC<StreamSectionProps> = ({
   const searchPopoverId = `stream-search-${sanitizedStreamId}`;
   const searchHeadingId = `${searchPopoverId}-title`;
 
-  const listenButtonUse = liveAudio.isListening ? "success" : "primary";
+  const listenButtonUse = liveListening ? "success" : "primary";
 
   const streamTitle = (
     <div className="d-flex align-items-center gap-3">
@@ -389,11 +422,26 @@ const StreamSection: React.FC<StreamSectionProps> = ({
         use={listenButtonUse}
         onClick={(e) => {
           e.stopPropagation();
-          liveAudio.toggle();
+          console.info("[live-audio] listen button clicked", {
+            streamId: stream.id,
+            canListenLive,
+            status: stream.status,
+          });
+          if (liveListening) {
+            stopLiveStream();
+          } else {
+            listenToStream({
+              id: stream.id,
+              name: liveStreamLabel,
+              baseUrl: liveAudioPath,
+              canListen: canListenLive,
+              url: stream.url ?? null,
+            });
+          }
         }}
         title="Toggle live audio monitoring"
         startContent={
-          liveAudio.isListening ? (
+          liveListening ? (
             <span className="live-listening-icon" aria-hidden="true">
               <Volume2 size={14} />
             </span>
@@ -402,23 +450,8 @@ const StreamSection: React.FC<StreamSectionProps> = ({
           )
         }
       >
-        {liveAudio.isListening ? "Stop listening" : "Listen live"}
+        {liveListening ? "Stop listening" : "Listen live"}
       </Button>
-      {liveAudio.isListening ? (
-        <audio
-          key="live-audio-element"
-          ref={liveAudio.audioRef}
-          src={liveAudioPath}
-          autoPlay
-          preload="none"
-          className="visually-hidden"
-          onLoadedMetadata={() => liveAudio.onReady()}
-          onCanPlay={() => liveAudio.onReady()}
-          onPlay={() => liveAudio.onPlay()}
-          onPlaying={() => liveAudio.onPlay()}
-          onError={() => liveAudio.onError()}
-        />
-      ) : null}
     </div>
   );
 
@@ -439,11 +472,11 @@ const StreamSection: React.FC<StreamSectionProps> = ({
   );
 
   const summarySections: React.ReactElement[] = [];
-  if (liveAudio.isListening && liveAudio.error) {
+  if (liveListening && liveAudioError) {
     summarySections.push(
       <div key="live-audio-error" className="transcript-stream__summary-block">
         <div className="small text-danger" role="alert">
-          {liveAudio.error}
+          {liveAudioError}
         </div>
       </div>,
     );

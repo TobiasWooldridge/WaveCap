@@ -8,6 +8,7 @@ import { setupConsoleLogging } from "./utils/setupConsoleLogging";
 import { UISettingsProvider } from "./contexts/UISettingsContext.tsx";
 import { ToastProvider } from "./contexts/ToastProvider.tsx";
 import { AuthProvider } from "./contexts/AuthContext.tsx";
+import { LiveAudioProvider } from "./contexts/LiveAudioContext.tsx";
 
 setupConsoleLogging();
 
@@ -20,7 +21,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <UISettingsProvider>
           <ToastProvider>
             <BrowserRouter>
-              <App />
+              <LiveAudioProvider>
+                <App />
+              </LiveAudioProvider>
             </BrowserRouter>
           </ToastProvider>
         </UISettingsProvider>

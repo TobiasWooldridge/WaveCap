@@ -46,6 +46,7 @@ import SettingsModal from "./components/SettingsModal.react";
 import { useToast } from "./hooks/useToast";
 import { useAuth } from "./contexts/AuthContext";
 import AppHeader from "./components/AppHeader.react";
+import LiveAudioBanner from "./components/LiveAudioBanner.react";
 import StreamSidebar, {
   type StreamSidebarItem,
   type StreamSortMode,
@@ -1396,6 +1397,7 @@ function App() {
           onRequestLogin={requestLogin}
           onLogout={logout}
         />
+        <LiveAudioBanner />
 
         <SettingsModal
           open={showSettings}

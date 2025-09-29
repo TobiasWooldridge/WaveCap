@@ -89,3 +89,17 @@
   width: auto;
   min-width: 8rem;
 }
+
+.app-header__live-indicator {
+  font-weight: 600;
+  white-space: nowrap;
+  max-width: clamp(10rem, 24vw, 16rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-header__live-indicator-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}

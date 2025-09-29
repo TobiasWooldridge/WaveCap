@@ -754,7 +754,9 @@ def create_app() -> FastAPI:
 
     @app.get("/api/streams/{stream_id}/live")
     async def live_audio(
-        stream_id: str, state: AppState = Depends(get_state)
+        stream_id: str,
+        request: Request,
+        state: AppState = Depends(get_state),
     ) -> StreamingResponse:
         stream = state.stream_manager.streams.get(stream_id)
         if not stream:
@@ -774,6 +776,15 @@ def create_app() -> FastAPI:
             raise HTTPException(
                 status_code=409, detail=str(exc)
             ) from exc
+
+        client_host = "unknown"
+        if request.client:
+            client_host = f"{request.client.host}:{request.client.port}"
+        LOGGER.info(
+            "Live audio requested for stream %s by %s",
+            stream_id,
+            client_host,
+        )
 
         headers = {"Cache-Control": "no-store"}
         return StreamingResponse(iterator, media_type="audio/wav", headers=headers)

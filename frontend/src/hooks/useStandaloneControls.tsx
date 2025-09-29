@@ -21,6 +21,7 @@ export interface UseStandaloneControlsOptions {
   isReadOnly: boolean;
   isPagerStream: boolean;
   isTranscribing: boolean;
+  canListenLive?: boolean;
   visibleTranscriptions: TranscriptionResult[];
   liveAudio: {
     isListening: boolean;
@@ -63,6 +64,7 @@ export const useStandaloneControls = (options: UseStandaloneControlsOptions): St
     isReadOnly,
     isPagerStream,
     isTranscribing,
+    canListenLive: canListenLiveOverride,
     visibleTranscriptions,
     liveAudio,
     search,
@@ -78,7 +80,8 @@ export const useStandaloneControls = (options: UseStandaloneControlsOptions): St
   const sanitizedStreamId = sanitizeStreamId(streamId);
   const metrics = calculatePerformanceMetrics(visibleTranscriptions);
   const canReset = !isReadOnly && visibleTranscriptions.length > 0;
-  const canListenLive = !isPagerStream && isTranscribing;
+  const canListenLive =
+    canListenLiveOverride ?? (!isPagerStream && isTranscribing);
   const statusLabel = isTranscribing
     ? "Live transcription"
     : "Transcription stopped";

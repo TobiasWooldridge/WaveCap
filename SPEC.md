@@ -39,6 +39,7 @@ transcribing multiple radio or pager feeds in real time.
 - Controls that trigger backend actions disable their buttons and show a spinner while the backend processes the request, preventing duplicate submissions.
 - Panels that may take time to populate display loading spinners until data arrives so operators understand the UI is still working.
 - Check aggregate counters for transcript volume, confidence, and recent activity.
+- Activate “Listen live” on any enabled audio stream to start a persistent live player. Playback continues while navigating other streams, surfaces a top-of-screen banner and header badge that name the current feed, and automatically switches over when you start listening to a different stream.
 - Receive real-time transcript bursts; contiguous speech is grouped for readability.
 - Pager feed messages that share an incident number and arrive within roughly a minute
   collapse into a single grouped thread, showing parsed incident details like the call

@@ -512,12 +512,24 @@ class StreamWorker:
     ) -> None:
         async with self._live_audio_lock:
             self._live_audio_listeners.add(listener)
+            listener_count = len(self._live_audio_listeners)
+        LOGGER.info(
+            "Live audio listener registered for stream %s (listeners=%d)",
+            self.stream.id,
+            listener_count,
+        )
 
     async def _unregister_live_audio_listener(
         self, listener: _LiveAudioListener
     ) -> None:
         async with self._live_audio_lock:
             self._live_audio_listeners.discard(listener)
+            listener_count = len(self._live_audio_listeners)
+        LOGGER.info(
+            "Live audio listener removed for stream %s (listeners=%d)",
+            self.stream.id,
+            listener_count,
+        )
 
     async def _broadcast_live_audio(self, pcm_bytes: bytes) -> None:
         if not pcm_bytes:
@@ -526,6 +538,12 @@ class StreamWorker:
             listeners = tuple(self._live_audio_listeners)
         if not listeners:
             return
+        LOGGER.debug(
+            "Broadcasting %d bytes of live audio for stream %s to %d listener(s)",
+            len(pcm_bytes),
+            self.stream.id,
+            len(listeners),
+        )
         for listener in listeners:
             listener.feed(pcm_bytes)
 
@@ -533,6 +551,12 @@ class StreamWorker:
         async with self._live_audio_lock:
             listeners = tuple(self._live_audio_listeners)
             self._live_audio_listeners.clear()
+        if listeners:
+            LOGGER.info(
+                "Shutting down %d live audio listener(s) for stream %s",
+                len(listeners),
+                self.stream.id,
+            )
         for listener in listeners:
             listener.close()
 

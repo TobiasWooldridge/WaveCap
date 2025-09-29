@@ -19,7 +19,9 @@
     "src/utils/unreadStorage.test.ts",
     "src/hooks/useTranscriptions.ts",
     "src/hooks/useTranscriptions.test.ts",
-    "src/types/**/*.ts"
+    "src/components/LiveAudioBanner.test.tsx",
+    "src/types/**/*.ts",
+    "src/types/**/*.d.ts"
   ],
   "exclude": ["node_modules", "dist", "dist-tests"]
 }
