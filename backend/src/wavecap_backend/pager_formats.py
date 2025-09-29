@@ -308,21 +308,9 @@ def _parse_cfs_flex_raw_message(raw_message: str) -> dict[str, Any]:
     if narrative_match:
         parsed["narrative"] = narrative_match.group(1).strip()
 
-    # Units may be embedded between colons ": LCH14A SHM03 ... :" or as "Units: ..."
-    units_match = re.search(
-        r":\s*([A-Z]{2,}[A-Z0-9]*(?:[\s,\-/]+[A-Z]{2,}[A-Z0-9]*)*)\s*:",
-        message_body,
-    )
-    if units_match:
-        parsed["units"] = " ".join(units_match.group(1).split())
-    else:
-        units_label_match = re.search(
-            r"UNITS?\s*[:=]\s*([A-Z]{2,}[A-Z0-9]*(?:[\s,\-/]+[A-Z]{2,}[A-Z0-9]*)*)",
-            message_body,
-            flags=re.IGNORECASE,
-        )
-        if units_label_match:
-            parsed["units"] = " ".join(units_label_match.group(1).split())
+    units_value = _extract_units_from_message(message_body)
+    if units_value:
+        parsed["units"] = units_value
 
     # Heuristic: attempt to capture priority tokens like "Priority: MAJOR"
     priority_match = re.search(
@@ -361,6 +349,92 @@ def _extract_address(remainder: str) -> str:
             break
         collected.append(stripped)
     return ", ".join(collected)
+
+
+_LOCATION_STOPWORDS = {
+    "AVE",
+    "AVENUE",
+    "CCT",
+    "CLOSE",
+    "CL",
+    "COURT",
+    "CT",
+    "CRES",
+    "CRESCENT",
+    "DR",
+    "DRIVE",
+    "EAST",
+    "FWY",
+    "HIGHWAY",
+    "HWY",
+    "LANE",
+    "LN",
+    "MAP",
+    "NEAR",
+    "NORTH",
+    "NTHBOUND",
+    "PARADE",
+    "PDE",
+    "PLACE",
+    "PL",
+    "ROAD",
+    "RD",
+    "SOUTH",
+    "ST",
+    "STHBOUND",
+    "STREET",
+    "TERRACE",
+    "TCE",
+    "WAY",
+    "WEST",
+}
+
+
+def _extract_units_from_message(message_body: str) -> str:
+    colon_pattern = re.compile(
+        r":\s*([A-Z]{2,}[A-Z0-9_]*(?:[\s,\-/]+[A-Z]{2,}[A-Z0-9_]*)*)\s*:"
+    )
+    candidates = [
+        " ".join(match.group(1).split())
+        for match in colon_pattern.finditer(message_body)
+    ]
+    for candidate in reversed(candidates):
+        if _looks_like_units(candidate):
+            return candidate
+
+    units_label_match = re.search(
+        r"UNITS?\s*[:=]\s*([A-Z]{2,}[A-Z0-9_]*(?:[\s,\-/]+[A-Z]{2,}[A-Z0-9_]*)*)",
+        message_body,
+        flags=re.IGNORECASE,
+    )
+    if units_label_match:
+        candidate = " ".join(units_label_match.group(1).split())
+        if _looks_like_units(candidate):
+            return candidate
+
+    return ""
+
+
+def _looks_like_units(candidate: str) -> bool:
+    tokens = [
+        token
+        for token in re.split(r"[\s,\-/]+", candidate.strip())
+        if token
+    ]
+    if not tokens:
+        return False
+
+    has_identifier = any(
+        any(ch.isdigit() for ch in token) or "_" in token for token in tokens
+    )
+    if not has_identifier:
+        return False
+
+    upper_tokens = [token.upper() for token in tokens]
+    if any(token in _LOCATION_STOPWORDS for token in upper_tokens):
+        return False
+
+    return True
 
 
 __all__ = ["PagerWebhookFormat", "parse_pager_webhook_payload"]
