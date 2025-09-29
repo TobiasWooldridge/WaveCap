@@ -8,6 +8,7 @@ from wavecap_backend.sdr import (
     _AMDemodDecimator,
     _ChannelDemod,
     _FMDemodDecimator,
+    _candidate_sample_rates,
     SdrManager,
 )
 
@@ -88,3 +89,26 @@ async def test_manager_status_reports_configured_devices() -> None:
     device = status["configuredDevices"][0]
     assert device["deviceId"] == "dev1"
     assert device["gainMode"] == "manual"
+
+
+def test_candidate_sample_rates_prioritises_supported_values() -> None:
+    requested = 240000
+    audio_rate = 16000
+    supported = [2_000_000, 2048000, 4800000]
+    attempts = _candidate_sample_rates(requested, audio_rate, supported)
+    assert attempts[0] == requested
+    assert 2_000_000 in attempts
+    # Supported values should appear before heuristics such as 2,000,000 (125×)
+    first_supported_index = attempts.index(2_000_000)
+    requested_index = attempts.index(requested)
+    assert first_supported_index > requested_index
+    # Heuristic 2,000,000 should not be duplicated
+    assert attempts.count(2_000_000) == 1
+
+
+def test_candidate_sample_rates_includes_heuristics_when_no_supported() -> None:
+    requested = 0
+    audio_rate = 16000
+    attempts = _candidate_sample_rates(requested, audio_rate, supported=[])
+    assert attempts[0] == audio_rate * 125
+    assert audio_rate in attempts

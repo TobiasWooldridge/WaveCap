@@ -14,7 +14,7 @@ import math
 import threading
 import time
 from dataclasses import dataclass
-from typing import Dict, Optional, Tuple, Any
+from typing import Dict, Optional, Tuple, Any, Sequence
 
 import numpy as np
 
@@ -46,6 +46,41 @@ _DEFAULT_SQUELCH_DBFS = {
     "wfm": -68.0,
     "am": -72.0,
 }
+
+
+def _candidate_sample_rates(
+    requested_rate: int, audio_rate: int, supported: Sequence[int]
+) -> list[int]:
+    """Generate a prioritised list of SDR sample-rate attempts.
+
+    The sequence always begins with the requested rate (when valid), followed by
+    supported values ordered by proximity, and finally heuristic fallbacks that
+    are known to work with common devices such as the RSP family.
+    """
+
+    attempts: list[int] = []
+
+    def _add(rate: int) -> None:
+        if rate <= 0:
+            return
+        if rate not in attempts:
+            attempts.append(int(rate))
+
+    if requested_rate > 0:
+        _add(int(requested_rate))
+
+    for rate in sorted({int(r) for r in supported if int(r) > 0}, key=lambda v: (abs(v - requested_rate), v)):
+        _add(rate)
+
+    heuristic_multipliers = (125, 96, 64, 48, 32)
+    for multiplier in heuristic_multipliers:
+        heuristic_rate = audio_rate * multiplier
+        if heuristic_rate >= audio_rate:
+            _add(heuristic_rate)
+
+    _add(audio_rate)
+
+    return attempts
 
 
 def _design_lowpass_fir(taps: int, cutoff_norm: float) -> np.ndarray:
@@ -609,7 +644,15 @@ class _DeviceWorker:
     def _init_device(self) -> None:
         assert SoapySDR is not None  # noqa: S101
         self._dev = SoapySDR.Device(self.soapy_args)
-        self._dev.setSampleRate(SOAPY_SDR_RX, 0, self.sample_rate_hz)
+        configured_rate = self._configure_sample_rate()
+        if configured_rate != self.sample_rate_hz:
+            LOGGER.warning(
+                "SDR %s adjusted sample rate from %d Hz to %d Hz",
+                self.device_id,
+                self.sample_rate_hz,
+                configured_rate,
+            )
+        self.sample_rate_hz = configured_rate
         if self.ppm_correction is not None:
             try:
                 self._dev.setFrequencyCorrection(SOAPY_SDR_RX, 0, float(self.ppm_correction))
@@ -695,6 +738,74 @@ class _DeviceWorker:
         for chan in self._channels.values():
             chan.update_offset(float(chan._abs_freq) - tuned)  # noqa: SLF001
         return tuned
+
+    def _configure_sample_rate(self) -> int:
+        assert self._dev is not None  # noqa: S101
+        attempts = _candidate_sample_rates(
+            self.sample_rate_hz,
+            self.audio_sample_rate,
+            self._gather_supported_sample_rates(),
+        )
+        for candidate in attempts:
+            actual = self._apply_sample_rate(candidate)
+            if self._sample_rate_is_valid(actual):
+                return actual
+        LOGGER.error(
+            "SDR %s failed to accept any sample rate; falling back to %d Hz",
+            self.device_id,
+            self.audio_sample_rate,
+        )
+        return self.audio_sample_rate
+
+    def _sample_rate_is_valid(self, rate: int) -> bool:
+        if rate <= 0:
+            return False
+        return rate % self.audio_sample_rate == 0
+
+    def _apply_sample_rate(self, rate: int) -> int:
+        assert self._dev is not None  # noqa: S101
+        if rate <= 0:
+            return 0
+        try:
+            self._dev.setSampleRate(SOAPY_SDR_RX, 0, float(rate))
+        except Exception as exc:  # pragma: no cover - hardware specific
+            LOGGER.debug(
+                "SDR %s rejected sample rate %d Hz: %s",
+                self.device_id,
+                rate,
+                exc,
+            )
+        actual = rate
+        try:
+            actual = self._dev.getSampleRate(SOAPY_SDR_RX, 0)
+        except Exception as exc:  # pragma: no cover - hardware specific
+            LOGGER.debug(
+                "SDR %s could not report current sample rate: %s",
+                self.device_id,
+                exc,
+            )
+        try:
+            return int(round(float(actual)))
+        except (TypeError, ValueError):  # pragma: no cover - defensive
+            return 0
+
+    def _gather_supported_sample_rates(self) -> list[int]:
+        assert self._dev is not None  # noqa: S101
+        candidates: list[int] = []
+        list_rates: Sequence[Any] = []
+        if hasattr(self._dev, "listSampleRates"):
+            try:
+                list_rates = self._dev.listSampleRates(SOAPY_SDR_RX, 0)
+            except Exception:  # pragma: no cover - hardware specific
+                list_rates = []
+        for value in list_rates:
+            try:
+                rate = int(round(float(value)))
+            except (TypeError, ValueError):
+                continue
+            if rate > 0:
+                candidates.append(rate)
+        return sorted(set(candidates))
 
     def _reader_loop(self) -> None:
         assert self._dev is not None and self._stream is not None
