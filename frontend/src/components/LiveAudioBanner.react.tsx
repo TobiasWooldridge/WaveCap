@@ -4,7 +4,6 @@ import { useSearchParams } from "react-router-dom";
 import Button from "./primitives/Button.react";
 import { useLiveAudioSession } from "../contexts/LiveAudioContext";
 import { STREAM_QUERY_PARAM } from "../hooks/useStreamSelection";
-import InlineText from "./primitives/InlineText.react";
 
 if (typeof window !== "undefined") {
   void import("./LiveAudioBanner.scss");
@@ -35,7 +34,7 @@ const LiveAudioBanner = () => {
     <div className="live-audio-banner" role="status" aria-live="polite">
       <div className="live-audio-banner__container app-container">
         <div className="live-audio-banner__content">
-          <InlineText as="div" gap={2} className="live-audio-banner__info">
+          <div className="live-audio-banner__info">
             {showError ? (
               <AlertTriangle className="live-audio-banner__icon live-audio-banner__icon--error" size={18} />
             ) : (
@@ -50,7 +49,7 @@ const LiveAudioBanner = () => {
             >
               {label}
             </button>
-          </InlineText>
+          </div>
 
           <div className="live-audio-banner__actions">
             {showError ? (

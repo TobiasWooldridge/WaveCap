@@ -55,11 +55,12 @@ const AppHeader = ({
               gap={{ base: 2, sm: 3 }}
             >
               {!isReadOnly ? (
-                <Flex
-                  className="form-check form-check-inline m-0 ps-0 text-white"
-                  align="center"
-                  gap={2}
-                >
+              <Flex
+                className="form-check form-check-inline m-0 ps-0 text-white"
+                align="center"
+                gap={2}
+                wrap="nowrap"
+              >
                   <input
                     id="transcript-correction-mode"
                     type="checkbox"
@@ -80,11 +81,11 @@ const AppHeader = ({
               ) : null}
 
               {isMobileViewport ? (
-                <Button
-                  size="sm"
-                  use="light"
-                  appearance="outline"
-                  onClick={onOpenMobileSidebar}
+              <Button
+                size="sm"
+                use="light"
+                appearance="outline"
+                onClick={onOpenMobileSidebar}
                   aria-controls="app-stream-sidebar"
                   aria-expanded={isMobileSidebarOpen}
                   aria-label="Open stream menu"
@@ -117,22 +118,22 @@ const AppHeader = ({
                     label="Loading streams"
                   />
                 ) : isReadOnly ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    use="light"
-                    appearance="outline"
+                <Button
+                  type="button"
+                  size="sm"
+                  use="light"
+                  appearance="outline"
                     onClick={onRequestLogin}
                     startContent={<LogIn size={16} />}
                   >
                     <span>Sign in</span>
                   </Button>
                 ) : (
-                  <Button
-                    type="button"
-                    size="sm"
-                    use="light"
-                    appearance="outline"
+                <Button
+                  type="button"
+                  size="sm"
+                  use="light"
+                  appearance="outline"
                     onClick={() => {
                       void onLogout();
                     }}

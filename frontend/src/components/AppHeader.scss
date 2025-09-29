@@ -64,24 +64,40 @@
   justify-content: space-between;
   gap: clamp(1rem, 3vw, 2.5rem);
   width: 100%;
+  flex-wrap: nowrap;
 }
 
 .app-header__branding {
   display: flex;
   align-items: center;
   gap: clamp(0.65rem, 2vw, 1rem);
+  flex-shrink: 0;
+}
+
+.app-header__controls {
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: clamp(0.5rem, 1.5vw, 1rem);
 }
 
 @media (max-width: 767.98px) {
-  .app-header__layout {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 1.25rem;
-  }
-
   .app-header__container {
     padding-top: 0.85rem;
     padding-bottom: 0.85rem;
+  }
+
+  .app-header__layout {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .app-header__branding {
+    justify-content: center;
+  }
+
+  .app-header__controls {
+    justify-content: center;
+    text-align: center;
   }
 }
 
