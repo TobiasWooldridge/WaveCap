@@ -1,0 +1,101 @@
+.live-audio-banner {
+  position: relative;
+  background: linear-gradient(
+      120deg,
+      rgba(255, 193, 7, 0.15) 0%,
+      rgba(255, 87, 34, 0.15) 100%
+    ),
+    var(--bs-body-bg);
+  border-bottom: 1px solid rgba(255, 193, 7, 0.35);
+  color: var(--bs-body-color);
+}
+
+.live-audio-banner__container {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.live-audio-banner__content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.live-audio-banner__info {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-weight: 600;
+}
+
+.live-audio-banner__label {
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  color: var(--bs-warning-text-emphasis, #7c5300);
+}
+
+.live-audio-banner__stream {
+  font-size: 0.95rem;
+  max-width: clamp(8rem, 32vw, 18rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-audio-banner__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.125rem;
+  border-radius: 999px;
+  color: inherit;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.live-audio-banner__link:hover,
+.live-audio-banner__link:focus {
+  background: rgba(0, 0, 0, 0.08);
+  color: inherit;
+  outline: none;
+}
+
+.live-audio-banner__link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.live-audio-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.live-audio-banner__error {
+  font-size: 0.825rem;
+  color: var(--bs-danger-text-emphasis);
+  max-width: clamp(12rem, 40vw, 24rem);
+}
+
+.live-audio-banner__icon {
+  color: var(--bs-warning-text-emphasis, #7c5300);
+}
+
+.live-audio-banner__icon--error {
+  color: var(--bs-danger-text-emphasis);
+}
+
+@media (max-width: 767.98px) {
+  .live-audio-banner__content {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .live-audio-banner__actions {
+    justify-content: space-between;
+  }
+}
