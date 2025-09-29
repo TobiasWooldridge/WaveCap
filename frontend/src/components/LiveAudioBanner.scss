@@ -23,10 +23,8 @@
 }
 
 .live-audio-banner__info {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
   font-weight: 600;
+  gap: 0.75rem;
 }
 
 .live-audio-banner__label {
@@ -37,33 +35,25 @@
 }
 
 .live-audio-banner__stream {
-  font-size: 0.95rem;
   max-width: clamp(8rem, 32vw, 18rem);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.live-audio-banner__link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.125rem;
-  border-radius: 999px;
-  color: inherit;
   border: 0;
   background: transparent;
-  cursor: pointer;
-}
-
-.live-audio-banner__link:hover,
-.live-audio-banner__link:focus {
-  background: rgba(0, 0, 0, 0.08);
   color: inherit;
-  outline: none;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
 }
 
-.live-audio-banner__link:focus-visible {
+.live-audio-banner__stream:hover,
+.live-audio-banner__stream:focus {
+  text-decoration: underline;
+}
+
+.live-audio-banner__stream:focus-visible {
   outline: 2px solid currentColor;
   outline-offset: 2px;
 }

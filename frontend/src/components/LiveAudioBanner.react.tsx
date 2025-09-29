@@ -1,9 +1,10 @@
 import { useCallback } from "react";
-import { AlertTriangle, ExternalLink, Volume2, X } from "lucide-react";
+import { AlertTriangle, Volume2, X } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import Button from "./primitives/Button.react";
 import { useLiveAudioSession } from "../contexts/LiveAudioContext";
 import { STREAM_QUERY_PARAM } from "../hooks/useStreamSelection";
+import InlineText from "./primitives/InlineText.react";
 
 if (typeof window !== "undefined") {
   void import("./LiveAudioBanner.scss");
@@ -34,26 +35,22 @@ const LiveAudioBanner = () => {
     <div className="live-audio-banner" role="status" aria-live="polite">
       <div className="live-audio-banner__container app-container">
         <div className="live-audio-banner__content">
-          <div className="live-audio-banner__info">
+          <InlineText as="div" gap={2} className="live-audio-banner__info">
             {showError ? (
               <AlertTriangle className="live-audio-banner__icon live-audio-banner__icon--error" size={18} />
             ) : (
               <Volume2 className="live-audio-banner__icon" size={18} />
             )}
             <span className="live-audio-banner__label">Listening to</span>
-            <span className="live-audio-banner__stream" title={label}>
-              {label}
-            </span>
             <button
               type="button"
-              className="live-audio-banner__link"
+              className="live-audio-banner__stream"
               onClick={handleFocusStream}
               title={`View ${label}`}
-              aria-label={`View ${label}`}
             >
-              <ExternalLink size={16} aria-hidden="true" />
+              {label}
             </button>
-          </div>
+          </InlineText>
 
           <div className="live-audio-banner__actions">
             {showError ? (
