@@ -59,6 +59,16 @@ body {
   margin: 0;
 }
 
+.bg-body-secondary {
+  background-color: rgb(235, 245, 255) !important;
+  color: var(--bs-body-color) !important;
+}
+
+:root[data-bs-theme='dark'] .bg-body-secondary {
+  background-color: rgb(36, 43, 58) !important;
+  color: var(--bs-body-color) !important;
+}
+
 body, html {
   min-height: 100%;
 }

@@ -16,8 +16,8 @@
 }
 
 .app-main {
-  --app-main-padding-block-start: 2rem;
-  --app-main-padding-block-end: 2.5rem;
+  --app-main-padding-block-start: 0;
+  --app-main-padding-block-end: 0;
   flex: 1;
   display: flex;
   padding: var(--app-main-padding-block-start) 0
@@ -31,7 +31,7 @@
   display: flex;
   flex: 1;
   width: 100%;
-  gap: 1.5rem;
+  gap: 1rem;
   min-height: 0;
   height: 100%;
   box-sizing: border-box;
@@ -282,8 +282,8 @@
 
   .app-main {
     overflow: auto;
-    --app-main-padding-block-start: 0.75rem;
-    --app-main-padding-block-end: 1.5rem;
+    --app-main-padding-block-start: 0;
+    --app-main-padding-block-end: 1rem;
     padding: var(--app-main-padding-block-start) 0
       var(--app-main-padding-block-end);
   }
