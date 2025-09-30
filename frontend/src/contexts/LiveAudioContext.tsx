@@ -1,6 +1,15 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { ReactNode } from "react";
 import { useLiveAudio } from "../hooks/useLiveAudio";
+import { createFaviconState } from "../utils/faviconState";
 
 export interface LiveAudioStreamDescriptor {
   id: string;
@@ -39,6 +48,21 @@ export const LiveAudioProvider = ({ children }: LiveAudioProviderProps) => {
   const [pendingAction, setPendingAction] = useState<"start" | "stop" | null>(null);
 
   const liveAudio = useLiveAudio(Boolean(activeStream?.canListen), activeStream?.baseUrl ?? "");
+  const faviconStateRef = useRef(createFaviconState());
+
+  useEffect(() => {
+    const faviconState = faviconStateRef.current;
+
+    if (liveAudio.isListening) {
+      faviconState.set("/favicon-live.svg");
+    } else {
+      faviconState.reset();
+    }
+
+    return () => {
+      faviconState.reset();
+    };
+  }, [liveAudio.isListening]);
 
   useEffect(() => {
     if (!pendingAction) {
