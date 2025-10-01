@@ -1048,6 +1048,16 @@ class StreamWorker:
                     recording_file = await self._write_recording(record_samples)
             else:
                 recording_file = await self._write_recording(record_samples)
+        # If we excluded the prefix from the saved file, shift segment timings
+        # to be relative to the file start so UI playback aligns without a
+        # recordingStartOffset.
+        if start_offset_seconds and segments:
+            for segment in segments:
+                new_start = max(0.0, segment.start - start_offset_seconds)
+                new_end = max(new_start, segment.end - start_offset_seconds)
+                segment.start = new_start
+                segment.end = new_end
+
         duration = float(
             effective_duration
             if effective_duration > 0
@@ -1341,11 +1351,15 @@ class StreamWorker:
         first_active = int(active_indices[0])
         if first_active <= 0:
             return samples, 0
-        # If there is a carried prefix, never trim beyond it; otherwise (no
-        # prefix), allow trimming pure leading silence up to the first active
-        # sample.
+        # If there is a carried prefix, allow trimming into the silent region
+        # up to the first active sample while retaining a short leading gap to
+        # preserve cadence between adjacent recordings.
+        # Keep at most ~2 seconds when a prefix exists, otherwise (no prefix)
+        # remove all pure leading silence up to the first active sample.
         if int(prefix_samples) > 0:
-            trim_index = min(first_active, int(prefix_samples))
+            keep_seconds = 2.0
+            keep_limit = min(int(prefix_samples), int(round(keep_seconds * self.sample_rate)))
+            trim_index = max(0, first_active - keep_limit)
         else:
             trim_index = first_active
         if trim_index <= 0:
