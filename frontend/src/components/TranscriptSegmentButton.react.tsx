@@ -166,7 +166,7 @@ interface TranscriptSegmentContentProps {
   startTime: number;
   endTime: number;
   duration: number;
-  text: string;
+  text: ReactNode;
   showTime: boolean;
   trailingAction?: ReactNode;
 }
@@ -229,6 +229,13 @@ export const TranscriptSegmentListItem = ({
   const segmentDuration = Math.max(0, segmentEnd - segmentStart);
   const hasRecording = Boolean(recordingUrl);
 
+  // Render placeholder (silence/blank) segments in italics.
+  const isNoTranscription =
+    segment.id === -1 &&
+    typeof segment.text === "string" &&
+    segment.text.trim().toLowerCase() === "no transcription";
+  const renderedText = isNoTranscription ? <em>No transcription</em> : segment.text;
+
   const handleClick = () => {
     if (hasRecording && recordingUrl) {
       onPlay(recordingUrl, segment.start, segment.end, transcriptionId, {
@@ -260,7 +267,7 @@ export const TranscriptSegmentListItem = ({
         startTime={segmentStart}
         endTime={segmentEnd}
         duration={segmentDuration}
-        text={segment.text}
+        text={renderedText}
         showTime={hasRecording}
         trailingAction={trailingAction}
       />

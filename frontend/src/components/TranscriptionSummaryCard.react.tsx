@@ -189,7 +189,7 @@ export const TranscriptionSummaryCard: React.FC<
     };
 
     const handleError = () => {
-      setPlaybackError("Unable to play silence clip");
+      setPlaybackError("Unable to play clip");
       setIsPlaying(false);
     };
 
@@ -273,16 +273,16 @@ export const TranscriptionSummaryCard: React.FC<
       }
       setIsPlaying(true);
     } catch (error) {
-      console.error("Error playing silence clip", error);
-      setPlaybackError("Unable to play silence clip");
+      console.error("Error playing clip", error);
+      setPlaybackError("Unable to play clip");
     } finally {
       setIsLoadingPlayback(false);
     }
   }, [hasSilenceRecording]);
 
   const silencePlaybackLabel = isPlaying
-    ? "Stop silence clip"
-    : `Play silence clip${silenceDurationSeconds > 0 ? ` (${formatDurationLabel(silenceDurationSeconds)})` : ""}`;
+    ? "Stop clip"
+    : `Play clip${silenceDurationSeconds > 0 ? ` (${formatDurationLabel(silenceDurationSeconds)})` : ""}`;
 
   return (
     <div
@@ -351,7 +351,7 @@ export const TranscriptionSummaryCard: React.FC<
           <Flex align="center" gap={3} wrap="wrap">
             <Flex align="center" gap={2} className="text-body-secondary small fst-italic">
               <VolumeX size={16} className="text-body-tertiary" />
-              <span>No speech detected</span>
+              <span><em>No transcription</em></span>
             </Flex>
             {hasSilenceRecording ? (
               <Button

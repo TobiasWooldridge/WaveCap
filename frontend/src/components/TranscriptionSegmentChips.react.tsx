@@ -250,7 +250,7 @@ const SilenceSegmentChip = ({
   const { start, end } = getBlankAudioSegmentBounds(transcription);
   const segment: TranscriptionSegmentData = {
     id: -1,
-    text: "Silence",
+    text: "No transcription",
     start,
     end,
     avg_logprob: Number.NaN,
@@ -275,21 +275,13 @@ const SilenceSegmentChip = ({
     );
   }
 
-  const silenceDuration = Math.max(0, end - start);
-  const formattedDuration =
-    silenceDuration >= 10
-      ? Math.round(silenceDuration).toString()
-      : silenceDuration.toFixed(1).replace(/\.0$/, "");
-  const label =
-    silenceDuration > 0 ? `${formattedDuration}s silence` : "Silence";
+  // Standardize UX label for silence/blank audio
+  const label = "No transcription";
 
   return (
-    <span
-      className="transcript-boundary transcript-silence-chip"
-      title="No speech detected"
-    >
+    <span className="transcript-boundary transcript-silence-chip" title="No transcription">
       <VolumeX size={14} className="transcript-silence-chip__icon text-neutral" />
-      <span>{label}</span>
+      <em>{label}</em>
     </span>
   );
 };
