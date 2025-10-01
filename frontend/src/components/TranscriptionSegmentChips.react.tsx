@@ -1,9 +1,10 @@
-import { useMemo, type ReactNode } from "react";
-import { VolumeX } from "lucide-react";
+import { useMemo, type MouseEvent, type ReactNode } from "react";
+import { Download, VolumeX } from "lucide-react";
 import {
   TranscriptionResult,
   TranscriptionSegment as TranscriptionSegmentData,
 } from "@types";
+import Button from "./primitives/Button.react";
 import {
   TranscriptBoundaryMarker,
   TranscriptSegmentListItem,
@@ -31,6 +32,118 @@ const buildSegmentIdentifier = (
   recordingId
     ? `${recordingId}-${segment.start}-${segment.end}`
     : `${transcriptionId}-${segment.start}-${segment.end}`;
+
+const DEFAULT_DOWNLOAD_EXTENSION = "wav";
+
+const sanitizeFilenameFragment = (value: string): string =>
+  value
+    .trim()
+    .replace(/[^a-zA-Z0-9-_]+/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-|-$/g, "")
+    .toLowerCase();
+
+const extractFilenameFromUrl = (recordingUrl: string): string | null => {
+  if (!recordingUrl) {
+    return null;
+  }
+
+  try {
+    const parsedUrl = new URL(recordingUrl);
+    const pathname = parsedUrl.pathname;
+    const segments = pathname.split("/").filter(Boolean);
+    const candidate = segments.pop();
+    if (candidate) {
+      return candidate;
+    }
+  } catch {
+    // Fall back to manual parsing for non-standard URLs
+    const withoutQuery = recordingUrl.split("?")[0]?.split("#")[0] ?? recordingUrl;
+    const segments = withoutQuery.split("/").filter(Boolean);
+    const candidate = segments.pop();
+    if (candidate) {
+      return candidate;
+    }
+  }
+
+  return null;
+};
+
+const deriveDownloadFilename = (
+  recordingUrl: string,
+  transcriptionId: string,
+): string => {
+  const candidate = extractFilenameFromUrl(recordingUrl)?.trim();
+  if (candidate) {
+    const hasExtension = /\.[a-zA-Z0-9]+$/.test(candidate);
+    return hasExtension ? candidate : `${candidate}.${DEFAULT_DOWNLOAD_EXTENSION}`;
+  }
+
+  const sanitizedId = sanitizeFilenameFragment(transcriptionId) || "transcription";
+  return `${sanitizedId}.${DEFAULT_DOWNLOAD_EXTENSION}`;
+};
+
+const formatTimeLabel = (seconds: number): string => {
+  if (!Number.isFinite(seconds)) {
+    return "0:00";
+  }
+
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(safeSeconds / 3600);
+  const mins = Math.floor((safeSeconds % 3600) / 60);
+  const secs = safeSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  }
+
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+};
+
+interface RecordingDownloadButtonProps {
+  recordingUrl: string;
+  transcriptionId: string;
+  label: string;
+}
+
+const RecordingDownloadButton = ({
+  recordingUrl,
+  transcriptionId,
+  label,
+}: RecordingDownloadButtonProps) => {
+  const handleDownload = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    event.preventDefault();
+
+    if (!recordingUrl) {
+      return;
+    }
+
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    const link = document.createElement("a");
+    link.href = recordingUrl;
+    link.rel = "noopener";
+    link.download = deriveDownloadFilename(recordingUrl, transcriptionId);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <Button
+      use="unstyled"
+      className="transcript-segment__download-button"
+      onClick={handleDownload}
+      startContent={<Download size={20} aria-hidden="true" />}
+      isCondensed
+    >
+      {label}
+    </Button>
+  );
+};
 
 interface SegmentPlaybackChipProps {
   transcription: TranscriptionResult;
@@ -62,23 +175,53 @@ const SegmentPlaybackChip = ({
     transcription.id,
     segment,
   );
-  const hasRecording = Boolean(recordingUrl);
+  const normalizedRecordingUrl = recordingUrl?.trim() ?? null;
+  const hasRecording = Boolean(normalizedRecordingUrl);
   const isPlaying = Boolean(
     (recordingId && playingSegmentId === segmentIdentifier) ||
       (hasRecording &&
-        recordingUrl &&
-        isSegmentCurrentlyPlaying(recordingUrl, segment.start, segment.end)),
+        normalizedRecordingUrl &&
+        isSegmentCurrentlyPlaying(
+          normalizedRecordingUrl,
+          segment.start,
+          segment.end,
+        )),
   );
+  const segmentStart = Math.max(
+    0,
+    typeof displayOffsetSeconds === "number" &&
+      Number.isFinite(displayOffsetSeconds)
+      ? displayOffsetSeconds
+      : segment.start,
+  );
+  const segmentEnd = Math.max(segmentStart, segment.end ?? segment.start);
+  const segmentDuration = Math.max(0, segmentEnd - segmentStart);
+
+  const trailingAction =
+    hasRecording && normalizedRecordingUrl
+      ? (
+          <RecordingDownloadButton
+            recordingUrl={normalizedRecordingUrl}
+            transcriptionId={transcription.id}
+            label={
+              segmentDuration
+                ? `Download audio from ${formatTimeLabel(segmentStart)} to ${formatTimeLabel(segmentEnd)}`
+                : `Download audio at ${formatTimeLabel(segmentStart)}`
+            }
+          />
+        )
+      : null;
 
   return (
     <TranscriptSegmentListItem
       segment={segment}
-      recordingUrl={recordingUrl ?? undefined}
+      recordingUrl={normalizedRecordingUrl ?? undefined}
       transcriptionId={transcription.id}
       isPlaying={isPlaying}
       onPlay={onPlay}
       displayOffsetSeconds={displayOffsetSeconds}
       recordingStartOffset={transcription.recordingStartOffset}
+      trailingAction={trailingAction ?? undefined}
     />
   );
 };

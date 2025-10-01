@@ -28,6 +28,7 @@ interface TranscriptSegmentListItemProps {
   ) => void;
   displayOffsetSeconds?: number;
   recordingStartOffset?: number;
+  trailingAction?: ReactNode;
 }
 
 type SegmentData = TranscriptSegmentListItemProps["segment"];
@@ -120,15 +121,11 @@ const TranscriptSegmentPlaybackButton = ({
     disabled && "transcript-segment--static",
   );
 
-  if (disabled) {
-    return (
-      <div className={segmentClassName} aria-disabled="true" title={tooltip}>
-        {children}
-      </div>
-    );
-  }
-
-  return (
+  const core = disabled ? (
+    <div className={segmentClassName} aria-disabled="true" title={tooltip}>
+      {children}
+    </div>
+  ) : (
     <Button
       use="unstyled"
       onClick={onClick}
@@ -138,6 +135,7 @@ const TranscriptSegmentPlaybackButton = ({
       {children}
     </Button>
   );
+  return core;
 };
 
 interface TranscriptSegmentTimeRangeProps {
@@ -170,6 +168,7 @@ interface TranscriptSegmentContentProps {
   duration: number;
   text: string;
   showTime: boolean;
+  trailingAction?: ReactNode;
 }
 
 const TranscriptSegmentContent = ({
@@ -178,6 +177,7 @@ const TranscriptSegmentContent = ({
   duration,
   text,
   showTime,
+  trailingAction,
 }: TranscriptSegmentContentProps) => (
   <TranscriptSegmentText>
     {showTime ? (
@@ -191,6 +191,9 @@ const TranscriptSegmentContent = ({
       </>
     ) : null}
     {text}
+    {trailingAction ? (
+      <span className="transcript-segment__inline-action">{trailingAction}</span>
+    ) : null}
   </TranscriptSegmentText>
 );
 
@@ -202,6 +205,7 @@ export const TranscriptSegmentListItem = ({
   onPlay,
   displayOffsetSeconds,
   recordingStartOffset,
+  trailingAction,
 }: TranscriptSegmentListItemProps) => {
   const { colorCodingEnabled } = useUISettings();
   const segmentConfidence = useMemo(
@@ -258,6 +262,7 @@ export const TranscriptSegmentListItem = ({
         duration={segmentDuration}
         text={segment.text}
         showTime={hasRecording}
+        trailingAction={trailingAction}
       />
     </TranscriptSegmentPlaybackButton>
   );
