@@ -142,3 +142,13 @@ transcribing multiple radio or pager feeds in real time.
 - UI controls for server connection settings, stream ordering, and default languages.
 - Alert rules for specified words or low-confidence results, delivered as sounds or browser notifications.
 - Decouple the transcription workers from the UI/API service so each can scale independently for heavier ingest loads and large numbers of simultaneous viewers; the dedicated executor makes this a drop-in swap for a remote service.
+
+## Recording & Trimming Guarantees
+- Trim leading silence only within the carried-over prefix context; never trim into the new body audio so the start of speech is not clipped.
+- Preserve audio even when transcription yields no text: emit an “[unable to transcribe]” result and still save the audio when it carries energy (don’t drop potentially useful recordings).
+- Save non-overlapping WAV files. Prefix context is excluded from files, so each recording contains a unique, contiguous segment.
+- Do not aggressively prune brief inter-segment gaps. Short pauses (a few seconds) between recordings are left intact to keep natural cadence.
+- Apply Broadcastify pre-roll skipping automatically (default 30 s) only to the live ingest window; it does not remove speech content.
+- Use amplitude + active-ratio lookback to detect silence; thresholds are configurable via `whisper.silenceThreshold`, `silenceLookbackSeconds`, `silenceHoldSeconds`, and `activeSamplesInLookbackPct`.
+- Keep chunk sizes within `chunkLength`/`minChunkDurationSeconds` and carry `contextSeconds` as prefix for transcription continuity without affecting saved file boundaries.
+- Recordings include front-end friendly metadata (URL, optional `recordingStartOffset`), but when prefix is excluded the offset is omitted and playback starts at 0.

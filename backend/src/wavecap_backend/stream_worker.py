@@ -1002,7 +1002,12 @@ class StreamWorker:
                 text = UNABLE_TO_TRANSCRIBE_TOKEN
                 segments = []
 
-        trimmed_samples, trimmed_count = self._trim_leading_silence(chunk.samples)
+        # Leading-silence trimming is intentionally constrained to the carried
+        # prefix context only. The high-level algorithm and rationale are
+        # outlined in SPEC.md (Recording & Trimming Guarantees).
+        trimmed_samples, trimmed_count = self._trim_leading_silence(
+            chunk.samples, prefix_samples
+        )
         if trimmed_count > 0:
             trimmed_seconds = trimmed_count / self.sample_rate
             start_offset_seconds = max(start_offset_seconds - trimmed_seconds, 0.0)
@@ -1029,24 +1034,27 @@ class StreamWorker:
         )
 
         recording_file: Optional[Path] = None
-        samples_to_write = trimmed_samples if trimmed_samples.size > 0 else chunk.samples
-        if samples_to_write.size > 0:
+        # Ensure saved WAVs do not overlap: exclude any remaining prefix from file
+        record_start_index = int(trimmed_prefix_samples)
+        record_samples = (
+            trimmed_samples[record_start_index:]
+            if trimmed_samples.size > record_start_index
+            else np.empty(0, dtype=np.float32)
+        )
+        if record_samples.size > 0:
             if text == BLANK_AUDIO_TOKEN:
-                peak = float(np.max(np.abs(samples_to_write))) if samples_to_write.size else 0.0
+                peak = float(np.max(np.abs(record_samples))) if record_samples.size else 0.0
                 if peak > 0.0:
-                    recording_file = await self._write_recording(samples_to_write)
+                    recording_file = await self._write_recording(record_samples)
             else:
-                recording_file = await self._write_recording(samples_to_write)
+                recording_file = await self._write_recording(record_samples)
         duration = float(
             effective_duration
             if effective_duration > 0
             else trimmed_samples.size / self.sample_rate
         )
-        recording_start_offset = (
-            start_offset_seconds
-            if recording_file is not None and start_offset_seconds > 0
-            else None
-        )
+        # Since we excluded prefix from the saved file, its local offset is 0
+        recording_start_offset = None
 
         transcription = TranscriptionResult(
             id=str(uuid.uuid4()),
@@ -1312,7 +1320,17 @@ class StreamWorker:
         allowed = " .,!?:;'-\"()[]{}“”’…"
         return all(char in allowed for char in stripped)
 
-    def _trim_leading_silence(self, samples: np.ndarray) -> Tuple[np.ndarray, int]:
+    def _trim_leading_silence(
+        self, samples: np.ndarray, prefix_samples: int
+    ) -> Tuple[np.ndarray, int]:
+        """Trim leading silence, but never into the body region.
+
+        Only remove silence that falls within the carried-over prefix context;
+        do not trim into the new body audio. This prevents clipping the very
+        start of recordings when the first syllables begin softly.
+
+        Returns (trimmed_samples, trimmed_count).
+        """
         if samples.size == 0:
             return samples, 0
         if self._silence_threshold <= 0.0:
@@ -1320,7 +1338,16 @@ class StreamWorker:
         active_indices = np.flatnonzero(np.abs(samples) > self._silence_threshold)
         if active_indices.size == 0:
             return samples, 0
-        trim_index = int(active_indices[0])
+        first_active = int(active_indices[0])
+        if first_active <= 0:
+            return samples, 0
+        # If there is a carried prefix, never trim beyond it; otherwise (no
+        # prefix), allow trimming pure leading silence up to the first active
+        # sample.
+        if int(prefix_samples) > 0:
+            trim_index = min(first_active, int(prefix_samples))
+        else:
+            trim_index = first_active
         if trim_index <= 0:
             return samples, 0
         return samples[trim_index:].copy(), trim_index
