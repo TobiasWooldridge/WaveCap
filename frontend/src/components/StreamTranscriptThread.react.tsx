@@ -264,7 +264,7 @@ const StreamTranscriptThread: React.FC<StreamTranscriptThreadProps> = ({
       className="chip-button chip-button--accent"
     >
       {isGroupPlaying ? <Pause size={14} /> : <Play size={14} />}
-      {isGroupPlaying ? "Stop" : "Play all"}
+      {isGroupPlaying ? "Stop" : "Play"}
     </Button>
   ) : null;
 

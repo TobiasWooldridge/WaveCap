@@ -156,7 +156,7 @@ export const TranscriptMessageRow: React.FC<TranscriptMessageRowProps> = ({
         className="chip-button chip-button--accent"
       >
         {isRecordingActive ? <Pause size={14} /> : <Play size={14} />}
-        {isRecordingActive ? "Stop" : "Play all"}
+        {isRecordingActive ? "Stop" : "Play"}
       </Button>,
     );
   }
