@@ -98,7 +98,7 @@ const DEFAULT_ERROR_MESSAGES: Record<ClientCommandType, string> = {
   update_stream: "Unable to update stream. Please try again.",
 };
 
-const DEFAULT_DOCUMENT_TITLE = "WaveCap Transcription";
+const DEFAULT_DOCUMENT_TITLE = "WaveCap";
 const STREAM_SORT_STORAGE_KEY = "wavecap-stream-sort-mode";
 const STREAM_SORT_DEFAULT: StreamSortMode = "activity";
 
