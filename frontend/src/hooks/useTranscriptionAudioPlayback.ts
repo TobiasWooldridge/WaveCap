@@ -236,14 +236,25 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
         stopCurrentRecording();
       }
 
-      setAudioElementSource(audio, recordingUrl);
       const { start: playbackStart, end: playbackEnd } = computePlaybackRange(
         startTime ?? null,
         endTime ?? null,
         options?.recordingStartOffset ?? null,
       );
 
-      const segmentKey = `${recordingId}-${startTime ?? playbackStart}-${endTime ?? playbackEnd}`;
+      const normalizedStart = startTime ?? playbackStart;
+      const normalizedEnd = endTime ?? playbackEnd;
+      const segmentKey = `${recordingId}-${normalizedStart}-${normalizedEnd}`;
+
+      if (
+        playingRecordingRef.current === recordingId &&
+        playingSegmentRef.current === segmentKey
+      ) {
+        stopCurrentRecording();
+        return;
+      }
+
+      setAudioElementSource(audio, recordingUrl);
 
       setPlaybackQueue(null);
       setPlayingRecording(recordingId);
