@@ -773,6 +773,38 @@
   text-overflow: ellipsis;
 }
 
+/* Defensive: ensure no pseudo-markers or stray bullets render in pager cells */
+.pager-table__row td,
+.pager-table__row th,
+.pager-table__cell {
+  list-style: none;
+}
+
+.pager-table__row td::before,
+.pager-table__row th::before,
+.pager-table__cell::before,
+.pager-table__cell--time::before {
+  content: none !important;
+}
+
+/* Extra guardrails for occasional stray markers in time/toggle cells */
+.pager-table__cell--time::marker,
+.pager-table__cell--toggle::marker,
+.pager-table__cell--time time::before,
+.pager-table__cell--time time::marker,
+.pager-table__cell--time span::before,
+.pager-table__cell--time span::marker,
+.pager-table__cell--toggle::before,
+.pager-table__cell--toggle::after {
+  content: none !important;
+}
+
+.pager-table__cell--time time,
+.pager-table__cell--time span,
+.pager-table__cell--toggle {
+  list-style: none;
+}
+
 .pager-table__col--toggle { width: 1.5rem; }
 .pager-table__col--time { width: 7.5rem; }
 .pager-table__col--alarm { width: 4.5rem; }
@@ -781,6 +813,15 @@
 .pager-table__col--alerts { width: 7rem; }
 
 .pager-table__cell--toggle { text-align: center; color: rgb(var(--app-ink-muted-rgb)); cursor: pointer; }
+.pager-table__cell--toggle {
+  /* Hide any stray text glyphs some browsers may render adjacent to the SVG */
+  font-size: 0;
+  line-height: 0;
+}
+.pager-table__cell--toggle svg {
+  /* Ensure icon sizing is unaffected by font-size reset */
+  display: inline-block;
+}
 .pager-table__cell--time { color: rgb(var(--app-ink-muted-rgb)); }
 .pager-table__cell--summary { font-weight: 600; color: rgb(var(--app-ink-rgb)); }
 .pager-table__cell--address { max-width: 24rem; }
