@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, MapPin } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, MapPin } from "lucide-react";
 import { type CondensedPagerMessage, getCondensedFieldValue } from "../utils/pagerMessages";
 import { getNotifiableAlerts } from "../utils/transcriptions";
 import { Timestamp } from "./primitives/Timestamp.react";
@@ -16,6 +16,7 @@ export interface PagerTranscriptTableProps {
   onToggleMessage: (id: string) => void;
   incidentLocationUrls?: { embed: string; link?: string } | null;
   incidentLocationQuery?: string | null;
+  hideTimeColumn?: boolean;
 }
 
 export const PagerTranscriptTable: React.FC<PagerTranscriptTableProps> = ({
@@ -26,6 +27,7 @@ export const PagerTranscriptTable: React.FC<PagerTranscriptTableProps> = ({
   onToggleMessage,
   incidentLocationUrls,
   incidentLocationQuery,
+  hideTimeColumn = false,
 }) => {
   if (!messages || messages.length === 0) return null;
 
@@ -55,14 +57,13 @@ export const PagerTranscriptTable: React.FC<PagerTranscriptTableProps> = ({
         <thead>
           <tr>
             <th className="pager-table__col--toggle" aria-hidden></th>
-            <th className="pager-table__col--time">Time</th>
+            {hideTimeColumn ? null : (
+              <th className="pager-table__col--time">Time</th>
+            )}
             <th className="pager-table__col--summary">Summary</th>
             <th className="pager-table__col--address">Address</th>
-            <th className="pager-table__col--alarm">Alarm</th>
-            <th className="pager-table__col--priority">Priority</th>
             <th className="pager-table__col--tg">TG</th>
             <th className="pager-table__col--units">Units</th>
-            <th className="pager-table__col--alerts">Alerts</th>
           </tr>
         </thead>
         <tbody>
@@ -117,12 +118,36 @@ export const PagerTranscriptTable: React.FC<PagerTranscriptTableProps> = ({
                       <ChevronRight size={14} aria-hidden />
                     )}
                   </td>
-                  <td className="pager-table__cell pager-table__cell--time">
-                    <Timestamp value={message.timestamp} />
-                    <TimeInterval value={message.timestamp} condensed className="ms-1" />
-                  </td>
+                  {hideTimeColumn ? null : (
+                    <td className="pager-table__cell pager-table__cell--time">
+                      <Timestamp value={message.timestamp} />
+                      <TimeInterval value={message.timestamp} condensed className="ms-1" />
+                    </td>
+                  )}
                   <td className="pager-table__cell pager-table__cell--summary" title={summaryDisplay}>
-                    {summaryDisplay}
+                    <div className="d-flex align-items-center gap-2 flex-wrap">
+                      {alarm && alarm.trim() !== "" && alarm.trim() === "1" ? (
+                        <span
+                          title="This pager event was sent with Alarm=1"
+                          aria-label="Alarm 1"
+                          className="text-warning d-inline-flex align-items-center"
+                        >
+                          <AlertTriangle size={14} />
+                        </span>
+                      ) : null}
+                      <span>{summaryDisplay}</span>
+                      {priority ? (
+                        <span className="chip-button chip-button--surface">Priority {priority}</span>
+                      ) : null}
+                      {messageTriggers.length > 0 ? (
+                        <AlertChips
+                          triggers={messageTriggers}
+                          mode="collapsed"
+                          idPrefix={`${message.id}-alert`}
+                          iconSize={12}
+                        />
+                      ) : null}
+                    </div>
                   </td>
                   <td
                     className="pager-table__cell pager-table__cell--address"
@@ -182,23 +207,13 @@ export const PagerTranscriptTable: React.FC<PagerTranscriptTableProps> = ({
                       "—"
                     )}
                   </td>
-                  <td className="pager-table__cell pager-table__cell--alarm">{alarm ?? "—"}</td>
-                  <td className="pager-table__cell pager-table__cell--priority">{priority ?? "—"}</td>
                   <td className="pager-table__cell pager-table__cell--tg">{tg ?? "—"}</td>
                   <td className="pager-table__cell pager-table__cell--units" title={units ?? undefined}>{units ?? "—"}</td>
-                  <td className="pager-table__cell pager-table__cell--alerts">
-                    <AlertChips
-                      triggers={messageTriggers}
-                      mode="collapsed"
-                      idPrefix={`${message.id}-alert`}
-                      iconSize={12}
-                    />
-                  </td>
                 </tr>
 
                 {isOpen ? (
                   <tr className="pager-table__row--details">
-                    <td className="pager-table__details" colSpan={8}>
+                    <td className="pager-table__details" colSpan={hideTimeColumn ? 4 : 5}>
                       {/* Details list */}
                       <div className="pager-table__details-grid">
                         {message.fields

@@ -347,6 +347,7 @@ export const CombinedTranscriptionLog: React.FC<CombinedTranscriptionLogProps> =
                         onToggleMessage={togglePagerMessage}
                         incidentLocationUrls={null}
                         incidentLocationQuery={incidentLocationQuery ?? undefined}
+                        hideTimeColumn
                       />
                     </div>
                   </div>
