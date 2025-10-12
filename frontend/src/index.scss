@@ -37,18 +37,29 @@
 }
 
 :root[data-bs-theme='dark'] {
-  --bs-border-color-rgb: 51, 65, 85;
-  --bs-border-color: rgba(51, 65, 85, 0.85);
-  --bs-border-color-translucent: rgba(51, 65, 85, 0.65);
-  --app-header-surface-rgb: 11, 17, 35;
-  --app-header-surface-subtle-rgb: 6, 9, 22;
-  --app-header-highlight-rgb: 96, 165, 250;
-  --app-header-highlight-soft-rgb: 244, 114, 182;
-  --app-header-border-rgb: 56, 70, 92;
-  --app-header-shadow-rgb: 4, 7, 18;
-  --transcript-segment-surface-rgb: 38, 44, 54;
-  --transcript-segment-surface-border-rgb: 46, 55, 70;
-  --transcript-segment-time-rgb: 47, 54, 66;
+  /* Bring back blue accents while keeping neutrals for surfaces */
+  --bs-primary: #60a5fa;               /* blue-400 */
+  --bs-primary-rgb: 96, 165, 250;
+  --bs-link-color: #93c5fd;           /* blue-300 for readability */
+  --bs-link-hover-color: #bfdbfe;     /* blue-200 */
+
+  /* Neutral gray borders */
+  --bs-border-color-rgb: 72, 72, 78;
+  --bs-border-color: rgba(72, 72, 78, 0.85);
+  --bs-border-color-translucent: rgba(72, 72, 78, 0.65);
+
+  /* Header backgrounds stay neutral; highlights regain a subtle blue */
+  --app-header-surface-rgb: 24, 24, 27;          /* near #18181b */
+  --app-header-surface-subtle-rgb: 15, 15, 18;   /* near #0f0f12 */
+  --app-header-highlight-rgb: 96, 165, 250;      /* blue-400 */
+  --app-header-highlight-soft-rgb: 147, 197, 253;/* blue-300 */
+  --app-header-border-rgb: 60, 60, 66;
+  --app-header-shadow-rgb: 0, 0, 0;
+
+  /* Transcript list surface tints to neutral grays */
+  --transcript-segment-surface-rgb: 34, 34, 38;
+  --transcript-segment-surface-border-rgb: 64, 64, 70;
+  --transcript-segment-time-rgb: 86, 86, 92;
 }
 
 body {
@@ -65,7 +76,7 @@ body {
 }
 
 :root[data-bs-theme='dark'] .bg-body-secondary {
-  background-color: rgb(36, 43, 58) !important;
+  background-color: rgb(38, 38, 42) !important; /* neutral tint */
   color: var(--bs-body-color) !important;
 }
 
