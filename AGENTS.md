@@ -10,6 +10,7 @@
 ## Documentation Expectations
 - Treat `SPEC.md` as the authoritative reference for the product. When adding, modifying, or removing functionality, make corresponding updates (even small ones) so the specification stays current.
 - Ensure every meaningful configuration option is represented in the project's configuration files and documented in `docs/configuration.md`.
+ - Do not boast about the technology stack. In user-facing docs, focus on outcomes and workflows; avoid naming frameworks/libraries unless strictly required for setup or troubleshooting.
 
 ## Workflow Notes
 - Follow repository-specific instructions in nested `AGENTS.md` files if present; their scope applies to the directory in which they reside and its descendants.
