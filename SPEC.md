@@ -21,7 +21,7 @@ transcribing multiple radio or pager feeds in real time.
 - Remove unused streams; the update syncs to every user and persists on disk.
 - Rename streams to keep labels accurate; updates propagate instantly to every operator.
 - Skip the first seconds of Broadcastify streams automatically (30 seconds by default, configurable per stream).
-- Define combined stream views in configuration files to surface virtual conversations that merge transcripts from multiple audio or pager sources.
+- Define combined stream views in configuration files to surface virtual conversations that merge transcripts from multiple audio or pager sources. The combined view presents a single chronological timeline that mixes radio transcriptions and pager messages, reusing the same components used in the individual pager and radio views for consistency.
 - Configure named transcription prompts and assign them per-stream. Define
   `whisper.prompts` once and reference with `initialPromptName` in each stream
   to tailor biasing by agency or region; streams without a name fall back to

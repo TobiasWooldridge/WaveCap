@@ -303,3 +303,15 @@ export const condensePagerTranscriptions = (
     } satisfies CondensedPagerMessage;
   });
 };
+
+/**
+ * Safely get the first value for a given condensed field key from a pager message.
+ */
+export const getCondensedFieldValue = (
+  message: CondensedPagerMessage,
+  key: string,
+): string | null => {
+  const f = message.fields.find((x) => x.key === key);
+  if (!f || f.values.length === 0) return null;
+  return f.values[0];
+};

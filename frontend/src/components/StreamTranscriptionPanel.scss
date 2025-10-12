@@ -552,6 +552,20 @@
   gap: 0.6rem;
 }
 
+.transcript-message--compact {
+  padding: 0.6rem 0.85rem;
+}
+
+.transcript-message--compact .transcript-message__avatar {
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 0.5rem;
+}
+
+.transcript-message--compact .transcript-message__channel {
+  font-size: 0.9rem;
+}
+
 .transcript-message__header {
   display: flex;
   align-items: baseline;

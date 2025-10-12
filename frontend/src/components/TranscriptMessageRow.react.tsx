@@ -44,6 +44,7 @@ export interface TranscriptMessageRowProps {
     startTime: number,
     endTime: number,
   ) => boolean;
+  compact?: boolean;
 }
 
 export const TranscriptMessageRow: React.FC<TranscriptMessageRowProps> = ({
@@ -60,6 +61,7 @@ export const TranscriptMessageRow: React.FC<TranscriptMessageRowProps> = ({
   onPlayAll,
   onPlaySegment,
   isSegmentCurrentlyPlaying,
+  compact = false,
 }) => {
   const isSystemEvent = isSystemTranscription(transcription);
   const blankAudio = isBlankAudioText(transcription.text);
@@ -178,7 +180,7 @@ export const TranscriptMessageRow: React.FC<TranscriptMessageRowProps> = ({
 
   return (
     <article
-      className={`transcript-message${hasAlerts ? " transcript-message--alert" : ""}`}
+      className={`transcript-message${hasAlerts ? " transcript-message--alert" : ""}${compact ? " transcript-message--compact" : ""}`}
     >
       <div className="transcript-message__avatar" aria-hidden="true">
         {stream ? (

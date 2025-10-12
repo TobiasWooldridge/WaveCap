@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, MapPin } from "lucide-react";
-import { type CondensedPagerMessage } from "../utils/pagerMessages";
+import { type CondensedPagerMessage, getCondensedFieldValue } from "../utils/pagerMessages";
 import { getNotifiableAlerts } from "../utils/transcriptions";
 import { Timestamp } from "./primitives/Timestamp.react";
 import { TimeInterval } from "./primitives/TimeInterval.react";
@@ -17,12 +17,6 @@ export interface PagerTranscriptTableProps {
   incidentLocationUrls?: { embed: string; link?: string } | null;
   incidentLocationQuery?: string | null;
 }
-
-const getFieldValue = (message: CondensedPagerMessage, key: string): string | null => {
-  const f = message.fields.find((x) => x.key === key);
-  if (!f || f.values.length === 0) return null;
-  return f.values[0];
-};
 
 export const PagerTranscriptTable: React.FC<PagerTranscriptTableProps> = ({
   groupId,
@@ -80,12 +74,12 @@ export const PagerTranscriptTable: React.FC<PagerTranscriptTableProps> = ({
                 ? message.fragments[0].text.split(/\r?\n/, 1)[0]
                 : "Pager update");
 
-            const address = getFieldValue(message, "address");
-            const alarm = getFieldValue(message, "alarm_level");
-            const tg = getFieldValue(message, "talkgroup");
-            const units = getFieldValue(message, "units");
-            const narrative = getFieldValue(message, "narrative");
-            const priority = getFieldValue(message, "priority");
+            const address = getCondensedFieldValue(message, "address");
+            const alarm = getCondensedFieldValue(message, "alarm_level");
+            const tg = getCondensedFieldValue(message, "talkgroup");
+            const units = getCondensedFieldValue(message, "units");
+            const narrative = getCondensedFieldValue(message, "narrative");
+            const priority = getCondensedFieldValue(message, "priority");
 
             // Derive a compact category (call type) for the Summary column.
             // Remove incident id, address, and alarm level parts if present.
