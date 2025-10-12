@@ -270,6 +270,11 @@ sdr:
       # antenna: "RX"            # Optional antenna selection
       # ppmCorrection: -0.8      # Optional frequency correction (ppm)
       # loOffsetHz: 250000       # Optional LO offset used when tuning
+      # Note: The backend clamps LO offsets to keep the logical tuned
+      # frequency within the observable passband for the configured
+      # sample rate and requested channel bandwidth. As a rule of thumb,
+      # choose a sampleRateHz such that: sampleRateHz ≥ (bandwidth + 2×|loOffsetHz|)
+      # to avoid clipping or silence at the edges.
 ```
 
 2) Add streams with `source: sdr` and a tuned frequency:
@@ -293,6 +298,9 @@ streams:
   - `sdrMode`: Demodulation mode (`nfm`, `wfm`, or `am`).
   - `sdrBandwidthHz`: Complex channel filter width prior to demodulation. Leave unset to pull default values for each mode.
   - `sdrSquelchDbFs`: Audio squelch threshold in dBFS (≤ 0). Suppresses low-level noise when no signal is present.
+  - `loOffsetHz`: Applies a local-oscillator offset when tuning to move DC away from baseband. If set too large for the device
+    sample rate and channel bandwidth, the backend automatically clamps it to a safe value so the desired channel remains inside
+    the capture span and audio continues to flow.
 
 ### Inspecting SDR health
 

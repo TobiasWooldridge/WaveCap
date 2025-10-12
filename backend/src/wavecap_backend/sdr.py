@@ -580,6 +580,38 @@ class _DeviceWorker:
 
     async def add_channel(self, spec: SdrChannelSpec) -> "asyncio.Queue[bytes]":
         async with self._lock:
+            # Clamp LO offset so the logical tuned frequency stays within the
+            # observable passband for the configured sample rate and requested
+            # channel bandwidth. A too-large LO offset can shift the RF center
+            # such that the desired channel falls outside Nyquist and yields no audio.
+            try:
+                configured_lo = float(self._configured_lo_offset_hz or 0.0)
+            except Exception:
+                configured_lo = 0.0
+            if configured_lo != 0.0:
+                # Resolve an expected channel bandwidth in Hz for safety margin
+                mode_norm = (spec.mode or "nfm").strip().lower()
+                default_bw = _DEFAULT_CHANNEL_BANDWIDTHS.get(mode_norm, 15000.0)
+                requested_bw = float(spec.bandwidth_hz) if spec.bandwidth_hz else float(default_bw)
+                # Keep a small guard band to avoid edge effects
+                guard_hz = max(self.sample_rate_hz * 0.02, 5_000.0)
+                # Maximum safe LO magnitude to keep half the channel bandwidth inside Nyquist
+                max_lo = max((self.sample_rate_hz / 2.0) - (requested_bw / 2.0) - guard_hz, 0.0)
+                if abs(configured_lo) > max_lo:
+                    clamped = math.copysign(max_lo, configured_lo)
+                    LOGGER.warning(
+                        "SDR %s LO offset %.0f Hz exceeds safe range for sample rate %d Hz and bandwidth %.0f Hz; clamping to %.0f Hz",
+                        self.device_id,
+                        configured_lo,
+                        self.sample_rate_hz,
+                        requested_bw,
+                        clamped,
+                    )
+                    self._lo_offset_hz = float(clamped)
+                else:
+                    self._lo_offset_hz = float(configured_lo)
+            else:
+                self._lo_offset_hz = 0.0
             # If no center yet, use this channel's frequency
             if self._center_hz is None:
                 tuned_center = self._tune(float(spec.frequency_hz))

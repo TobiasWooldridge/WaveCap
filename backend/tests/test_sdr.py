@@ -9,7 +9,9 @@ from wavecap_backend.sdr import (
     _ChannelDemod,
     _FMDemodDecimator,
     _candidate_sample_rates,
+    SdrChannelSpec,
     SdrManager,
+    _DeviceWorker,
 )
 
 
@@ -112,3 +114,41 @@ def test_candidate_sample_rates_includes_heuristics_when_no_supported() -> None:
     attempts = _candidate_sample_rates(requested, audio_rate, supported=[])
     assert attempts[0] == audio_rate * 125
     assert audio_rate in attempts
+
+
+@pytest.mark.asyncio
+async def test_lo_offset_clamped_to_visible_passband() -> None:
+    """Ensure large LO offsets are clamped so channels stay observable.
+
+    With a 240 kHz sample rate and a 200 kHz WFM channel, an LO offset of
+    250 kHz would push the desired RF content outside Nyquist and yield
+    silence. We clamp to keep half the channel bandwidth inside ±fs/2.
+    """
+    worker = _DeviceWorker(
+        device_id="dev",
+        soapy_args="driver=test",
+        sample_rate_hz=240000,
+        audio_sample_rate=16000,
+        gain_db=None,
+        gain_mode="manual",
+        rf_bandwidth_hz=None,
+        antenna=None,
+        ppm_correction=None,
+        lo_offset_hz=250000.0,
+    )
+    spec = SdrChannelSpec(
+        stream_id="s1",
+        device_id="dev",
+        frequency_hz=90_300_000,
+        mode="wfm",
+        bandwidth_hz=200_000,
+        squelch_dbfs=-200.0,
+    )
+    # add_channel will compute a safe LO and not touch hardware because _dev is None
+    await worker.add_channel(spec)
+    # Expected clamp: max_lo = fs/2 - bw/2 - guard; guard = max(2% fs, 5k)
+    fs = 240000.0
+    bw = 200000.0
+    guard = max(fs * 0.02, 5000.0)
+    max_lo = max((fs / 2.0) - (bw / 2.0) - guard, 0.0)
+    assert abs(worker._lo_offset_hz) == pytest.approx(max_lo)  # type: ignore[attr-defined]
