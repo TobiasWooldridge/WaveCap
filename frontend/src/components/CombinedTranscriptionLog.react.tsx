@@ -16,6 +16,8 @@ import { AlertChips } from "./chips/AlertChips.react";
 import { useAuth } from "../contexts/AuthContext";
 import { StreamTranscriptList } from "./StreamTranscriptList.react";
 import StreamStatusIndicator from "./StreamStatusIndicator.react";
+import { Timestamp } from "./primitives/Timestamp.react";
+import { TimeInterval } from "./primitives/TimeInterval.react";
 
 interface CombinedTranscriptionLogProps {
   streams: Stream[];
@@ -320,6 +322,21 @@ export const CombinedTranscriptionLog: React.FC<CombinedTranscriptionLogProps> =
                   <div className="transcript-message__content">
                     <header className="transcript-message__header">
                       <span className="transcript-message__channel">{item.streamName}</span>
+                      {item.message.timestamp ? (
+                        <>
+                          <Timestamp
+                            value={item.message.timestamp}
+                            className="transcript-message__timestamp"
+                            showDate
+                            dateClassName="ms-1"
+                          />
+                          <TimeInterval
+                            value={item.message.timestamp}
+                            className="ms-1 transcript-message__timestamp"
+                            condensed
+                          />
+                        </>
+                      ) : null}
                     </header>
                     <div className="w-100">
                       <PagerTranscriptTable
