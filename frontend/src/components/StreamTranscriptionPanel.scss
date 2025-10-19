@@ -575,7 +575,8 @@
 
 .transcript-message__channel {
   font-weight: 600;
-  color: rgb(var(--app-ink-rgb));
+  color: var(--transcript-channel-color, rgb(var(--app-ink-rgb)));
+  transition: color 0.2s ease;
 }
 
 .transcript-message__timestamp {
