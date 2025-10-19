@@ -70,6 +70,9 @@ whisper:
     - "alright here we go"
     - "all right let's go"
     - "alright let's go"
+  # Automatically restart audio streams when upstream audio stays silent for
+  # this long. Set to null to disable automatic reconnects for inactivity.
+  noAudioReconnectSeconds: 3600
   # Treat segments that repeat the same phrase longer than this many characters
   # more than the allowed count as untranscribable noise.
   segmentRepetitionMinCharacters: 16

@@ -996,7 +996,11 @@ class StreamManager:
             )
 
     async def _handle_upstream_disconnect(
-        self, stream: Stream, attempt: int, delay_seconds: float
+        self,
+        stream: Stream,
+        attempt: int,
+        delay_seconds: float,
+        reason: Optional[str] = None,
     ) -> None:
         async with self._lock:
             current = self.streams.get(stream.id)
@@ -1004,11 +1008,16 @@ class StreamManager:
             return
         attempt_value = max(attempt, 1)
         retry_phrase = _format_retry_phrase(delay_seconds)
-        message = (
-            f"{UPSTREAM_DISCONNECTED_MESSAGE}; {retry_phrase} "
-            f"(attempt {attempt_value})"
+        message_parts = [UPSTREAM_DISCONNECTED_MESSAGE]
+        normalized_reason = reason.strip() if isinstance(reason, str) else None
+        if normalized_reason:
+            message_parts.append(normalized_reason)
+        message_parts.append(f"{retry_phrase} (attempt {attempt_value})")
+        message = "; ".join(message_parts)
+        trigger_detail = (
+            normalized_reason if normalized_reason else "upstream stream disconnected"
         )
-        trigger = SystemEventTrigger.system_activity("upstream stream disconnected")
+        trigger = SystemEventTrigger.system_activity(trigger_detail)
         await self._record_system_event(
             current,
             TranscriptionEventType.UPSTREAM_DISCONNECTED,

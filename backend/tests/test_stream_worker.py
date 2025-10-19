@@ -3,7 +3,7 @@ from collections import deque
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 import pytest
@@ -1779,6 +1779,7 @@ def make_reconnect_worker(
     on_status_change=async_noop,
     on_disconnect=async_noop,
     on_reconnect=async_noop,
+    config: Optional[WhisperConfig] = None,
 ) -> StreamWorker:
     stream = Stream(
         id="stream-1",
@@ -1797,7 +1798,7 @@ def make_reconnect_worker(
         on_status_change=on_status_change,
         on_upstream_disconnect=on_disconnect,
         on_upstream_reconnect=on_reconnect,
-        config=WhisperConfig(),
+        config=config or WhisperConfig(),
     )
 
 
@@ -1834,6 +1835,75 @@ class FakeProcess:
 
 
 @pytest.mark.asyncio
+async def test_inactivity_reconnect_triggers_after_silence(monkeypatch):
+    class FakeTime:
+        def __init__(self, start: float = 0.0, step: float = 10.0) -> None:
+            self._current = start
+            self._step = step
+
+        def monotonic(self) -> float:
+            value = self._current
+            self._current += self._step
+            return value
+
+    fake_time = FakeTime()
+    monkeypatch.setattr(stream_worker_module, "time", fake_time)
+
+    disconnect_events = []
+
+    async def record_disconnect(
+        _stream, attempt: int, delay: float, reason: Optional[str]
+    ) -> None:
+        disconnect_events.append((attempt, delay, reason))
+
+    worker = make_reconnect_worker(
+        on_disconnect=record_disconnect,
+        config=WhisperConfig(noAudioReconnectSeconds=5.0),
+    )
+
+    silent_chunk = b"\x00\x00" * 64
+
+    async def fake_create_subprocess_exec(*_args, **_kwargs):
+        return FakeProcess([silent_chunk, silent_chunk])
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_create_subprocess_exec)
+
+    def fake_start_workers(self):
+        self._chunk_queue = None
+
+    async def fake_shutdown_workers(self, *, flush: bool):
+        return None
+
+    async def fake_flush_pending_chunks(self):
+        return None
+
+    async def fake_ingest_pcm_bytes(self, _pcm: bytes):
+        return False
+
+    monkeypatch.setattr(StreamWorker, "_start_transcription_workers", fake_start_workers)
+    monkeypatch.setattr(StreamWorker, "_shutdown_transcription_workers", fake_shutdown_workers)
+    monkeypatch.setattr(StreamWorker, "_flush_pending_chunks", fake_flush_pending_chunks)
+    monkeypatch.setattr(StreamWorker, "_ingest_pcm_bytes", fake_ingest_pcm_bytes)
+
+    attempts = []
+
+    async def fake_wait_before_reconnect(self, attempt: int) -> bool:
+        attempts.append(attempt)
+        self._stop_event.set()
+        return False
+
+    monkeypatch.setattr(StreamWorker, "_wait_before_reconnect", fake_wait_before_reconnect)
+
+    await worker._run_pipeline()
+
+    assert attempts == [1]
+    assert disconnect_events
+    attempt, _delay, reason = disconnect_events[0]
+    assert attempt == 1
+    assert reason is not None and "no audio detected" in reason
+
+
+@pytest.mark.asyncio
 async def test_reconnect_backoff_increases_after_repeated_failures(monkeypatch):
     worker = make_reconnect_worker()
 
@@ -1864,7 +1934,7 @@ async def test_reconnect_backoff_increases_after_repeated_failures(monkeypatch):
         return None
 
     async def fake_ingest_pcm_bytes(self, _pcm: bytes):
-        return None
+        return False
 
     monkeypatch.setattr(StreamWorker, "_start_transcription_workers", fake_start_workers)
     monkeypatch.setattr(StreamWorker, "_shutdown_transcription_workers", fake_shutdown_workers)
@@ -1911,7 +1981,7 @@ async def test_reconnect_backoff_resets_after_receiving_audio(monkeypatch):
         return None
 
     async def fake_ingest_pcm_bytes(self, _pcm: bytes):
-        return None
+        return False
 
     monkeypatch.setattr(StreamWorker, "_start_transcription_workers", fake_start_workers)
     monkeypatch.setattr(StreamWorker, "_shutdown_transcription_workers", fake_shutdown_workers)
@@ -1928,8 +1998,10 @@ async def test_connectivity_events_emitted_for_reconnect(monkeypatch):
     disconnect_events = []
     reconnect_events = []
 
-    async def record_disconnect(_stream, attempt: int, delay: float) -> None:
-        disconnect_events.append((attempt, delay))
+    async def record_disconnect(
+        _stream, attempt: int, delay: float, reason: Optional[str]
+    ) -> None:
+        disconnect_events.append((attempt, delay, reason))
 
     async def record_reconnect(_stream, attempt: int) -> None:
         reconnect_events.append(attempt)
@@ -1970,6 +2042,7 @@ async def test_connectivity_events_emitted_for_reconnect(monkeypatch):
         nonlocal chunks_processed
         chunks_processed += 1
         self._stop_event.set()
+        return True
 
     monkeypatch.setattr(StreamWorker, "_start_transcription_workers", fake_start_workers)
     monkeypatch.setattr(StreamWorker, "_shutdown_transcription_workers", fake_shutdown_workers)
@@ -1980,8 +2053,10 @@ async def test_connectivity_events_emitted_for_reconnect(monkeypatch):
 
     assert attempts == [1]
     assert len(disconnect_events) == 1
-    assert disconnect_events[0][0] == 1
-    assert disconnect_events[0][1] == pytest.approx(0.0)
+    attempt, delay, reason = disconnect_events[0]
+    assert attempt == 1
+    assert delay == pytest.approx(0.0)
+    assert reason is None
     assert reconnect_events == [1]
     assert chunks_processed == 1
 

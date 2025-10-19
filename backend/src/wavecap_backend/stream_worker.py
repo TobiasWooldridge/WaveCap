@@ -7,6 +7,7 @@ import inspect
 import logging
 import re
 import struct
+import time
 import uuid
 from collections import deque
 from dataclasses import dataclass
@@ -290,7 +291,7 @@ class StreamWorker:
         on_transcription: Callable[[TranscriptionResult], Awaitable[None]],
         on_status_change: Callable[[Stream, StreamStatus], Awaitable[None]],
         on_upstream_disconnect: Optional[
-            Callable[[Stream, int, float], Awaitable[None]]
+            Callable[[Stream, int, float, Optional[str]], Awaitable[None]]
         ] = None,
         on_upstream_reconnect: Optional[
             Callable[[Stream, int], Awaitable[None]]
@@ -360,6 +361,15 @@ class StreamWorker:
             if config.blankAudioMinRms is not None
             else silence_threshold
         )
+        self._no_audio_reconnect_seconds = (
+            float(config.noAudioReconnectSeconds)
+            if config.noAudioReconnectSeconds is not None
+            else None
+        )
+        self._last_audio_activity_monotonic = (
+            time.monotonic() if self._no_audio_reconnect_seconds is not None else None
+        )
+        self._last_inactivity_duration: Optional[float] = None
         self._low_energy_peak_threshold = min(
             max(self._silence_threshold * 3.0, 0.04),
             1.0,
@@ -701,6 +711,12 @@ class StreamWorker:
                                 timeout=0.5,
                             )
                         except asyncio.TimeoutError:
+                            if self._check_audio_inactivity(False):
+                                await self._handle_inactivity_disconnect(
+                                    next_reconnect_attempt
+                                )
+                                session_should_reconnect = True
+                                break
                             continue
                         if not chunk:
                             attempt_number = max(next_reconnect_attempt + 1, 1)
@@ -715,7 +731,7 @@ class StreamWorker:
                                 attempt_number
                             )
                             await self.on_upstream_disconnect(
-                                self.stream, attempt_number, delay_seconds
+                                self.stream, attempt_number, delay_seconds, None
                             )
                             session_should_reconnect = True
                             break
@@ -727,7 +743,13 @@ class StreamWorker:
                             await self.on_upstream_reconnect(
                                 self.stream, attempt_value
                             )
-                        await self._ingest_pcm_bytes(chunk)
+                        had_audio = await self._ingest_pcm_bytes(chunk)
+                        if self._check_audio_inactivity(had_audio):
+                            await self._handle_inactivity_disconnect(
+                                next_reconnect_attempt
+                            )
+                            session_should_reconnect = True
+                            break
                 finally:
                     if process is not None:
                         if process.returncode is None:
@@ -771,7 +793,7 @@ class StreamWorker:
                     self._pending_reconnect_attempt = attempt_number
                     delay_seconds = self._reconnect_delay_seconds(attempt_number)
                     await self.on_upstream_disconnect(
-                        self.stream, attempt_number, delay_seconds
+                        self.stream, attempt_number, delay_seconds, None
                     )
                     next_reconnect_attempt += 1
                     continue
@@ -791,6 +813,77 @@ class StreamWorker:
         if attempt <= 1:
             return 0.0
         return RECONNECT_BACKOFF_SECONDS
+
+    def _check_audio_inactivity(self, has_audio: bool) -> bool:
+        threshold = self._no_audio_reconnect_seconds
+        if threshold is None:
+            return False
+        now = time.monotonic()
+        if has_audio:
+            self._last_audio_activity_monotonic = now
+            self._last_inactivity_duration = None
+            return False
+        last = self._last_audio_activity_monotonic
+        if last is None:
+            self._last_audio_activity_monotonic = now
+            return False
+        idle_seconds = max(now - last, 0.0)
+        if idle_seconds >= threshold:
+            self._last_audio_activity_monotonic = now
+            self._last_inactivity_duration = idle_seconds
+            return True
+        self._last_inactivity_duration = idle_seconds
+        return False
+
+    @staticmethod
+    def _format_duration_phrase(seconds: float) -> str:
+        if seconds <= 0:
+            return "0 seconds"
+        if seconds < 60:
+            seconds_value = max(int(round(seconds)), 1)
+            unit = "second" if seconds_value == 1 else "seconds"
+            return f"{seconds_value} {unit}"
+        if seconds < 3600:
+            minutes = seconds / 60.0
+            rounded = round(minutes, 1)
+            if abs(rounded - round(minutes)) < 1e-6:
+                minutes_value = max(int(round(minutes)), 1)
+                unit = "minute" if minutes_value == 1 else "minutes"
+                return f"{minutes_value} {unit}"
+            return f"{rounded:.1f} minutes"
+        hours = seconds / 3600.0
+        rounded = round(hours, 1)
+        if abs(rounded - round(hours)) < 1e-6:
+            hours_value = max(int(round(hours)), 1)
+            unit = "hour" if hours_value == 1 else "hours"
+            return f"{hours_value} {unit}"
+        return f"{rounded:.1f} hours"
+
+    def _format_inactivity_reason(self) -> str:
+        duration = self._last_inactivity_duration
+        if duration is None or duration <= 0:
+            duration = self._no_audio_reconnect_seconds or 0.0
+        phrase = self._format_duration_phrase(duration)
+        return f"no audio detected for {phrase}"
+
+    async def _handle_inactivity_disconnect(self, next_reconnect_attempt: int) -> None:
+        attempt_number = max(next_reconnect_attempt + 1, 1)
+        reason_detail = self._format_inactivity_reason()
+        LOGGER.warning(
+            "Stream %s detected inactivity (%s); scheduling reconnect attempt %d",
+            self.stream.id,
+            reason_detail,
+            attempt_number,
+        )
+        self._upstream_connected = False
+        self._pending_reconnect_attempt = attempt_number
+        delay_seconds = self._reconnect_delay_seconds(attempt_number)
+        await self.on_upstream_disconnect(
+            self.stream,
+            attempt_number,
+            delay_seconds,
+            reason_detail,
+        )
 
     async def _wait_before_reconnect(self, attempt: int) -> bool:
         delay = self._reconnect_delay_seconds(attempt)
@@ -813,40 +906,47 @@ class StreamWorker:
             return not self._stop_event.is_set()
         return False
 
-    async def _ingest_pcm_bytes(self, pcm_bytes: bytes) -> None:
+    async def _ingest_pcm_bytes(self, pcm_bytes: bytes) -> bool:
         if not pcm_bytes:
-            return
+            return False
         total_samples = len(pcm_bytes) // 2
         if total_samples <= 0:
-            return
-        trimmed_bytes = pcm_bytes
+            return False
+        int_samples = np.frombuffer(pcm_bytes, dtype=np.int16)
+        if int_samples.size == 0:
+            return False
+        float_samples = int_samples.astype(np.float32) / 32768.0
+        has_audio = bool(np.any(np.abs(float_samples) > self._silence_threshold))
+        result = has_audio
+        trimmed_int_samples = int_samples
+        trimmed_float_samples = float_samples
         if self._ignore_initial_samples:
             if total_samples <= self._ignore_initial_samples:
                 self._ignore_initial_samples -= total_samples
-                return
+                return result
             skip_samples = self._ignore_initial_samples
-            skip_bytes = skip_samples * 2
-            trimmed_bytes = pcm_bytes[skip_bytes:]
+            trimmed_int_samples = int_samples[skip_samples:]
+            trimmed_float_samples = float_samples[skip_samples:]
             self._ignore_initial_samples = 0
-        if len(trimmed_bytes) % 2 == 1:
-            trimmed_bytes = trimmed_bytes[:-1]
+        if trimmed_int_samples.size == 0:
+            return result
+        trimmed_bytes = trimmed_int_samples.tobytes()
         if len(trimmed_bytes) < 2:
-            return
+            return result
         await self._broadcast_live_audio(trimmed_bytes)
-        samples = (
-            np.frombuffer(trimmed_bytes, dtype=np.int16).astype(np.float32) / 32768.0
-        )
+        samples = trimmed_float_samples
         if samples.size == 0:
-            return
+            return result
         chunks = self._chunker.add_samples(samples)
         if not chunks:
-            return
+            return result
         if self._chunk_queue is None:
             for chunk in chunks:
                 await self._transcribe_chunk(chunk)
-            return
+            return result
         for chunk in chunks:
             await self._chunk_queue.put(chunk)
+        return result
 
     async def _flush_pending_chunks(self) -> None:
         chunks = self._chunker.flush()
