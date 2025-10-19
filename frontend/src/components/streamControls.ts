@@ -10,6 +10,7 @@ export interface StandaloneStreamControls {
   liveAudioError: string | null;
   onToggleLiveListening: () => void;
   onReset: () => void;
+  openSearchDialog: () => void;
   toolButtons: ReactNode | null;
   dialogs: ReactNode[];
 }

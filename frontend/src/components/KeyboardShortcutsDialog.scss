@@ -1,0 +1,78 @@
+.keyboard-shortcuts-dialog {
+  max-width: min(44rem, 92vw);
+  width: min(44rem, 92vw);
+}
+
+.keyboard-shortcuts-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.keyboard-shortcuts-dialog__sections {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+}
+
+.keyboard-shortcuts-dialog__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.keyboard-shortcuts-dialog__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.keyboard-shortcuts-dialog__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.keyboard-shortcuts-dialog__keys {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--bs-body-color, #212529);
+}
+
+.keyboard-shortcuts-dialog__keys kbd {
+  background-color: rgba(var(--app-surface-rgb, 248, 249, 250), 0.85);
+  border: 1px solid rgba(var(--bs-border-color-rgb, 222, 226, 230), 0.85);
+  border-radius: 0.5rem;
+  padding: 0.3rem 0.55rem;
+  min-width: 2.1rem;
+  text-align: center;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.keyboard-shortcuts-dialog__description {
+  flex: 1;
+  font-size: 0.9rem;
+  color: var(--bs-body-secondary-color, rgba(108, 117, 125));
+}
+
+@media (max-width: 575.98px) {
+  .keyboard-shortcuts-dialog__sections {
+    grid-template-columns: 1fr;
+  }
+
+  .keyboard-shortcuts-dialog__item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+
+  .keyboard-shortcuts-dialog__description {
+    font-size: 0.95rem;
+  }
+}
