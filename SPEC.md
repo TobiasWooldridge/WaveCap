@@ -27,7 +27,7 @@ transcribing multiple radio or pager feeds in real time.
   to tailor biasing by agency or region; streams without a name fall back to
   the global `whisper.initialPrompt` when provided.
 - For SDR-backed streams, choose narrow/wide FM or AM demodulation, tighten complex channel bandwidth, apply per-stream squelch thresholds, and adjust hardware controls (gain mode, RF bandwidth, antenna, LO offset, PPM correction) directly through configuration files. LO offsets are automatically clamped based on device sample rate and channel bandwidth so the logical tuned frequency remains inside the capture span (prevents silent reception when offsets exceed Nyquist).
-- Restart behavior is automatic when configured streams are enabled; status updates instantly for every connected browser. If a remote HTTP stream drops unexpectedly, the backend attempts to reconnect immediately once and then only every ten minutes to avoid hammering the source.
+- Restart behavior is automatic when configured streams are enabled; status updates instantly for every connected browser. If a remote HTTP stream drops unexpectedly—or stays silent longer than the configured inactivity window—the backend attempts to reconnect immediately once and then only every ten minutes to avoid hammering the source. Inactivity-triggered restarts log a system event that explains the silence threshold that fired.
 - Each stream exposes two state fields in the API: an **enabled** flag that comes exclusively from configuration (`state/config.yaml`) and a runtime **status** flag that reflects the backend's current progress (stopped, queued, transcribing, or error). The UI does not toggle enabled/disabled; it only reflects the configured streams.
 
 ### 2. Monitoring Live Traffic

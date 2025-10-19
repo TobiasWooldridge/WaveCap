@@ -321,6 +321,9 @@ class WhisperConfig(APIModel):
     silenceHallucinationPhrases: List[str] = Field(
         default_factory=list, alias="silenceHallucinationPhrases"
     )
+    noAudioReconnectSeconds: Optional[float] = Field(
+        default=None, alias="noAudioReconnectSeconds"
+    )
     highpassCutoffHz: Optional[float] = Field(default=250.0, alias="highpassCutoffHz")
     lowpassCutoffHz: Optional[float] = Field(default=3800.0, alias="lowpassCutoffHz")
     deemphasisTimeConstantMicros: Optional[float] = Field(
@@ -356,6 +359,18 @@ class WhisperConfig(APIModel):
                 "segmentRepetitionMaxAllowedConsecutiveRepeats must be non-negative"
             )
         return parsed
+
+    @field_validator("noAudioReconnectSeconds")
+    @classmethod
+    def _validate_no_audio_reconnect_seconds(
+        cls, value: Optional[float]
+    ) -> Optional[float]:
+        if value is None:
+            return None
+        seconds = float(value)
+        if seconds <= 0:
+            raise ValueError("noAudioReconnectSeconds must be positive when provided")
+        return seconds
 
 
 class ThemeMode(str, Enum):

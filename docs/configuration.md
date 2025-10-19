@@ -496,7 +496,28 @@ still match a configured `"thank you"` rule. The backend also treats strings mad
 of a configured phrase (for example, `"thank you thank you"`) as hallucinations so common duplications are
 filtered automatically.
 
-### 11. Example configurations
+### 11. Restart silent streams automatically
+
+Long-running Broadcastify and Icecast feeds occasionally stall without closing
+the TCP connection. When that happens the stream continues to deliver perfect
+silence and the usual connection watchdogs never fire. Set
+`whisper.noAudioReconnectSeconds` to have WaveCap reconnect those feeds after a
+prolonged quiet spell.
+
+The timer counts how long the worker has gone without seeing samples above the
+configured silence threshold. Once the limit is exceeded the backend logs a
+system event ("Lost connection to upstream stream; no audio detected for …")
+and restarts FFmpeg. Use a large window—an hour (`3600`) is a safe starting
+point for dispatch feeds that naturally have short pauses. Set the field to
+`null` to disable the watchdog entirely.
+
+```yaml
+whisper:
+  # Restart the stream when silence persists for an hour.
+  noAudioReconnectSeconds: 3600
+```
+
+### 12. Example configurations
 
 **Low-latency dispatch console** (`state/config.yaml`):
 
