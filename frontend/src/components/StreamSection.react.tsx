@@ -643,7 +643,7 @@ const StreamSection: React.FC<StreamSectionProps> = ({
                 ) : stream.enabled ? (
                   <span className="flex items-center justify-content-center gap-2 text-accent">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Listening for new audio…</span>
+                    <span>Waiting for new updates…</span>
                   </span>
                 ) : (
                   "No transcriptions yet for this stream."
