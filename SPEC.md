@@ -32,6 +32,7 @@ transcribing multiple radio or pager feeds in real time.
 
 ### 2. Monitoring Live Traffic
 - Use the stream list to spot transcribing, queued, stopped, or error states. Queued means the stream was enabled and is waiting for the backend to catch up. If transcription concurrency is full, recording continues and transcripts arrive once a slot opens.
+- Navigate quickly with Discord-style shortcuts: `Ctrl`/`⌘` + `↑` or `↓` (or `Alt` + `↑`/`↓`) cycles through streams, `Shift` + `Esc` marks the current stream read, `Ctrl`/`⌘` + `Shift` + `A` clears all unread badges, `Ctrl`/`⌘` + `F` or `Ctrl`/`⌘` + `K` opens transcript search, `Ctrl`/`⌘` + `Shift` + `M` toggles live listening, `Ctrl`/`⌘` + `,` opens settings, and `Ctrl`/`⌘` + `/` shows the shortcut reference overlay.
 - Sort the stream sidebar by latest activity or stream name. Streams pinned in configuration files stay at the top regardless of the selected sort mode.
 - Open each stream's conversation view with search, time-range filters, and "Go to timestamp" controls to review recent traffic.
 - When you open the search tool, the results appear in a wide, modal-style panel that occupies most of the viewport so you can scan long hit lists without juggling cramped popovers.

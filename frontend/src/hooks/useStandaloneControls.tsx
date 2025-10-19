@@ -235,6 +235,7 @@ export const useStandaloneControls = (options: UseStandaloneControlsOptions): St
         if (isReadOnly) return;
         onResetStream(streamId);
       },
+      openSearchDialog: () => setOpenTool("search"),
       toolButtons:
         toolButtonItems.length > 0 ? (
           <ButtonGroup size="sm">{toolButtonItems}</ButtonGroup>
@@ -339,6 +340,7 @@ export const useStandaloneControls = (options: UseStandaloneControlsOptions): St
       focus,
       closeDialog,
       sanitizedStreamId,
+      setOpenTool,
     ],
   );
 };

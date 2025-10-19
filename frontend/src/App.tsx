@@ -46,6 +46,7 @@ import { useToast } from "./hooks/useToast";
 import { useAuth } from "./contexts/AuthContext";
 import AppHeader from "./components/AppHeader.react";
 import LiveAudioBanner from "./components/LiveAudioBanner.react";
+import KeyboardShortcutsDialog from "./components/KeyboardShortcutsDialog.react";
 import StreamSidebar, {
   type StreamSidebarItem,
   type StreamSortMode,
@@ -294,6 +295,7 @@ function App() {
     defaultReviewExportStatuses,
   } = useUISettings();
   const [showSettings, setShowSettings] = useState(false);
+  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   const settingsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const settingsCloseButtonRef = useRef<HTMLButtonElement | null>(null);
   const {
@@ -915,6 +917,60 @@ function App() {
     });
   }, [displayStreams, streamSortMode]);
 
+  const markStreamAsRead = useCallback(
+    (streamId: string | null) => {
+      if (!streamId) {
+        return;
+      }
+
+      const stream = sortedConversations.find(
+        (candidate) => candidate.id === streamId,
+      );
+      if (!stream) {
+        return;
+      }
+
+      const latestTimestamp = getLatestActivityTimestamp(stream);
+      if (!latestTimestamp) {
+        return;
+      }
+
+      setLastViewedAtByConversation((current) => {
+        const previous = current[streamId] ?? 0;
+        if (previous >= latestTimestamp) {
+          return current;
+        }
+
+        return {
+          ...current,
+          [streamId]: latestTimestamp,
+        };
+      });
+    },
+    [setLastViewedAtByConversation, sortedConversations],
+  );
+
+  const markAllStreamsAsRead = useCallback(() => {
+    setLastViewedAtByConversation((current) => {
+      let changed = false;
+      const next = { ...current } as Record<string, number>;
+
+      sortedConversations.forEach((stream) => {
+        const latestTimestamp = getLatestActivityTimestamp(stream);
+        if (!latestTimestamp) {
+          return;
+        }
+
+        if ((next[stream.id] ?? 0) < latestTimestamp) {
+          next[stream.id] = latestTimestamp;
+          changed = true;
+        }
+      });
+
+      return changed ? next : current;
+    });
+  }, [setLastViewedAtByConversation, sortedConversations]);
+
   const handleStreamSortModeChange = useCallback(
     (mode: StreamSortMode) => {
       setStreamSortMode((previous) => (previous === mode ? previous : mode));
@@ -972,6 +1028,11 @@ function App() {
     selectedStreamId,
     streamSortMode,
   ]);
+
+  const orderedStreamIds = useMemo(
+    () => streamSidebarItems.map((item) => item.id),
+    [streamSidebarItems],
+  );
 
   const selectedStream = useMemo(() => {
     if (!selectedStreamId) {
@@ -1119,6 +1180,200 @@ function App() {
     },
     [closeMobileSidebar, isMobileViewport, selectStream],
   );
+
+  const selectRelativeStream = useCallback(
+    (offset: number) => {
+      if (orderedStreamIds.length === 0) {
+        return;
+      }
+
+      if (!selectedStreamId) {
+        const fallback =
+          offset > 0
+            ? orderedStreamIds[0]
+            : orderedStreamIds[orderedStreamIds.length - 1];
+        handleSelectStream(fallback);
+        return;
+      }
+
+      const currentIndex = orderedStreamIds.indexOf(selectedStreamId);
+      const total = orderedStreamIds.length;
+
+      if (currentIndex === -1) {
+        const fallback =
+          offset > 0
+            ? orderedStreamIds[0]
+            : orderedStreamIds[orderedStreamIds.length - 1];
+        handleSelectStream(fallback);
+        return;
+      }
+
+      const nextIndex = (currentIndex + offset + total) % total;
+      const nextId = orderedStreamIds[nextIndex];
+
+      if (nextId && nextId !== selectedStreamId) {
+        handleSelectStream(nextId);
+      }
+    },
+    [handleSelectStream, orderedStreamIds, selectedStreamId],
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) {
+        return;
+      }
+
+      const activeElement = document.activeElement as HTMLElement | null;
+      const activeTag = activeElement?.tagName?.toLowerCase() ?? "";
+      const isEditable =
+        activeElement?.isContentEditable ||
+        activeTag === "input" ||
+        activeTag === "textarea" ||
+        activeTag === "select";
+
+      const isCtrlOrMeta = event.ctrlKey || event.metaKey;
+      if (isEditable && !isCtrlOrMeta) {
+        return;
+      }
+
+      const attemptSelectRelativeStream = (offset: number) => {
+        if (orderedStreamIds.length === 0) {
+          return false;
+        }
+        selectRelativeStream(offset);
+        return true;
+      };
+
+      const key = event.key;
+
+      if (isCtrlOrMeta && !event.altKey && !event.shiftKey) {
+        if (key === "ArrowUp") {
+          if (attemptSelectRelativeStream(-1)) {
+            event.preventDefault();
+          }
+          return;
+        }
+
+        if (key === "ArrowDown") {
+          if (attemptSelectRelativeStream(1)) {
+            event.preventDefault();
+          }
+          return;
+        }
+
+        const normalizedKey = key.toLowerCase();
+        if (normalizedKey === ",") {
+          event.preventDefault();
+          setShowSettings(true);
+          return;
+        }
+
+        if (normalizedKey === "f" || normalizedKey === "k") {
+          if (standaloneControls?.openSearchDialog) {
+            event.preventDefault();
+            standaloneControls.openSearchDialog();
+            return;
+          }
+        }
+
+        if (normalizedKey === "/") {
+          event.preventDefault();
+          setShowKeyboardShortcuts((current) => !current);
+          return;
+        }
+      }
+
+      if (isCtrlOrMeta && event.altKey && !event.shiftKey) {
+        if (key === "ArrowUp") {
+          if (attemptSelectRelativeStream(-1)) {
+            event.preventDefault();
+            return;
+          }
+        }
+
+        if (key === "ArrowDown") {
+          if (attemptSelectRelativeStream(1)) {
+            event.preventDefault();
+            return;
+          }
+        }
+      }
+
+      if (!isCtrlOrMeta && event.altKey && !event.shiftKey) {
+        if (key === "ArrowUp") {
+          if (attemptSelectRelativeStream(-1)) {
+            event.preventDefault();
+            return;
+          }
+        }
+
+        if (key === "ArrowDown") {
+          if (attemptSelectRelativeStream(1)) {
+            event.preventDefault();
+            return;
+          }
+        }
+      }
+
+      if (isCtrlOrMeta && event.shiftKey && !event.altKey) {
+        const normalizedKey = key.toLowerCase();
+        if (normalizedKey === "m") {
+          if (standaloneControls?.canListenLive) {
+            event.preventDefault();
+            standaloneControls.onToggleLiveListening();
+            return;
+          }
+        }
+
+        if (normalizedKey === "a") {
+          if (orderedStreamIds.length > 0) {
+            event.preventDefault();
+            markAllStreamsAsRead();
+            return;
+          }
+        }
+      }
+
+      if (!isCtrlOrMeta && event.shiftKey && !event.altKey && key === "Escape") {
+        if (selectedStreamId) {
+          event.preventDefault();
+          markStreamAsRead(selectedStreamId);
+          return;
+        }
+      }
+
+      if (
+        !isCtrlOrMeta &&
+        !event.altKey &&
+        !event.shiftKey &&
+        key === "Escape" &&
+        showKeyboardShortcuts
+      ) {
+        event.preventDefault();
+        setShowKeyboardShortcuts(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [
+    markAllStreamsAsRead,
+    markStreamAsRead,
+    orderedStreamIds,
+    selectRelativeStream,
+    selectedStreamId,
+    setShowKeyboardShortcuts,
+    setShowSettings,
+    showKeyboardShortcuts,
+    standaloneControls,
+  ]);
 
   const renderConversationStatusBadge = () => {
     if (!standaloneControls) {
@@ -1415,6 +1670,11 @@ function App() {
           onExportPagerFeed={exportPagerFeed}
           isReadOnly={isReadOnly}
           onRequestLogin={requestLogin}
+        />
+
+        <KeyboardShortcutsDialog
+          open={showKeyboardShortcuts}
+          onClose={() => setShowKeyboardShortcuts(false)}
         />
 
         <main className="app-main">
