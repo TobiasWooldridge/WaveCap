@@ -17,6 +17,7 @@ from pydantic import (
 )
 
 from .datetime_utils import ensure_utc, isoformat_utc, optional_isoformat, parse_iso8601
+from . import state_paths
 
 
 class APIModel(BaseModel):
@@ -148,6 +149,28 @@ class TranscriptionResult(APIModel):
     pagerIncident: Optional["PagerIncidentDetails"] = Field(
         default=None, alias="pagerIncident"
     )
+
+    @field_validator("recordingUrl", mode="before")
+    @classmethod
+    def _validate_recording_url(cls, value: Optional[str]) -> Optional[str]:
+        """Return None if a recording path points to a missing file.
+
+        This prevents the UI from attempting to play stale clips when
+        the database contains older entries whose audio files have been
+        removed from disk.
+        """
+        if not value:
+            return None
+        try:
+            # Accept absolute/relative URLs; use the final path segment as the filename
+            name = str(value).rsplit("/", 1)[-1]
+            if not name:
+                return None
+            file_path = state_paths.RECORDINGS_DIR / name
+            return value if file_path.exists() else None
+        except Exception:
+            # Be conservative on unexpected values
+            return None
 
     @field_validator("timestamp", mode="before")
     @classmethod
@@ -340,6 +363,12 @@ class WhisperConfig(APIModel):
             "segmentRepetitionMaxAllowedConsecutiveRepeats",
             "segmentRepetitionMaxRepeats",
         ),
+    )
+    # When a remote HTTP audio source remains effectively silent for this long,
+    # the worker restarts the upstream connection to nudge stuck transports.
+    # Set to null or 0 to disable automatic reconnects on silence.
+    silentStreamReconnectSeconds: Optional[float] = Field(
+        default=3600.0, alias="silentStreamReconnectSeconds"
     )
 
     @field_validator("segmentRepetitionMinCharacters")

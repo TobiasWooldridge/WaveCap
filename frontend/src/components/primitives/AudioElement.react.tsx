@@ -12,7 +12,7 @@ const AudioElement: React.FC<AudioElementProps> = ({
   recordingId,
   recordingUrl,
   refsMap,
-  className = "hidden",
+  className = "visually-hidden",
   preload = "none",
 }) => {
   return (
@@ -33,4 +33,3 @@ const AudioElement: React.FC<AudioElementProps> = ({
 };
 
 export default AudioElement;
-

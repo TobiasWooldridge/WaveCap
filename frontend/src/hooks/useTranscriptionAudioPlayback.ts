@@ -176,6 +176,16 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
 
       const handleError = (error: Event | string) => {
         console.error("❌ Error playing audio:", error);
+        try {
+          const globalAny = window as unknown as { __smartSpeakerShowToast?: (opts: { id?: string; title?: string; message: string; variant?: "success" | "error" | "info" }) => string };
+          globalAny.__smartSpeakerShowToast?.({
+            title: "Playback error",
+            message: "Audio clip not available (file missing).",
+            variant: "error",
+          });
+        } catch {
+          /* ignore toast errors */
+        }
         resetAudioPlaybackState(audio);
       };
 
@@ -263,6 +273,16 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
 
       const handleError = (error: Event | string) => {
         console.error("❌ Error playing audio:", error);
+        try {
+          const globalAny = window as unknown as { __smartSpeakerShowToast?: (opts: { id?: string; title?: string; message: string; variant?: "success" | "error" | "info" }) => string };
+          globalAny.__smartSpeakerShowToast?.({
+            title: "Playback error",
+            message: "Audio clip not available (file missing).",
+            variant: "error",
+          });
+        } catch {
+          /* ignore toast errors */
+        }
         resetAudioPlaybackState(audio);
       };
 

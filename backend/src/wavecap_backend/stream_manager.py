@@ -1115,7 +1115,8 @@ class StreamManager:
                 )
         # Do not persist transient statuses during shutdown.
         if self._owns_executor:
-            await self._executor.close()
+            # Avoid blocking on long-running inference during service shutdown.
+            await self._executor.close(wait=False)
 
 
 __all__ = [

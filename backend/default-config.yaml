@@ -41,6 +41,11 @@ whisper:
   activeSamplesInLookbackPct: 0.10
   # Increase if trailing words are lost, decrease to shave latency.
   silenceHoldSeconds: 1.2
+  # When the upstream HTTP audio stays effectively silent for this many
+  # seconds, restart the connection to nudge stuck transports. Set to 0 or
+  # null to disable automatic reconnects on silence. Streams that are quiet for
+  # extended periods will reconnect roughly once per hour by default.
+  silentStreamReconnectSeconds: 3600
   maxConcurrentProcesses: 2
   # Decoder tweaks to keep phrases consistent across bursts.
   beamSize: 8

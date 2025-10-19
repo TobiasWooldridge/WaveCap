@@ -12,6 +12,7 @@ import { condensePagerTranscriptions, getCondensedFieldValue } from "../utils/pa
 import { getNotifiableAlerts, getTranscriptionDisplayText, isBlankAudioText, isSystemTranscription } from "../utils/transcriptions";
 import { getRecordingElementId } from "./StreamTranscriptionPanel.logic";
 import { TranscriptionSegmentChips } from "./TranscriptionSegmentChips.react";
+import AudioElement from "./primitives/AudioElement.react";
 import { AlertChips } from "./chips/AlertChips.react";
 import { useAuth } from "../contexts/AuthContext";
 import { StreamTranscriptList } from "./StreamTranscriptList.react";
@@ -314,6 +315,26 @@ export const CombinedTranscriptionLog: React.FC<CombinedTranscriptionLogProps> =
                 elementMap.set(t.id, elems);
               });
 
+              // Ensure pager items have corresponding hidden audio elements
+              // so segment playback can target an HTMLAudioElement.
+              const renderedRecordingIds = new Set<string>();
+              const pagerAudioElements: React.ReactNode[] = [];
+              item.message.fragments.forEach((t) => {
+                const url = t.recordingUrl;
+                if (!url) return;
+                const id = getRecordingElementId(url);
+                if (renderedRecordingIds.has(id)) return;
+                renderedRecordingIds.add(id);
+                pagerAudioElements.push(
+                  <AudioElement
+                    key={id}
+                    recordingId={id}
+                    recordingUrl={url}
+                    refsMap={recordingAudioRefs}
+                  />,
+                );
+              });
+
               const address = getCondensedFieldValue(item.message, "address");
               const mapGrid = getCondensedFieldValue(item.message, "map");
               const baseLocationSuffix = (() => {
@@ -373,6 +394,11 @@ export const CombinedTranscriptionLog: React.FC<CombinedTranscriptionLogProps> =
                         hideTimeColumn
                       />
                     </div>
+                    {pagerAudioElements.length > 0 ? (
+                      <div className="hidden" aria-hidden>
+                        {pagerAudioElements}
+                      </div>
+                    ) : null}
                   </div>
                 </article>
               );

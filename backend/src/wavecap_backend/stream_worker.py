@@ -10,6 +10,7 @@ import struct
 import time
 import uuid
 from collections import deque
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from functools import lru_cache
@@ -455,6 +456,18 @@ class StreamWorker:
             int(round(ignore_seconds * self.sample_rate)), 0
         )
 
+        # Silent-stream reconnect watchdog
+        try:
+            threshold = (
+                float(config.silentStreamReconnectSeconds)
+                if getattr(config, "silentStreamReconnectSeconds", None) is not None
+                else 3600.0
+            )
+        except Exception:
+            threshold = 3600.0
+        self._silent_reconnect_seconds = max(float(threshold), 0.0)
+        self._last_non_silent_monotonic = time.monotonic()
+
     def start(self) -> None:
         if self._task and not self._task.done():
             raise RuntimeError("Stream worker already running")
@@ -619,6 +632,12 @@ class StreamWorker:
                     else:
                         queue.task_done()
         finally:
+            # Proactively cancel worker coroutines to reduce await times
+            # during shutdown. Underlying threads may continue, but we
+            # won't block the event loop waiting on model inference.
+            for task in self._worker_tasks:
+                if not task.done():
+                    task.cancel()
             for task in self._worker_tasks:
                 if not task.done():
                     await queue.put(None)
@@ -711,12 +730,36 @@ class StreamWorker:
                                 timeout=0.5,
                             )
                         except asyncio.TimeoutError:
+                            # Check inactivity window (no audio seen)
                             if self._check_audio_inactivity(False):
                                 await self._handle_inactivity_disconnect(
                                     next_reconnect_attempt
                                 )
                                 session_should_reconnect = True
                                 break
+                            # Also check for prolonged low‑energy silence
+                            if (
+                                self.stream.source == StreamSource.AUDIO
+                                and self._silent_reconnect_seconds > 0.0
+                            ):
+                                elapsed = time.monotonic() - self._last_non_silent_monotonic
+                                if elapsed >= self._silent_reconnect_seconds:
+                                    attempt_number = max(next_reconnect_attempt + 1, 1)
+                                    LOGGER.info(
+                                        "Audio stream %s silent for %.0f seconds; scheduling reconnect attempt %d",
+                                        self.stream.id,
+                                        elapsed,
+                                        attempt_number,
+                                    )
+                                    self._upstream_connected = False
+                                    self._pending_reconnect_attempt = attempt_number
+                                    delay_seconds = self._reconnect_delay_seconds(attempt_number)
+                                    reason = f"no audio detected for {self._format_duration_phrase(elapsed)}"
+                                    await self.on_upstream_disconnect(
+                                        self.stream, attempt_number, delay_seconds, reason
+                                    )
+                                    session_should_reconnect = True
+                                    break
                             continue
                         if not chunk:
                             attempt_number = max(next_reconnect_attempt + 1, 1)
@@ -744,12 +787,36 @@ class StreamWorker:
                                 self.stream, attempt_value
                             )
                         had_audio = await self._ingest_pcm_bytes(chunk)
+                        # Check inactivity window (no audio seen)
                         if self._check_audio_inactivity(had_audio):
                             await self._handle_inactivity_disconnect(
                                 next_reconnect_attempt
                             )
                             session_should_reconnect = True
                             break
+                        # After ingest, check if stream has been silent for too long
+                        if (
+                            self.stream.source == StreamSource.AUDIO
+                            and self._silent_reconnect_seconds > 0.0
+                        ):
+                            elapsed = time.monotonic() - self._last_non_silent_monotonic
+                            if elapsed >= self._silent_reconnect_seconds:
+                                attempt_number = max(next_reconnect_attempt + 1, 1)
+                                LOGGER.info(
+                                    "Audio stream %s silent for %.0f seconds; scheduling reconnect attempt %d",
+                                    self.stream.id,
+                                    elapsed,
+                                    attempt_number,
+                                )
+                                self._upstream_connected = False
+                                self._pending_reconnect_attempt = attempt_number
+                                delay_seconds = self._reconnect_delay_seconds(attempt_number)
+                                reason = f"no audio detected for {self._format_duration_phrase(elapsed)}"
+                                await self.on_upstream_disconnect(
+                                    self.stream, attempt_number, delay_seconds, reason
+                                )
+                                session_should_reconnect = True
+                                break
                 finally:
                     if process is not None:
                         if process.returncode is None:
@@ -805,7 +872,10 @@ class StreamWorker:
                 worker_failed = True
             self._pending_reconnect_attempt = None
             self._upstream_connected = True
-            await self._shutdown_transcription_workers(flush=not worker_failed)
+            # Prefer a fast shutdown when a stop is requested to avoid
+            # long waits while Whisper finishes in-flight work.
+            should_flush = (not worker_failed) and (not self._stop_event.is_set())
+            await self._shutdown_transcription_workers(flush=should_flush)
         if worker_failure is not None:
             raise worker_failure
 
@@ -937,6 +1007,14 @@ class StreamWorker:
         samples = trimmed_float_samples
         if samples.size == 0:
             return result
+        # Update silence watchdog based on basic activity detection
+        try:
+            active_ratio = float(np.mean(np.abs(samples) > self._silence_threshold))
+        except Exception:
+            active_ratio = 0.0
+        is_low_energy = self._is_low_energy(samples)
+        if active_ratio >= self._active_ratio_threshold or not is_low_energy:
+            self._last_non_silent_monotonic = time.monotonic()
         chunks = self._chunker.add_samples(samples)
         if not chunks:
             return result
@@ -1142,12 +1220,9 @@ class StreamWorker:
             else np.empty(0, dtype=np.float32)
         )
         if record_samples.size > 0:
-            if text == BLANK_AUDIO_TOKEN:
-                peak = float(np.max(np.abs(record_samples))) if record_samples.size else 0.0
-                if peak > 0.0:
-                    recording_file = await self._write_recording(record_samples)
-            else:
-                recording_file = await self._write_recording(record_samples)
+            # Always persist the recording for auditing, including blank-audio
+            # placeholders, so operators can review what was heard.
+            recording_file = await self._write_recording(record_samples)
         # If we excluded the prefix from the saved file, shift segment timings
         # to be relative to the file start so UI playback aligns without a
         # recordingStartOffset.

@@ -41,15 +41,13 @@ export const useLiveAudio = (
   const [attachVersion, setAttachVersion] = useState(0);
   const [streamNonce, setStreamNonce] = useState<string | null>(null);
   const source = useMemo(() => {
-    if (!baseUrl) {
-      return "";
-    }
-    if (!streamNonce) {
-      return baseUrl;
-    }
+    if (!baseUrl) return "";
     const url = new URL(baseUrl, window.location.origin);
-    url.searchParams.set("session", streamNonce);
-    return url.pathname + url.search;
+    if (streamNonce) {
+      url.searchParams.set("session", streamNonce);
+    }
+    // Always return an absolute URL to avoid origin/BASE href pitfalls
+    return url.toString();
   }, [baseUrl, streamNonce]);
 
   const setAudio = useCallback((node: HTMLAudioElement | null) => {

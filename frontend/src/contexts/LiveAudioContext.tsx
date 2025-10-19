@@ -144,6 +144,7 @@ export const LiveAudioProvider = ({ children }: LiveAudioProviderProps) => {
         ref={liveAudio.audioRef}
         className="visually-hidden"
         autoPlay
+        playsInline
         preload="none"
         src={liveAudio.source}
         data-live-session={liveAudio.streamNonce ?? undefined}

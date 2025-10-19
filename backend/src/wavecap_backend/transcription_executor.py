@@ -74,8 +74,13 @@ class TranscriptionExecutor:
         await self._enqueue_job(job)
         return await future
 
-    async def close(self) -> None:
-        """Signal workers to exit and wait for them to finish."""
+    async def close(self, *, wait: bool = True) -> None:
+        """Signal workers to exit and optionally wait for them to finish.
+
+        When ``wait`` is False, sentinels are enqueued but the method will not
+        block on thread joins. This is useful during process shutdown to avoid
+        long waits for in-flight model inference to complete.
+        """
 
         with self._lock:
             if not self._started or self._closing:
@@ -86,8 +91,9 @@ class TranscriptionExecutor:
             return
         for _ in range(len(self._threads)):
             await self._enqueue_sentinel()
-        await asyncio.gather(*(asyncio.to_thread(thread.join) for thread in self._threads))
-        self._threads.clear()
+        if wait:
+            await asyncio.gather(*(asyncio.to_thread(thread.join) for thread in self._threads))
+            self._threads.clear()
 
     async def _enqueue_job(self, job: _ExecutorJob[T]) -> None:
         while True:
