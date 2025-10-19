@@ -18,6 +18,7 @@ import { StreamTranscriptList } from "./StreamTranscriptList.react";
 import StreamStatusIndicator from "./StreamStatusIndicator.react";
 import { Timestamp } from "./primitives/Timestamp.react";
 import { TimeInterval } from "./primitives/TimeInterval.react";
+import { getStreamAccentColor } from "../utils/streamColors";
 
 interface CombinedTranscriptionLogProps {
   streams: Stream[];
@@ -56,8 +57,8 @@ export const CombinedTranscriptionLog: React.FC<CombinedTranscriptionLogProps> =
   loading = false,
   limit = 400,
 }) => {
-  const { transcriptCorrectionEnabled } = useUISettings();
-  const { baseLocation } = useUISettings();
+  const { transcriptCorrectionEnabled, baseLocation, colorCodingEnabled } =
+    useUISettings();
   const {
     recordingAudioRefs,
     playingRecording,
@@ -130,6 +131,13 @@ export const CombinedTranscriptionLog: React.FC<CombinedTranscriptionLogProps> =
   const streamMap = useMemo(() => {
     const map = new Map<string, Stream>();
     streams.forEach((s) => map.set(s.id, s));
+    return map;
+  }, [streams]);
+  const streamColorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    streams.forEach((s) => {
+      map.set(s.id, getStreamAccentColor(s.id));
+    });
     return map;
   }, [streams]);
   // number of items available for display
@@ -245,6 +253,10 @@ export const CombinedTranscriptionLog: React.FC<CombinedTranscriptionLogProps> =
           <div className="transcript-message-list">
             {combinedItems.map((item) => {
               const stream = streamMap.get(item.streamId) ?? undefined;
+              const channelColor = colorCodingEnabled
+                ? streamColorMap.get(item.streamId) ??
+                  getStreamAccentColor(item.streamId)
+                : undefined;
               if (item.kind === "audio") {
                 const ordered = transcriptionsByStream.get(item.streamId) ?? [];
                 return (
@@ -264,10 +276,16 @@ export const CombinedTranscriptionLog: React.FC<CombinedTranscriptionLogProps> =
                     onPlaySegment={playSegment}
                     isSegmentCurrentlyPlaying={isSegmentCurrentlyPlaying}
                     compact
+                    channelColor={channelColor}
                   />
                 );
               }
               // pager item: reuse the same compact table used in the pager view, wrapped for consistent border and header
+              const channelStyle = channelColor
+                ? ({
+                    "--transcript-channel-color": channelColor,
+                  } as React.CSSProperties)
+                : undefined;
               const elementMap = new Map<string, React.ReactNode[]>();
               item.message.fragments.forEach((t) => {
                 const displayText = getTranscriptionDisplayText(t);
@@ -321,7 +339,12 @@ export const CombinedTranscriptionLog: React.FC<CombinedTranscriptionLogProps> =
                   </div>
                   <div className="transcript-message__content">
                     <header className="transcript-message__header">
-                      <span className="transcript-message__channel">{item.streamName}</span>
+                      <span
+                        className="transcript-message__channel"
+                        style={channelStyle}
+                      >
+                        {item.streamName}
+                      </span>
                       {item.message.timestamp ? (
                         <>
                           <Timestamp

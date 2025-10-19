@@ -45,6 +45,7 @@ export interface TranscriptMessageRowProps {
     endTime: number,
   ) => boolean;
   compact?: boolean;
+  channelColor?: string;
 }
 
 export const TranscriptMessageRow: React.FC<TranscriptMessageRowProps> = ({
@@ -62,6 +63,7 @@ export const TranscriptMessageRow: React.FC<TranscriptMessageRowProps> = ({
   onPlaySegment,
   isSegmentCurrentlyPlaying,
   compact = false,
+  channelColor,
 }) => {
   const isSystemEvent = isSystemTranscription(transcription);
   const blankAudio = isBlankAudioText(transcription.text);
@@ -191,7 +193,18 @@ export const TranscriptMessageRow: React.FC<TranscriptMessageRowProps> = ({
       </div>
       <div className="transcript-message__content">
         <header className="transcript-message__header">
-          <span className="transcript-message__channel">{streamName}</span>
+          <span
+            className="transcript-message__channel"
+            style={
+              channelColor
+                ? ({
+                    "--transcript-channel-color": channelColor,
+                  } as React.CSSProperties)
+                : undefined
+            }
+          >
+            {streamName}
+          </span>
           {transcription.timestamp ? (
             <>
               <Timestamp
