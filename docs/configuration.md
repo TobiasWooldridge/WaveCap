@@ -395,9 +395,10 @@ If background noise triggers false starts, raise `silenceThreshold` or `silenceH
 - `blankAudioMinActiveRatio`: Require this proportion of samples to sit above the silence threshold before we surface a blank-audio placeholder. Increase it to suppress hiss-heavy feeds.
 - `blankAudioMinRms`: Minimum RMS energy needed for a blank-audio entry. Raise it if background static should stay hidden; lower it when quiet radios still need to appear.
 
-Automatic reconnection on prolonged silence
+ Automatic reconnection on prolonged silence
 
 - `silentStreamReconnectSeconds`: When an HTTP audio source remains effectively silent for this many seconds, the backend restarts the upstream connection. This nudges stuck transports that keep delivering zero-energy audio. Set to `0` or `null` to disable. Default: `3600` (one hour).
+ - `upstreamNoDataReconnectSeconds`: When no PCM bytes are received from the upstream process for this many seconds (a transport stall), the backend restarts the upstream connection. This is independent of audio energy and safe to keep enabled. Set to `0` or `null` to disable. Default: `120` seconds.
 
 When Whisper returns no text but these thresholds are met, the UI shows a "Silence" chip with playback controls so operators can review the captured audio manually. Short or low-energy bursts are filtered out.
 

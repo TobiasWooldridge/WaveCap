@@ -46,6 +46,10 @@ whisper:
   # null to disable automatic reconnects on silence. Streams that are quiet for
   # extended periods will reconnect roughly once per hour by default.
   silentStreamReconnectSeconds: 3600
+  # If ffmpeg reads no PCM bytes at all for this long (transport/write stall),
+  # restart the upstream regardless of audio energy. This is separate from
+  # silence-based reconnects above and is safe to keep enabled.
+  upstreamNoDataReconnectSeconds: 120
   maxConcurrentProcesses: 2
   # Decoder tweaks to keep phrases consistent across bursts.
   beamSize: 8

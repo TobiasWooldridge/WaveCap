@@ -467,6 +467,17 @@ class StreamWorker:
             threshold = 3600.0
         self._silent_reconnect_seconds = max(float(threshold), 0.0)
         self._last_non_silent_monotonic = time.monotonic()
+        # Watchdog for upstream stalls (no PCM bytes received from ffmpeg)
+        try:
+            stall_seconds = (
+                float(config.upstreamNoDataReconnectSeconds)
+                if getattr(config, "upstreamNoDataReconnectSeconds", None) is not None
+                else 120.0
+            )
+        except Exception:
+            stall_seconds = 120.0
+        self._no_data_reconnect_seconds = max(float(stall_seconds or 0.0), 0.0)
+        self._last_byte_monotonic = time.monotonic()
 
     def start(self) -> None:
         if self._task and not self._task.done():
@@ -730,14 +741,24 @@ class StreamWorker:
                                 timeout=0.5,
                             )
                         except asyncio.TimeoutError:
-                            # Check inactivity window (no audio seen)
-                            if self._check_audio_inactivity(False):
-                                await self._handle_inactivity_disconnect(
-                                    next_reconnect_attempt
-                                )
-                                session_should_reconnect = True
-                                break
-                            # Also check for prolonged low‑energy silence
+                            # First, check for upstream stall (no PCM bytes received)
+                            if self._no_data_reconnect_seconds > 0.0:
+                                elapsed_nd = time.monotonic() - self._last_byte_monotonic
+                                if elapsed_nd >= self._no_data_reconnect_seconds:
+                                    attempt_number = max(next_reconnect_attempt + 1, 1)
+                                    reason = (
+                                        f"no data received from upstream for "
+                                        f"{self._format_duration_phrase(elapsed_nd)}"
+                                    )
+                                    self._upstream_connected = False
+                                    self._pending_reconnect_attempt = attempt_number
+                                    delay_seconds = self._reconnect_delay_seconds(attempt_number)
+                                    await self.on_upstream_disconnect(
+                                        self.stream, attempt_number, delay_seconds, reason
+                                    )
+                                    session_should_reconnect = True
+                                    break
+                            # Also check for prolonged low‑energy silence (audio flowing)
                             if (
                                 self.stream.source == StreamSource.AUDIO
                                 and self._silent_reconnect_seconds > 0.0
@@ -779,6 +800,7 @@ class StreamWorker:
                             session_should_reconnect = True
                             break
                         next_reconnect_attempt = 0
+                        self._last_byte_monotonic = time.monotonic()
                         if not self._upstream_connected:
                             attempt_value = self._pending_reconnect_attempt or 1
                             self._upstream_connected = True

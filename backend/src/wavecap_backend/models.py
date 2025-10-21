@@ -370,6 +370,14 @@ class WhisperConfig(APIModel):
     silentStreamReconnectSeconds: Optional[float] = Field(
         default=3600.0, alias="silentStreamReconnectSeconds"
     )
+    # If the upstream transport delivers no PCM bytes for this long while
+    # connected, treat it as a stalled connection and restart the upstream.
+    # This is distinct from audio-energy silence: it only triggers when the
+    # process stdout yields no data at all for the duration. Set to null or 0
+    # to disable.
+    upstreamNoDataReconnectSeconds: Optional[float] = Field(
+        default=120.0, alias="upstreamNoDataReconnectSeconds"
+    )
 
     @field_validator("segmentRepetitionMinCharacters")
     @classmethod
@@ -399,6 +407,18 @@ class WhisperConfig(APIModel):
         seconds = float(value)
         if seconds <= 0:
             raise ValueError("noAudioReconnectSeconds must be positive when provided")
+        return seconds
+
+    @field_validator("upstreamNoDataReconnectSeconds")
+    @classmethod
+    def _validate_upstream_no_data_reconnect_seconds(
+        cls, value: Optional[float]
+    ) -> Optional[float]:
+        if value is None:
+            return None
+        seconds = float(value)
+        if seconds <= 0:
+            return 0.0
         return seconds
 
 
