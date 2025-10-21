@@ -478,6 +478,10 @@ class StreamWorker:
             stall_seconds = 120.0
         self._no_data_reconnect_seconds = max(float(stall_seconds or 0.0), 0.0)
         self._last_byte_monotonic = time.monotonic()
+        # Keep ffmpeg read waits bounded so it can self-recover on network blips
+        self._ffmpeg_rw_timeout_us = int(15.0 * 1e6)
+        # Track last disconnect cause to tailor backoff
+        self._last_disconnect_was_stall = False
 
     def start(self) -> None:
         if self._task and not self._task.done():
@@ -702,10 +706,25 @@ class StreamWorker:
                 try:
                     process = await asyncio.create_subprocess_exec(
                         "ffmpeg",
+                        "-nostdin",
+                        "-hide_banner",
                         "-loglevel",
                         "warning",
+                        # Help ffmpeg recover from short network interruptions
+                        "-reconnect",
+                        "1",
+                        "-reconnect_streamed",
+                        "1",
+                        "-reconnect_at_eof",
+                        "1",
+                        "-rw_timeout",
+                        str(self._ffmpeg_rw_timeout_us),
+                        # Some hosts gate by user agent; present a generic UA
+                        "-user_agent",
+                        "WaveCap/1.0 (+https://example.invalid)",
                         "-i",
                         self.stream.url,
+                        # Decode to mono 16k s16le PCM on stdout
                         "-vn",
                         "-ac",
                         "1",
@@ -722,6 +741,8 @@ class StreamWorker:
                     worker_failed = True
                     break
                 assert process.stdout is not None
+                # Fresh session; measure stall from this point until first bytes arrive
+                self._last_byte_monotonic = time.monotonic()
                 try:
                     while True:
                         if self._worker_failure is not None:
@@ -756,6 +777,7 @@ class StreamWorker:
                                     await self.on_upstream_disconnect(
                                         self.stream, attempt_number, delay_seconds, reason
                                     )
+                                    self._last_disconnect_was_stall = True
                                     session_should_reconnect = True
                                     break
                             # Also check for prolonged low‑energy silence (audio flowing)
@@ -805,6 +827,7 @@ class StreamWorker:
                             attempt_value = self._pending_reconnect_attempt or 1
                             self._upstream_connected = True
                             self._pending_reconnect_attempt = None
+                            self._last_disconnect_was_stall = False
                             await self.on_upstream_reconnect(
                                 self.stream, attempt_value
                             )
@@ -978,6 +1001,15 @@ class StreamWorker:
         )
 
     async def _wait_before_reconnect(self, attempt: int) -> bool:
+        # Fast path for transport stalls: immediate retry, let ffmpeg self-reconnect
+        if self._last_disconnect_was_stall:
+            LOGGER.info(
+                "Stalled upstream for stream %s; attempting immediate reconnect (attempt %d)",
+                self.stream.id,
+                attempt,
+            )
+            self._last_disconnect_was_stall = False
+            return not self._stop_event.is_set()
         delay = self._reconnect_delay_seconds(attempt)
         if delay <= 0:
             LOGGER.info(
