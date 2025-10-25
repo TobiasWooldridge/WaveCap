@@ -52,6 +52,7 @@ import StreamSidebar, {
   type StreamSortMode,
 } from "./components/StreamSidebar.react";
 import { buildSidebarComparator } from "./utils/sidebarSort";
+import { isBlankAudioText } from "./utils/transcriptions";
 import StreamStatusIndicator from "./components/StreamStatusIndicator.react";
 import Spinner from "./components/primitives/Spinner.react";
 import { Timestamp } from "./components/primitives/Timestamp.react";
@@ -248,18 +249,18 @@ const buildPreviewText = (
     return "No activity yet";
   }
 
-  const text = transcription.correctedText ?? transcription.text ?? "";
-  const trimmed = text.trim();
+  const baseText = (transcription.correctedText ?? transcription.text ?? "").trim();
 
-  if (!trimmed) {
-    return "[Blank audio]";
+  // Normalize blank/silence placeholder to a consistent UX label
+  if (!baseText || isBlankAudioText(baseText)) {
+    return "No transcription";
   }
 
-  if (trimmed.length > 200) {
-    return `${trimmed.slice(0, 197)}…`;
+  if (baseText.length > 200) {
+    return `${baseText.slice(0, 197)}…`;
   }
 
-  return trimmed;
+  return baseText;
 };
 
 const renderStandaloneStatusIcon = (

@@ -254,6 +254,10 @@ adjust the phrases, and choose whether each rule plays a chime or only shows a b
 
 ## SDR devices and streams
 
+By default, the generated configuration does not include an active `sdr` block.
+WaveCap only initialises SDR support when an `sdr.devices` list is present in
+your configuration. Uncomment or add the section below to enable SDR capture.
+
 WaveCap can ingest audio directly from a local SDR when available on the host machine. Devices are addressed via SoapySDR; for the SDRplay RSPdx install the SDRplay API and the `SoapySDRPlay3` module on the host or in the container, then define a device and one or more SDR-backed streams.
 
 1) Register devices in a top-level `sdr.devices` list:

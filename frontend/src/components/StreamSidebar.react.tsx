@@ -206,7 +206,11 @@ const StreamSidebar = ({
                       })()}
                     </Flex>
                     <div className="stream-sidebar__item-preview text-body-secondary">
-                      {item.previewText}
+                      {item.previewText.trim().toLowerCase() === "no transcription" ? (
+                        <em>No transcription</em>
+                      ) : (
+                        item.previewText
+                      )}
                     </div>
                   </Flex>
                   <Flex

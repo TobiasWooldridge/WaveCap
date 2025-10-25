@@ -42,8 +42,20 @@ if [ ! -d "$VENV_DIR" ]; then
 fi
 
 source "$VENV_DIR/bin/activate"
-pip install --upgrade pip >/dev/null
-(cd "$BACKEND_DIR" && pip install -e .)
+# Ensure pip is available in the venv even on externally-managed systems
+# 1) Try ensurepip (may be unavailable on some Debian/Ubuntu installs)
+python -m ensurepip --upgrade >/dev/null 2>&1 || true
+# 2) If pip is still missing, bootstrap with get-pip
+if ! command -v pip >/dev/null 2>&1; then
+  echo "Bootstrapping pip in virtualenv..."
+  curl -fsSL https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py
+  python /tmp/get-pip.py >/dev/null
+  rm -f /tmp/get-pip.py
+fi
+
+# Always invoke pip via the venv's python for reliability
+python -m pip install --upgrade pip >/dev/null
+(cd "$BACKEND_DIR" && python -m pip install -e .)
 echo
 
 echo "Installing frontend dependencies..."

@@ -42,7 +42,7 @@ from .models import (
     WhisperConfig,
 )
 from .models import StreamSource
-from .sdr import get_sdr_manager
+# Avoid importing SDR at module import time; we'll import lazily when needed.
 from .state_paths import RECORDINGS_DIR
 from .stream_defaults import resolve_ignore_first_seconds
 from .transcription_postprocessor import PhraseCanonicalizer
@@ -672,6 +672,8 @@ class StreamWorker:
         try:
             # SDR sources: read PCM from the SDR manager instead of ffmpeg
             if self.stream.source == StreamSource.SDR:
+                # Import lazily to avoid touching optional SDR dependencies
+                from .sdr import get_sdr_manager
                 mgr = get_sdr_manager()
                 spec = mgr.get_stream_spec(self.stream.id)
                 if spec is None:

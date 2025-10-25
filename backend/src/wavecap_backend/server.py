@@ -9,6 +9,7 @@ import json
 import logging
 import os
 from contextlib import asynccontextmanager, suppress
+import time
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Optional, Sequence
@@ -67,7 +68,8 @@ from .whisper_transcriber import (
     PassthroughTranscriber,
     WhisperTranscriber,
 )
-from .sdr import get_sdr_manager, SdrChannelSpec
+# Note: Avoid importing the optional SDR module at import time.
+# Import lazily only when SDR is configured/used.
 
 TRANSCRIBER_ENV_FLAG = "WAVECAP_USE_PASSTHROUGH_TRANSCRIBER"
 
@@ -102,6 +104,9 @@ class AppState:
         # Configure SDR devices (if any) early so workers can open channels
         sdr_cfg = config.sdr
         if sdr_cfg and sdr_cfg.devices:
+            # Import lazily to avoid touching SDR dependencies when unused
+            from .sdr import get_sdr_manager
+
             mgr = get_sdr_manager()
             for dev in sdr_cfg.devices:
                 mgr.configure_device(
@@ -179,6 +184,28 @@ async def stream_events(
         except WebSocketDisconnect:
             pass
 
+    async def send_heartbeat(interval_seconds: float = 30.0) -> None:
+        """Periodically send a ping message to keep intermediaries from idling out the WebSocket.
+
+        Some reverse proxies (e.g., Cloudflare) close idle WebSocket connections after a short
+        period without any frames. Sending a lightweight application-level heartbeat ensures
+        there is regular activity so long-lived dashboards stay connected.
+        """
+        try:
+            while True:
+                await asyncio.sleep(max(interval_seconds, 5.0))
+                try:
+                    payload = {"type": "ping", "timestamp": int(time.time() * 1000)}
+                    await websocket.send_text(json.dumps(payload))
+                except WebSocketDisconnect:
+                    break
+                except Exception as exc:  # pragma: no cover - defensive
+                    # Log and continue; heartbeat failures should not tear down the connection.
+                    LOGGER.debug("Heartbeat send failed for %s: %s", client_label, exc)
+        except asyncio.CancelledError:
+            # Task cancelled during shutdown/cleanup
+            pass
+
     async def send_error(message: str, request_id: Optional[str] = None) -> None:
         LOGGER.warning(
             "WebSocket error for %s: %s (request_id=%s)",
@@ -219,15 +246,15 @@ async def stream_events(
                 return
         try:
             if action == "start_transcription":
-                stream_id = message.get("streamId")
-                if not isinstance(stream_id, str) or not stream_id:
-                    raise ValueError("streamId is required")
-                await manager.start_stream(stream_id)
+                # Runtime start via UI is disabled; configuration controls enabled state.
+                raise ValueError(
+                    "Enable streams via configuration (config.yaml); UI start is disabled"
+                )
             elif action == "stop_transcription":
-                stream_id = message.get("streamId")
-                if not isinstance(stream_id, str) or not stream_id:
-                    raise ValueError("streamId is required")
-                await manager.stop_stream(stream_id)
+                # Runtime stop via UI is disabled; configuration controls enabled state.
+                raise ValueError(
+                    "Disable streams via configuration (config.yaml); UI stop is disabled"
+                )
             elif action == "reset_stream":
                 stream_id = message.get("streamId")
                 if not isinstance(stream_id, str) or not stream_id:
@@ -293,10 +320,11 @@ async def stream_events(
 
     sender = asyncio.create_task(send_events())
     receiver = asyncio.create_task(receive_commands())
+    heartbeat = asyncio.create_task(send_heartbeat())
     try:
         await asyncio.wait({sender, receiver}, return_when=asyncio.FIRST_COMPLETED)
     finally:
-        for task in (sender, receiver):
+        for task in (sender, receiver, heartbeat):
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task
@@ -801,8 +829,16 @@ def create_app() -> FastAPI:
 
     @app.get("/api/sdr/status")
     async def sdr_status(state: AppState = Depends(get_state)) -> dict:
-        manager = get_sdr_manager()
+        # If no SDR is configured, avoid importing the optional module and
+        # return an empty status payload.
+        cfg = state.config.sdr
+        if not cfg or not cfg.devices:
+            return {"activeDevices": [], "configuredDevices": []}
         try:
+            # Import lazily to avoid initializing drivers unnecessarily.
+            from .sdr import get_sdr_manager
+
+            manager = get_sdr_manager()
             return await manager.get_status()
         except Exception as exc:  # pragma: no cover - defensive
             LOGGER.error("Failed to read SDR status: %s", exc)

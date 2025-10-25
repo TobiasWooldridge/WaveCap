@@ -137,17 +137,17 @@ streams:
 # Local SDR devices for on-hardware capture (optional). Configure a SoapySDR
 # device that can be used by streams with source: sdr. The SDRplay RSPdx is
 # supported via the SoapySDRPlay3 module when installed on the host.
-sdr:
-  devices:
-    - id: rspdx
-      soapy: "driver=sdrplay"
-      sampleRateHz: 240000   # 240 kS/s keeps CPU low and covers nearby channels
-      # gainDb: 40           # Optional fixed gain; leave unset to use device defaults
-      # gainMode: auto       # 'auto' enables device AGC when supported
-      # rfBandwidthHz: 200000 # Hardware IF bandwidth; leave unset for driver default
-      # antenna: "RX"        # Optional antenna selection
-      # ppmCorrection: 0.0   # Optional frequency correction in parts-per-million
-      # loOffsetHz: 250000   # Optional LO offset to dodge DC spike
+# sdr:
+#   devices:
+#     - id: rspdx
+#       soapy: "driver=sdrplay"
+#       sampleRateHz: 240000   # 240 kS/s keeps CPU low and covers nearby channels
+#       # gainDb: 40           # Optional fixed gain; leave unset to use device defaults
+#       # gainMode: auto       # 'auto' enables device AGC when supported
+#       # rfBandwidthHz: 200000 # Hardware IF bandwidth; leave unset for driver default
+#       # antenna: "RX"        # Optional antenna selection
+#       # ppmCorrection: 0.0   # Optional frequency correction in parts-per-million
+#       # loOffsetHz: 250000   # Optional LO offset to dodge DC spike
 
 combinedStreamViews:
   - id: aus-emergency-overview
