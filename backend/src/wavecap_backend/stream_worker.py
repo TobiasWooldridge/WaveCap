@@ -42,6 +42,9 @@ from .models import (
     WhisperConfig,
 )
 from .models import StreamSource
+# Remote upstream support
+from .models import RemoteUpstreamConfig
+from .remote_streams import MultiUpstreamSelector
 # Avoid importing SDR at module import time; we'll import lazily when needed.
 from .state_paths import RECORDINGS_DIR
 from .stream_defaults import resolve_ignore_first_seconds
@@ -301,6 +304,7 @@ class StreamWorker:
         config: WhisperConfig,
         transcription_executor: Optional[TranscriptionExecutor] = None,
         initial_prompt: Optional[str] = None,
+        remote_upstreams: Optional[list[RemoteUpstreamConfig]] = None,
     ) -> None:
         self.stream = stream
         self.transcriber = transcriber
@@ -319,6 +323,8 @@ class StreamWorker:
         self._upstream_connected = True
         self._pending_reconnect_attempt: Optional[int] = None
         self._initial_prompt = (initial_prompt or "").strip() or None
+        self._remote_selector: Optional[MultiUpstreamSelector] = None
+        self._remote_upstreams: Optional[list[RemoteUpstreamConfig]] = remote_upstreams
 
         self.sample_rate = max(config.sampleRate, 1)
         max_chunk_seconds = max(float(config.chunkLength), 1.0)
@@ -670,23 +676,25 @@ class StreamWorker:
         self._upstream_connected = True
         self._pending_reconnect_attempt = None
         try:
-            # SDR sources: read PCM from the SDR manager instead of ffmpeg
-            if self.stream.source == StreamSource.SDR:
-                # Import lazily to avoid touching optional SDR dependencies
-                from .sdr import get_sdr_manager
-                mgr = get_sdr_manager()
-                spec = mgr.get_stream_spec(self.stream.id)
-                if spec is None:
-                    raise RuntimeError(f"SDR spec not registered for stream {self.stream.id}")
-                channel = await mgr.open_channel(spec, self.sample_rate)
+            # Remote sources: multiplex bytes from multiple upstreams
+            if self.stream.source == StreamSource.REMOTE:
+                selector = MultiUpstreamSelector(
+                    upstreams=self._remote_upstreams or [],
+                    target_sample_rate=self.sample_rate,
+                    read_size_bytes=self._read_size_bytes,
+                )
+                self._remote_selector = selector
+                await selector.start()
                 try:
                     while not self._stop_event.is_set():
-                        chunk = await channel.read(max_wait_seconds=0.5)
-                        if chunk:
-                            await self._ingest_pcm_bytes(chunk)
+                        picked = await selector.read(timeout=0.5)
+                        if picked is None:
+                            continue
+                        _source_id, chunk = picked
+                        await self._ingest_pcm_bytes(chunk)
                     await self._flush_pending_chunks()
                 finally:
-                    await channel.close()
+                    await selector.stop()
                 return
 
             while not self._stop_event.is_set():
@@ -1081,6 +1089,19 @@ class StreamWorker:
         for chunk in chunks:
             await self._chunk_queue.put(chunk)
         return result
+
+    # Public API for server-side push ingest
+    async def ingest_remote_push(self, source_id: str, data: bytes) -> None:
+        selector = self._remote_selector
+        if selector is None:
+            raise RuntimeError("Remote ingest not available for this stream")
+        await selector.push_bytes(source_id, data)
+
+    def get_remote_upstream_states(self):
+        selector = self._remote_selector
+        if selector is None:
+            return []
+        return selector.states()
 
     async def _flush_pending_chunks(self) -> None:
         chunks = self._chunker.flush()

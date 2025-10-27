@@ -53,6 +53,7 @@ from .models import (
     Stream,
     StreamSource,
     StreamStatus,
+    RemoteIngestServerConfig,
     TranscriptionQueryResponse,
     TranscriptionResult,
     TranscriptionReviewStatus,
@@ -101,25 +102,7 @@ class AppState:
         self.transcriber = _create_transcriber(config)
         self.stream_manager = StreamManager(config, self.database, self.transcriber)
         self.fixture_set = fixture_set.strip() if fixture_set else ""
-        # Configure SDR devices (if any) early so workers can open channels
-        sdr_cfg = config.sdr
-        if sdr_cfg and sdr_cfg.devices:
-            # Import lazily to avoid touching SDR dependencies when unused
-            from .sdr import get_sdr_manager
-
-            mgr = get_sdr_manager()
-            for dev in sdr_cfg.devices:
-                mgr.configure_device(
-                    dev.id,
-                    dev.soapy,
-                    dev.sampleRateHz,
-                    dev.gainDb,
-                    gain_mode=dev.gainMode,
-                    rf_bandwidth_hz=dev.rfBandwidthHz,
-                    antenna=dev.antenna,
-                    ppm_correction=dev.ppmCorrection,
-                    lo_offset_hz=dev.loOffsetHz,
-                )
+        # SDR devices are no longer configured in WaveCap. Use WaveCap‑SDR.
 
     async def shutdown(self) -> None:
         await self.stream_manager.shutdown()
@@ -799,7 +782,7 @@ def create_app() -> FastAPI:
         stream = state.stream_manager.streams.get(stream_id)
         if not stream:
             raise HTTPException(status_code=404, detail="Stream not found")
-        if stream.source not in (StreamSource.AUDIO, StreamSource.SDR):
+        if stream.source not in (StreamSource.AUDIO, StreamSource.REMOTE):
             raise HTTPException(
                 status_code=400, detail="Stream does not provide live audio"
             )
@@ -827,22 +810,7 @@ def create_app() -> FastAPI:
         headers = {"Cache-Control": "no-store"}
         return StreamingResponse(iterator, media_type="audio/wav", headers=headers)
 
-    @app.get("/api/sdr/status")
-    async def sdr_status(state: AppState = Depends(get_state)) -> dict:
-        # If no SDR is configured, avoid importing the optional module and
-        # return an empty status payload.
-        cfg = state.config.sdr
-        if not cfg or not cfg.devices:
-            return {"activeDevices": [], "configuredDevices": []}
-        try:
-            # Import lazily to avoid initializing drivers unnecessarily.
-            from .sdr import get_sdr_manager
-
-            manager = get_sdr_manager()
-            return await manager.get_status()
-        except Exception as exc:  # pragma: no cover - defensive
-            LOGGER.error("Failed to read SDR status: %s", exc)
-            raise HTTPException(status_code=500, detail="Unable to read SDR status") from exc
+    # SDR status endpoint removed; integrate with WaveCap‑SDR for device details.
 
     @app.websocket("/ws")
     async def websocket_endpoint(
@@ -889,6 +857,50 @@ def create_app() -> FastAPI:
     @app.get("/api/health")
     async def health() -> dict:
         return {"status": "ok"}
+
+    @app.post("/api/ingest/{stream_id}/audio")
+    async def ingest_remote_audio(
+        stream_id: str,
+        request: Request,
+        state: AppState = Depends(get_state),
+    ) -> Response:
+        """Accepts push-mode remote audio for a REMOTE stream.
+
+        Headers:
+          - X-Ingest-Password: required when config.ingest.password is set
+          - X-Source-Id: identifier of the upstream within stream.remoteUpstreams (mode==push)
+          - X-Audio-Rate: optional integer sample rate hint (must match configured)
+        Body: raw PCM bytes (mono s16le or f32 depending on negotiated format)
+        """
+        cfg: RemoteIngestServerConfig | None = state.config.ingest
+        expected_password = (cfg.password.strip() if (cfg and cfg.password) else None)  # type: ignore[union-attr]
+        provided = request.headers.get("X-Ingest-Password") or request.headers.get("x-ingest-password")
+        if expected_password:
+            if not provided or provided.strip() != expected_password:
+                raise HTTPException(status_code=401, detail="Invalid ingest password")
+
+        source_id = request.headers.get("X-Source-Id") or request.headers.get("x-source-id")
+        if not source_id or not source_id.strip():
+            raise HTTPException(status_code=400, detail="Missing X-Source-Id header")
+
+        worker = state.stream_manager.workers.get(stream_id)
+        if worker is None:
+            raise HTTPException(status_code=409, detail="Stream is not actively transcribing")
+        stream = state.stream_manager.streams.get(stream_id)
+        if stream is None:
+            raise HTTPException(status_code=404, detail="Stream not found")
+        if stream.source != StreamSource.REMOTE:
+            raise HTTPException(status_code=400, detail="Stream does not accept remote ingest")
+
+        try:
+            async for chunk in request.stream():  # type: ignore[attr-defined]
+                if not chunk:
+                    continue
+                await worker.ingest_remote_push(source_id.strip(), bytes(chunk))
+        except Exception as exc:  # pragma: no cover - defensive
+            LOGGER.warning("Remote ingest error for %s (%s): %s", stream_id, source_id, exc)
+            raise HTTPException(status_code=500, detail="Ingest failed") from exc
+        return Response(status_code=202)
 
     if RECORDINGS_DIR.exists():
         app.mount(

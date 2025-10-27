@@ -26,24 +26,7 @@ docker build -t wavecap .
 docker run -p 8000:8000 -v $(pwd)/state:/app/state wavecap
 ```
 
-If you plan to use an SDR (e.g., SDRplay RSPdx), you have two options:
-
-- Host install: install SoapySDR and your device plugin on the host, then expose USB devices to the container (already configured in `docker-compose.yml`).
-- In-container install: the Dockerfile installs SoapySDR core, tools, and Python bindings. To also bundle the SDRplay API and SoapySDRPlay3 plugin, pass build args in Compose:
-
-  ```yaml
-  build:
-    context: .
-    args:
-      SDRPLAY_API_DEB_URL: "<vendor .deb URL>"
-      SOAPY_SDRPLAY3_DEB_URL: "<vendor .deb URL>"
-  ```
-
-  Obtain the correct .deb URLs from the SDRplay downloads page for Debian Bookworm/amd64. Alternatively, install them on the host and just use USB passthrough.
-
-Define a device under `sdr.devices` in your config and enable an SDR stream (for example, the included Marine VHF Ch 16 example).
-
-Note: the SDRplay Soapy module (`SoapySDRPlay3`) depends on the proprietary SDRplay API; follow SDRplay’s installation guide on the host and ensure the libraries are discoverable inside the container if you install them there as well.
+Radio capture has moved out of this repo. Use WaveCap‑SDR for device control and demodulation, and connect WaveCap to it as a remote audio source. WaveCap no longer bundles SDR drivers or DSP logic.
 
 ### Windows
 ```powershell
@@ -174,6 +157,8 @@ Override any setting in `state/config.yaml` to keep customisations separate from
 - Streams: define under `streams`. Add/remove streams by editing YAML; there is no UI or API to create or delete streams.
 - Pager feeds: define under `streams` with `source: pager` to receive token-protected webhook posts from CAD systems. The generated `state/config.yaml` already includes unique tokens for the sample pager entries.
 - Combined views: define under `combinedStreamViews` to merge activity from multiple streams into a single conversation.
+ - Remote radio: define `source: remote` with one or more `remoteUpstreams`. Each upstream can be `mode: pull` (WaveCap connects to a remote PCM URL, e.g., a WaveCap‑SDR channel endpoint) or `mode: push` (an external sender POSTs raw PCM to `/api/ingest/{streamId}/audio` with the ingest password). When multiple upstreams are provided, WaveCap automatically uses the highest‑priority active source.
+ - Ingest protection: set `ingest.password` to require a password for push‑mode senders. The shipped defaults rotate placeholder passwords automatically when `state/config.yaml` is created.
 
 For detailed guidance on tuning transcription latency versus accuracy, see the
 [Configuration & Transcription Tuning Guide](docs/configuration.md).
@@ -188,6 +173,7 @@ For detailed guidance on tuning transcription latency versus accuracy, see the
 - `PATCH /api/transcriptions/:id/review` – update review metadata.
 - `GET /api/transcriptions/export-reviewed` – download a ZIP containing JSONL metadata and referenced audio clips.
 - `GET /api/health` – service heartbeat.
+ - `POST /api/ingest/{streamId}/audio` – accept push PCM audio for a REMOTE stream. Requires `X-Ingest-Password` header (configured under `ingest.password`) and `X-Source-Id` identifying the upstream.
 
 Note: Stream add/remove is configuration-only via YAML, not exposed via UI or public API.
 

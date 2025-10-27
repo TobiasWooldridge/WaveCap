@@ -122,32 +122,32 @@ streams:
     source: pager
     webhookToken: replace-me
 
-  # Example SDR stream for Marine VHF Channel 16 (156.800 MHz). Disabled by
-  # default; enable after verifying the SDR plugin is available.
-  - id: marine-ch16-sdr
-    name: Marine VHF Ch 16 (SDR)
-    source: sdr
-    sdrDeviceId: rspdx
-    sdrFrequencyHz: 156800000
-    sdrMode: nfm
-    sdrBandwidthHz: 15000
-    sdrSquelchDbFs: -65
+  # Example remote radio stream powered by WaveCap‑SDR. Replace host/ids with
+  # your WaveCap‑SDR channel endpoint(s). Multiple upstreams can be provided
+  # for redundancy; the highest priority active source is used.
+  - id: marine-ch16-remote
+    name: Marine VHF Ch 16 (Remote)
+    source: remote
     enabled: false
+    remoteUpstreams:
+      - id: primary
+        mode: pull
+        url: http://127.0.0.1:8087/api/v1/stream/channels/ch1.pcm?format=pcm16
+        # authToken: <optional bearer token for WaveCap‑SDR>
+        sampleRate: 16000
+        format: pcm16
+        priority: 10
+      - id: backup
+        mode: pull
+        url: http://127.0.0.1:8087/api/v1/stream/channels/ch2.pcm?format=pcm16
+        sampleRate: 16000
+        format: pcm16
+        priority: 5
 
-# Local SDR devices for on-hardware capture (optional). Configure a SoapySDR
-# device that can be used by streams with source: sdr. The SDRplay RSPdx is
-# supported via the SoapySDRPlay3 module when installed on the host.
-# sdr:
-#   devices:
-#     - id: rspdx
-#       soapy: "driver=sdrplay"
-#       sampleRateHz: 240000   # 240 kS/s keeps CPU low and covers nearby channels
-#       # gainDb: 40           # Optional fixed gain; leave unset to use device defaults
-#       # gainMode: auto       # 'auto' enables device AGC when supported
-#       # rfBandwidthHz: 200000 # Hardware IF bandwidth; leave unset for driver default
-#       # antenna: "RX"        # Optional antenna selection
-#       # ppmCorrection: 0.0   # Optional frequency correction in parts-per-million
-#       # loOffsetHz: 250000   # Optional LO offset to dodge DC spike
+ingest:
+  # When set, remote senders must provide X-Ingest-Password with this value.
+  # This password is rotated automatically in state/config.yaml when missing.
+  password: change-me
 
 combinedStreamViews:
   - id: aus-emergency-overview

@@ -40,6 +40,9 @@ class StreamSource(str, Enum):
 
     AUDIO = "audio"
     PAGER = "pager"
+    # Remote radio/audio provided by an external service (e.g., WaveCap‑SDR),
+    # or pushed to WaveCap when acting as a server.
+    REMOTE = "remote"
     SDR = "sdr"
 
 
@@ -220,6 +223,9 @@ class Stream(APIModel):
     baseLocation: Optional["BaseLocationConfig"] = Field(
         default=None, alias="baseLocation"
     )
+    # Optional runtime metadata for remote streams; describes upstream sources
+    # and selection state. This field is populated by the backend.
+    upstreams: Optional[List["RemoteUpstreamState"]] = None
 
     @field_validator("createdAt", mode="before")
     @classmethod
@@ -474,6 +480,10 @@ class StreamConfig(APIModel):
     language: Optional[str] = None
     webhookToken: Optional[str] = Field(default=None, alias="webhookToken")
     ignoreFirstSeconds: float = Field(default=0.0, alias="ignoreFirstSeconds")
+    # Remote upstream bundle definition. Only used when source == "remote".
+    remoteUpstreams: Optional[List["RemoteUpstreamConfig"]] = Field(
+        default=None, alias="remoteUpstreams"
+    )
     # SDR-specific configuration. Only used when source == "sdr".
     sdrDeviceId: Optional[str] = Field(default=None, alias="sdrDeviceId")
     sdrFrequencyHz: Optional[int] = Field(default=None, alias="sdrFrequencyHz")
@@ -506,6 +516,24 @@ class StreamConfig(APIModel):
                 raise ValueError("Pager streams require a webhookToken")
             if self.language is not None:
                 raise ValueError("Pager streams do not support language settings")
+        elif self.source == StreamSource.REMOTE:
+            if self.webhookToken is not None:
+                raise ValueError("Remote streams must not define webhookToken")
+            upstreams = self.remoteUpstreams or []
+            if not upstreams:
+                raise ValueError("Remote streams require at least one upstream")
+            # Validate unique upstream ids
+            seen: set[str] = set()
+            for u in upstreams:
+                uid = (u.id or "").strip()
+                if not uid:
+                    raise ValueError("Each remote upstream must have an id")
+                if uid in seen:
+                    raise ValueError(f"Duplicate remote upstream id: {uid}")
+                seen.add(uid)
+            # Build a synthetic URL if missing so persistence stays simple
+            if not (self.url or "").strip():
+                self.url = f"remote://{self.id}"
         elif self.source == StreamSource.SDR:
             if self.webhookToken is not None:
                 raise ValueError("SDR streams must not define webhookToken")
@@ -597,8 +625,66 @@ class AppConfig(APIModel):
     )
     ui: UISettingsConfig = UISettingsConfig()
     access: AccessControlConfig = AccessControlConfig()
-    # Optional SDR device registry
+    # Optional SDR device registry (legacy; deprecated in favor of WaveCap‑SDR)
     sdr: Optional["SDRSystemConfig"] = None
+    # Server-side ingest configuration for push-mode upstreams
+    ingest: Optional["RemoteIngestServerConfig"] = None
+
+
+# Remote streaming configuration and runtime state ------------------------------
+
+class RemoteUpstreamConfig(APIModel):
+    id: str
+    # "pull" uses WaveCap to connect to the upstream URL.
+    # "push" allows a remote sender to POST/WS audio into WaveCap.
+    mode: str = Field(default="pull")
+    url: Optional[str] = None
+    authToken: Optional[str] = Field(default=None, alias="authToken")
+    # Expected input sample rate for this upstream. When unset, WaveCap will
+    # assume the global whisper.sampleRate.
+    sampleRate: Optional[int] = Field(default=None, alias="sampleRate")
+    # Currently only "pcm16" and "f32" are accepted; default is pcm16.
+    format: Optional[str] = Field(default="pcm16")
+    # Higher priority wins when multiple upstreams are healthy.
+    priority: int = 0
+
+    @model_validator(mode="after")
+    def _validate_remote_upstream(self) -> "RemoteUpstreamConfig":
+        mode = (self.mode or "").strip().lower() or "pull"
+        if mode not in {"pull", "push"}:
+            raise ValueError("remoteUpstreams[].mode must be 'pull' or 'push'")
+        self.mode = mode
+        if mode == "pull":
+            if not (self.url or "").strip():
+                raise ValueError("remoteUpstreams[].url is required for pull mode")
+        if self.sampleRate is not None and int(self.sampleRate) <= 0:
+            raise ValueError("remoteUpstreams[].sampleRate must be positive")
+        fmt = (self.format or "pcm16").strip().lower()
+        if fmt not in {"pcm16", "f32"}:
+            raise ValueError("remoteUpstreams[].format must be 'pcm16' or 'f32'")
+        self.format = fmt
+        return self
+
+
+class RemoteUpstreamState(APIModel):
+    id: str
+    mode: str
+    connected: bool = False
+    active: bool = False
+    lastBytesAt: Optional[datetime] = Field(default=None, alias="lastBytesAt")
+    sampleRate: Optional[int] = Field(default=None, alias="sampleRate")
+    format: Optional[str] = None
+    # Optional radio metrics when provided by the upstream
+    snr: Optional[float] = None
+    rssi: Optional[float] = None
+    # For pull sources, a sanitized URL label; for push sources, a sender label
+    label: Optional[str] = None
+
+
+class RemoteIngestServerConfig(APIModel):
+    """Server-side audio ingest configuration for push-mode upstreams."""
+
+    password: Optional[str] = None
 
 
 class SDRDeviceConfig(APIModel):

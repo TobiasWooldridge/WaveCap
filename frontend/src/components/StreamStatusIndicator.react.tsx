@@ -188,11 +188,12 @@ const getIconStatusClass = (variant: StreamStatusVariant): string => {
 
 const resolveStreamKind = (
   stream: Stream,
-): "pager" | "combined" | "web" | "sdr" | "audio" => {
+): "pager" | "combined" | "web" | "sdr" | "remote" | "audio" => {
   const source = stream.source ?? "audio";
   if (source === "pager") return "pager";
   if (source === "combined") return "combined";
   if (source === "sdr") return "sdr";
+  if (source === "remote") return "remote";
   const url = String(stream.url || "");
   if (/^https?:\/\//i.test(url)) return "web";
   return "audio";

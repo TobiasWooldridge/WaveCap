@@ -21,6 +21,7 @@ from .models import (
     AppConfig,
     ExportTranscriptionsRequest,
     PagerWebhookRequest,
+    RemoteUpstreamConfig,
     Stream,
     StreamConfig,
     StreamSource,
@@ -296,6 +297,12 @@ class StreamManager:
                     )
         if prompt_override is None:
             prompt_override = self.config.whisper.initialPrompt
+        # Attach remote upstream definitions when applicable
+        remote_upstreams: Optional[list[RemoteUpstreamConfig]] = None
+        if stream_cfg and stream_cfg.source == StreamSource.REMOTE:
+            ups = list(stream_cfg.remoteUpstreams or [])
+            remote_upstreams = ups if ups else None
+
         return factory(
             stream=stream,
             transcriber=self.transcriber,
@@ -308,6 +315,7 @@ class StreamManager:
             on_upstream_reconnect=self._handle_upstream_reconnect,
             config=self.config.whisper,
             initial_prompt=prompt_override,
+            remote_upstreams=remote_upstreams,
         )
 
     async def _ensure_stream_alignment(
@@ -436,12 +444,11 @@ class StreamManager:
         }
         return existing.model_copy(update=updates)
 
-    def _build_sdr_stream_from_config(self, stream_config: StreamConfig, existing: Optional[Stream]) -> Stream:
-        # Build a synthetic URL if not provided already
-        url = (stream_config.url or f"sdr://{stream_config.sdrDeviceId}/{int(stream_config.sdrFrequencyHz or 0)}").strip()
+    def _build_remote_stream_from_config(self, stream_config: StreamConfig, existing: Optional[Stream]) -> Stream:
+        url = (stream_config.url or f"remote://{stream_config.id}").strip()
         pinned = bool(stream_config.pinned)
         language = (stream_config.language or "").strip() or None
-        ignore_seconds = resolve_ignore_first_seconds(StreamSource.SDR, url, stream_config.ignoreFirstSeconds)
+        ignore_seconds = resolve_ignore_first_seconds(StreamSource.REMOTE, url, stream_config.ignoreFirstSeconds)
         base = existing or Stream(
             id=stream_config.id,
             name=stream_config.name,
@@ -452,7 +459,7 @@ class StreamManager:
             createdAt=utcnow(),
             language=language,
             transcriptions=[],
-            source=StreamSource.SDR,
+            source=StreamSource.REMOTE,
             webhookToken=None,
             ignoreFirstSeconds=ignore_seconds,
             baseLocation=stream_config.baseLocation,
@@ -461,28 +468,14 @@ class StreamManager:
             "name": stream_config.name,
             "url": url,
             "language": language,
-            "source": StreamSource.SDR,
+            "source": StreamSource.REMOTE,
             "ignoreFirstSeconds": ignore_seconds,
             "webhookToken": None,
             "pinned": pinned,
             "enabled": bool(stream_config.enabled),
             "baseLocation": stream_config.baseLocation,
+            # upstreams metadata populated at runtime
         }
-        # Register SDR channel spec for this stream
-        try:
-            from .sdr import get_sdr_manager, SdrChannelSpec
-
-            spec = SdrChannelSpec(
-                stream_id=stream_config.id,
-                device_id=str(stream_config.sdrDeviceId),
-                frequency_hz=int(stream_config.sdrFrequencyHz or 0),
-                mode=str(stream_config.sdrMode or "nfm"),
-                bandwidth_hz=(int(stream_config.sdrBandwidthHz) if stream_config.sdrBandwidthHz else None),
-                squelch_dbfs=(float(stream_config.sdrSquelchDbFs) if stream_config.sdrSquelchDbFs is not None else None),
-            )
-            get_sdr_manager().register_stream_spec(spec)
-        except Exception as exc:  # pragma: no cover - optional
-            LOGGER.warning("Failed to register SDR stream %s: %s", stream_config.id, exc)
         return base.model_copy(update=updates)
 
     async def initialize(self) -> None:
@@ -517,8 +510,8 @@ class StreamManager:
                 existing = None
             if stream_config.source == StreamSource.PAGER:
                 stream = self._build_stream_from_config(stream_config, existing)
-            elif stream_config.source == StreamSource.SDR:
-                stream = self._build_sdr_stream_from_config(stream_config, existing)
+            elif stream_config.source == StreamSource.REMOTE:
+                stream = self._build_remote_stream_from_config(stream_config, existing)
             else:
                 stream = self._build_stream_from_config(stream_config, existing)
             await self._save_stream(stream)
@@ -526,7 +519,7 @@ class StreamManager:
         streams_to_activate: List[Stream] = []
         for stream in streams:
             await self._apply_default_preroll(stream)
-            if (stream.source in (StreamSource.AUDIO, StreamSource.SDR)):
+            if (stream.source in (StreamSource.AUDIO, StreamSource.REMOTE)):
                 if stream.enabled:
                     if stream.error:
                         # Clear ephemeral errors but do not persist to DB
@@ -579,7 +572,21 @@ class StreamManager:
                     )
 
     def get_streams(self) -> List[Stream]:
-        return [stream.model_copy() for stream in self.streams.values()]
+        results: List[Stream] = []
+        for s in self.streams.values():
+            copy = s.model_copy()
+            if copy.source == StreamSource.REMOTE:
+                worker = self.workers.get(copy.id)
+                if worker is not None:
+                    try:
+                        states = worker.get_remote_upstream_states()
+                    except Exception:
+                        states = []
+                    copy.upstreams = states or None
+                else:
+                    copy.upstreams = None
+            results.append(copy)
+        return results
 
     async def update_stream(
         self, stream_id: str, request: UpdateStreamRequest
@@ -1004,7 +1011,7 @@ class StreamManager:
     ) -> None:
         async with self._lock:
             current = self.streams.get(stream.id)
-        if not current or current.source != StreamSource.AUDIO:
+        if not current or current.source not in (StreamSource.AUDIO, StreamSource.REMOTE):
             return
         attempt_value = max(attempt, 1)
         retry_phrase = _format_retry_phrase(delay_seconds)
@@ -1028,7 +1035,7 @@ class StreamManager:
     async def _handle_upstream_reconnect(self, stream: Stream, attempt: int) -> None:
         async with self._lock:
             current = self.streams.get(stream.id)
-        if not current or current.source != StreamSource.AUDIO:
+        if not current or current.source not in (StreamSource.AUDIO, StreamSource.REMOTE):
             return
         attempt_value = max(attempt, 1)
         attempt_label = "attempt" if attempt_value == 1 else "attempts"
@@ -1048,9 +1055,27 @@ class StreamManager:
         detailed_payload: List[dict] = []
         for stream in self.streams.values():
             summary = stream.model_dump(by_alias=True, exclude={"transcriptions"})
+            if stream.source == StreamSource.REMOTE:
+                worker = self.workers.get(stream.id)
+                if worker is not None:
+                    try:
+                        states = worker.get_remote_upstream_states()
+                    except Exception:
+                        states = []
+                    if states:
+                        summary["upstreams"] = [s.model_dump(by_alias=True) for s in states]
             summary_payload.append(summary)
             if include_transcriptions:
                 stream_data = stream.model_dump(by_alias=True)
+                if stream.source == StreamSource.REMOTE:
+                    worker = self.workers.get(stream.id)
+                    if worker is not None:
+                        try:
+                            states = worker.get_remote_upstream_states()
+                        except Exception:
+                            states = []
+                        if states:
+                            stream_data["upstreams"] = [s.model_dump(by_alias=True) for s in states]
                 if stream.transcriptions:
                     stream_data["transcriptions"] = [
                         transcription.model_dump(by_alias=True, exclude={"segments"})
@@ -1084,7 +1109,7 @@ class StreamManager:
             workers = list(self.workers.items())
             for stream_id, _ in workers:
                 stream = self.streams.get(stream_id)
-                if stream and stream.source == StreamSource.AUDIO:
+                if stream and stream.source in (StreamSource.AUDIO, StreamSource.REMOTE):
                     audio_streams.append(stream)
                     self._stop_triggers[stream.id] = (
                         SystemEventTrigger.service_shutdown()

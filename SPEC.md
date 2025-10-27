@@ -8,14 +8,14 @@ transcribing multiple radio or pager feeds in real time.
 - Stay simple enough for scanner hobbyists to run at home without custom scripts.
 
 ## Product Snapshot
-- Ships as a single service that includes the web app and API. Start it with one command or use the provided Docker setup. Optional SDR capture is available for radio devices.
+- Ships as a single service that includes the web app and API. Start it with one command or use the provided Docker setup. Radio capture is provided by external services like WaveCap‑SDR; WaveCap no longer manages SDR hardware directly.
 - Runs comfortably on a single machine or small server; all browsers share the same state in real time.
 - Transcription runs in background workers to keep the interface responsive today and enable scaling later.
 - Stores configuration in plain-text configuration files so admins can preload stream URLs, names, language defaults, and UI preferences before sharing the app.
 
 ## Primary Workflows
 ### 1. Preparing Streams
-- Open the app to see each stream with its name, URL, and status badge. Streams can be backed by HTTP audio, local SDR channels, or tokenised pager feeds.
+- Open the app to see each stream with its name, URL, and status badge. Streams can be backed by HTTP audio, remote radio services (e.g., WaveCap‑SDR), or tokenised pager feeds.
 - Add an audio stream with a URL, optional name, and optional language. The backend validates the entry, acknowledges it, and saves it for all users.
 - Create a pager feed when no audio exists; the UI issues a webhook URL and token so CAD systems can post messages directly.
 - Remove unused streams; the update syncs to every user and persists on disk.
@@ -26,9 +26,13 @@ transcribing multiple radio or pager feeds in real time.
   `whisper.prompts` once and reference with `initialPromptName` in each stream
   to tailor biasing by agency or region; streams without a name fall back to
   the global `whisper.initialPrompt` when provided.
-- For SDR-backed streams, choose narrow/wide FM or AM demodulation, tighten complex channel bandwidth, apply per-stream squelch thresholds, and adjust hardware controls (gain mode, RF bandwidth, antenna, LO offset, PPM correction) directly through configuration files. LO offsets are automatically clamped based on device sample rate and channel bandwidth so the logical tuned frequency remains inside the capture span (prevents silent reception when offsets exceed Nyquist).
+ - For remote radio streams, define one or more upstreams using `remoteUpstreams`. Each upstream can be:
+   - pull: WaveCap connects to a remote PCM stream (e.g., WaveCap‑SDR channel endpoint).
+   - push: an external sender streams PCM to WaveCap's ingest endpoint. Push mode is protected by an ingest password.
+   Multiple upstreams can be bundled; WaveCap selects the highest‑priority active source and switches automatically if the current source goes quiet.
  - Restart behavior is automatic when configured streams are enabled; status updates instantly for every connected browser. If a remote HTTP stream drops unexpectedly, the backend attempts to reconnect immediately once and then only every ten minutes to avoid hammering the source. When a stream remains effectively silent for longer than the configured inactivity window, the backend proactively restarts the upstream connection to recover from stuck transports that continue to send zero‑energy audio. The inactivity threshold is configurable (default one hour), and inactivity‑triggered restarts log a system event that notes the silence threshold that fired.
 - Each stream exposes two state fields in the API: an **enabled** flag that comes exclusively from configuration (`state/config.yaml`) and a runtime **status** flag that reflects the backend's current progress (stopped, queued, transcribing, or error). The UI does not toggle enabled/disabled; it only reflects the configured streams.
+ - Remote streams include an `upstreams` metadata array that reports per‑source connectivity and selection state (id, mode, connected, active, sampleRate, format, optional SNR/RSSI when provided by the upstream).
 
 ### 2. Monitoring Live Traffic
 - Use the stream list to spot transcribing, queued, stopped, or error states. Queued means the stream was enabled and is waiting for the backend to catch up. If transcription concurrency is full, recording continues and transcripts arrive once a slot opens.

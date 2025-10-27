@@ -1,6 +1,6 @@
 export type StreamStatus = "stopped" | "queued" | "transcribing" | "error";
 
-export type StreamSource = "audio" | "pager" | "combined" | "sdr";
+export type StreamSource = "audio" | "pager" | "combined" | "sdr" | "remote";
 
 export type ThemeMode = "light" | "dark" | "system";
 
@@ -94,6 +94,8 @@ export interface Stream {
   lastActivityAt?: IsoDateTimeString | null;
   combinedStreamIds?: string[];
   baseLocation?: BaseLocation | null;
+  // Optional metadata for remote streams
+  upstreams?: RemoteUpstreamState[];
 }
 
 export type StreamUpdate = Pick<Stream, "id"> & Partial<Omit<Stream, "id">>;
@@ -224,6 +226,19 @@ export interface AppConfig {
   logging?: LoggingConfig;
   alerts?: AlertsConfig;
   ui?: UISettingsConfig;
+}
+
+export interface RemoteUpstreamState {
+  id: string;
+  mode: "pull" | "push" | string;
+  connected: boolean;
+  active: boolean;
+  lastBytesAt?: IsoDateTimeString | null;
+  sampleRate?: number | null;
+  format?: string | null;
+  snr?: number | null;
+  rssi?: number | null;
+  label?: string | null;
 }
 
 export interface BaseLocation {
