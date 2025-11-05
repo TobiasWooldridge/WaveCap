@@ -36,6 +36,17 @@ done
 
 printf "Starting Multi-Stream WaveCap Application...\n\n"
 
+# Check npm version
+NPM_VERSION=$(npm --version | cut -d. -f1)
+USE_NPX_NPM=false
+if [ "$NPM_VERSION" -lt 10 ]; then
+  echo "npm version $NPM_VERSION detected. This project requires npm >=10.0.0."
+  echo "Will use npx to run a compatible npm version for installation."
+  USE_NPX_NPM=true
+  echo ""
+fi
+
+
 echo "Setting up Python environment..."
 if [ ! -d "$VENV_DIR" ]; then
   python3 -m venv "$VENV_DIR"
@@ -59,7 +70,31 @@ python -m pip install --upgrade pip >/dev/null
 echo
 
 echo "Installing frontend dependencies..."
-(cd "$FRONTEND_DIR" && npm install)
+# Clean npm cache to avoid corruption issues
+if [ "$USE_NPX_NPM" = true ]; then
+  npx --yes npm@latest cache clean --force >/dev/null 2>&1
+else
+  npm cache clean --force >/dev/null 2>&1
+fi
+
+if [ -d "$FRONTEND_DIR/node_modules" ]; then
+  echo "Removing existing node_modules for clean install..."
+  # Try normal rm first, if it fails use find with force delete
+  if ! rm -rf "$FRONTEND_DIR/node_modules" 2>/dev/null; then
+    echo "Standard removal failed, using alternative method..."
+    find "$FRONTEND_DIR/node_modules" -type f -delete 2>/dev/null || true
+    find "$FRONTEND_DIR/node_modules" -type d -delete 2>/dev/null || true
+    rm -rf "$FRONTEND_DIR/node_modules" 2>/dev/null || true
+  fi
+fi
+
+# Use npx npm@latest if local npm is too old
+if [ "$USE_NPX_NPM" = true ]; then
+  (cd "$FRONTEND_DIR" && npx --yes npm@latest ci --include=dev --legacy-peer-deps)
+else
+  # Install exact lockfile with dev deps to ensure TypeScript/Vite present
+  (cd "$FRONTEND_DIR" && npm ci --include=dev)
+fi
 echo
 
 echo "Building frontend bundle..."
