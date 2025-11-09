@@ -1218,6 +1218,24 @@ class StreamWorker:
             text = ""
             segments = []
 
+        confidence: Optional[float] = None
+        if bundle.no_speech_prob is not None:
+            confidence = float(max(0.0, min(1.0, 1.0 - bundle.no_speech_prob)))
+
+        hallucination_discarded = False
+        blank_due_to_hallucination = False
+        if text and self._should_discard_hallucination(
+            text, effective_samples, confidence, bundle.avg_logprob
+        ):
+            LOGGER.debug(
+                "Stream %s discarding hallucinated silence phrase: %s",
+                self.stream.id,
+                text,
+            )
+            text = ""
+            segments = []
+            hallucination_discarded = True
+
         if text and self._is_low_energy(effective_samples):
             LOGGER.debug(
                 "Stream %s dropping low-energy transcription output: %s",
@@ -1231,25 +1249,14 @@ class StreamWorker:
             text = ""
             segments = []
 
-        confidence: Optional[float] = None
-        if bundle.no_speech_prob is not None:
-            confidence = float(max(0.0, min(1.0, 1.0 - bundle.no_speech_prob)))
-
-        if text and self._should_discard_hallucination(
-            text, effective_samples, confidence, bundle.avg_logprob
-        ):
-            LOGGER.debug(
-                "Stream %s discarding hallucinated silence phrase: %s",
-                self.stream.id,
-                text,
-            )
-            text = ""
-            segments = []
-
+        blank_audio_emitted = False
         if not text:
             if self._should_emit_blank_audio(effective_samples):
                 text = BLANK_AUDIO_TOKEN
                 segments = []
+                blank_audio_emitted = True
+                if hallucination_discarded:
+                    blank_due_to_hallucination = True
             elif self._is_mostly_silence(effective_samples, None):
                 LOGGER.debug("Stream %s skipping silent chunk", self.stream.id)
                 return
@@ -1296,9 +1303,11 @@ class StreamWorker:
             if trimmed_samples.size > record_start_index
             else np.empty(0, dtype=np.float32)
         )
-        if record_samples.size > 0:
-            # Always persist the recording for auditing, including blank-audio
-            # placeholders, so operators can review what was heard.
+        skip_recording = text == BLANK_AUDIO_TOKEN and blank_due_to_hallucination
+        should_store_recording = record_samples.size > 0 and not skip_recording
+        if should_store_recording:
+            # Persist recordings for anything that carried energy so editors can
+            # replay questionable speech. Pure silence placeholders are skipped.
             recording_file = await self._write_recording(record_samples)
         # If we excluded the prefix from the saved file, shift segment timings
         # to be relative to the file start so UI playback aligns without a

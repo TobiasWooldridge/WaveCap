@@ -56,12 +56,16 @@ def pytest_pyfunc_call(pyfuncitem: pytest.Function) -> bool | None:
 def isolate_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     from wavecap_backend import state_paths
     from wavecap_backend import stream_manager as stream_manager_module
+    from wavecap_backend import stream_worker as stream_worker_module
 
     monkeypatch.setattr(state_paths, "STATE_DIR", tmp_path)
     monkeypatch.setattr(state_paths, "RECORDINGS_DIR", tmp_path / "recordings")
     monkeypatch.setattr(state_paths, "LOG_DIR", tmp_path / "logs")
     monkeypatch.setattr(
         stream_manager_module, "RECORDINGS_DIR", tmp_path / "recordings"
+    )
+    monkeypatch.setattr(
+        stream_worker_module, "RECORDINGS_DIR", tmp_path / "recordings"
     )
 
     def _resolve(*parts: str) -> Path:

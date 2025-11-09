@@ -218,6 +218,9 @@ class Stream(APIModel):
     source: StreamSource = Field(default=StreamSource.AUDIO)
     webhookToken: Optional[str] = Field(default=None, alias="webhookToken")
     ignoreFirstSeconds: float = Field(default=0.0, alias="ignoreFirstSeconds")
+    recordingRetentionSeconds: Optional[float] = Field(
+        default=None, alias="recordingRetentionSeconds"
+    )
     lastActivityAt: Optional[datetime] = Field(default=None, alias="lastActivityAt")
     # Optional base location used by the UI to disambiguate partial addresses
     baseLocation: Optional["BaseLocationConfig"] = Field(
@@ -246,6 +249,18 @@ class Stream(APIModel):
         if value < 0:
             raise ValueError("ignoreFirstSeconds must be non-negative")
         return float(value)
+
+    @field_validator("recordingRetentionSeconds")
+    @classmethod
+    def _validate_recording_retention_seconds(
+        cls, value: Optional[float]
+    ) -> Optional[float]:
+        if value is None:
+            return None
+        seconds = float(value)
+        if seconds <= 0:
+            return None
+        return seconds
 
     @field_validator("lastActivityAt", mode="before")
     @classmethod
@@ -480,6 +495,9 @@ class StreamConfig(APIModel):
     language: Optional[str] = None
     webhookToken: Optional[str] = Field(default=None, alias="webhookToken")
     ignoreFirstSeconds: float = Field(default=0.0, alias="ignoreFirstSeconds")
+    recordingRetentionSeconds: Optional[float] = Field(
+        default=None, alias="recordingRetentionSeconds"
+    )
     # Remote upstream bundle definition. Only used when source == "remote".
     remoteUpstreams: Optional[List["RemoteUpstreamConfig"]] = Field(
         default=None, alias="remoteUpstreams"
@@ -503,6 +521,18 @@ class StreamConfig(APIModel):
         if value < 0:
             raise ValueError("ignoreFirstSeconds must be non-negative")
         return float(value)
+
+    @field_validator("recordingRetentionSeconds")
+    @classmethod
+    def _validate_recording_retention_seconds(
+        cls, value: Optional[float]
+    ) -> Optional[float]:
+        if value is None:
+            return None
+        seconds = float(value)
+        if seconds < 0:
+            raise ValueError("recordingRetentionSeconds must be non-negative")
+        return seconds
 
     @model_validator(mode="after")
     def _validate_source_requirements(self) -> "StreamConfig":

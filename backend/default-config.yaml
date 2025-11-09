@@ -112,11 +112,13 @@ streams:
     enabled: true
     pinned: true
     ignoreFirstSeconds: 30
+    recordingRetentionSeconds: 604800
   - id: broadcastify-34010
     name: NSW - Primary Emergency Services
     url: https://broadcastify.cdnstream1.com/34010
     enabled: true
     ignoreFirstSeconds: 30
+    recordingRetentionSeconds: 604800
   - id: 4bb38cec-4662-4a3a-b83f-59685e81045d
     name: SA SES Pager Gateway
     source: pager
@@ -129,6 +131,7 @@ streams:
     name: Marine VHF Ch 16 (Remote)
     source: remote
     enabled: false
+    recordingRetentionSeconds: 604800
     remoteUpstreams:
       - id: primary
         mode: pull

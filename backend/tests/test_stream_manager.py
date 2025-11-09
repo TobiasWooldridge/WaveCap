@@ -1,4 +1,6 @@
 import asyncio
+import os
+from pathlib import Path
 from typing import Iterable
 
 import pytest
@@ -14,7 +16,10 @@ from wavecap_backend.models import (
     TranscriptionEventType,
     UpdateStreamRequest,
 )
-from wavecap_backend.stream_defaults import BROADCASTIFY_PREROLL_SECONDS
+from wavecap_backend.stream_defaults import (
+    BROADCASTIFY_PREROLL_SECONDS,
+    DEFAULT_RECORDING_RETENTION_SECONDS,
+)
 from wavecap_backend.stream_manager import (
     RECORDING_STARTED_MESSAGE,
     RECORDING_STOPPED_MESSAGE,
@@ -56,6 +61,7 @@ def _audio_stream(
     enabled: bool = False,
     ignore_first_seconds: float = 0.0,
     language: str | None = None,
+    recording_retention_seconds: float | None = None,
 ) -> StreamConfig:
     return StreamConfig(
         id=stream_id,
@@ -64,6 +70,7 @@ def _audio_stream(
         enabled=enabled,
         ignoreFirstSeconds=ignore_first_seconds,
         language=language,
+        recordingRetentionSeconds=recording_retention_seconds,
     )
 
 
@@ -187,6 +194,57 @@ async def test_start_and_stop_stream_records_events(minimal_config, tmp_path):
         event_types = [event.eventType for event in recent]
         assert TranscriptionEventType.RECORDING_STARTED in event_types
         assert TranscriptionEventType.RECORDING_STOPPED in event_types
+    finally:
+        await _shutdown_manager(manager)
+
+
+@pytest.mark.asyncio
+async def test_prune_expired_recordings_respects_per_stream_retention(
+    minimal_config, tmp_path
+):
+    config = minimal_config.model_copy(deep=True)
+    config.streams = [
+        _audio_stream(stream_id="default-retention", enabled=True),
+        _audio_stream(
+            stream_id="short-retention",
+            enabled=True,
+            recording_retention_seconds=20,
+        ),
+        _audio_stream(
+            stream_id="keep-forever",
+            enabled=True,
+            recording_retention_seconds=0,
+        ),
+    ]
+    recordings_dir = tmp_path / "recordings"
+    recordings_dir.mkdir(parents=True, exist_ok=True)
+    manager = _build_manager(config, tmp_path)
+    await _start_manager(manager)
+    try:
+        now = utcnow().timestamp()
+
+        def _write(stream_id: str, age_seconds: float, suffix: int) -> Path:
+            file_path = recordings_dir / f"stream-{stream_id}-{suffix}.wav"
+            file_path.write_bytes(b"\x00")
+            timestamp = now - age_seconds
+            os.utime(file_path, (timestamp, timestamp))
+            return file_path
+
+        expired_default = _write(
+            "default-retention", DEFAULT_RECORDING_RETENTION_SECONDS + 10, 1
+        )
+        fresh_default = _write(
+            "default-retention", DEFAULT_RECORDING_RETENTION_SECONDS - 10, 2
+        )
+        expired_short = _write("short-retention", 30, 3)
+        keep_forever = _write("keep-forever", DEFAULT_RECORDING_RETENTION_SECONDS * 2, 4)
+
+        await manager._prune_expired_recordings()
+
+        assert not expired_default.exists()
+        assert fresh_default.exists()
+        assert not expired_short.exists()
+        assert keep_forever.exists()
     finally:
         await _shutdown_manager(manager)
 

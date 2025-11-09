@@ -94,6 +94,20 @@ streams:
 
 Leave the field at `0` (or omit it) to ingest audio from the very beginning.
 
+## Recording retention
+
+WaveCap now prunes saved WAV files automatically so audio directories do not grow without bound. Each audio, remote, or SDR stream accepts an optional `recordingRetentionSeconds` field that declares how long to keep its recordings in `state/recordings`. When the field is omitted the backend keeps one week's worth of audio (604 800 seconds). Set the value to any positive duration to pick a different window or set it to `0`/`null` to retain recordings indefinitely. Pager streams ignore the field because they never emit audio clips.
+
+```yaml
+streams:
+  - id: marine-ch16
+    name: Marine VHF Channel 16
+    url: https://example.com/vhf-ch16
+    recordingRetentionSeconds: 172800  # keep 2 days of audio
+```
+
+Retention is enforced continuously in the background, so old files disappear shortly after they age out without requiring restarts or manual cleanup commands.
+
 ## Pinned streams
 
 Highlight critical feeds by marking them as pinned. Pinned streams always

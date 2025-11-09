@@ -9,6 +9,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
+from pathlib import Path
 from typing import AsyncIterator, Callable, Dict, List, Optional
 
 from pydantic_core import to_jsonable_python
@@ -36,7 +37,11 @@ from .state_paths import RECORDINGS_DIR
 from .stream_worker import StreamWorker
 from .transcription_executor import TranscriptionExecutor
 from .whisper_transcriber import AbstractTranscriber
-from .stream_defaults import resolve_ignore_first_seconds
+from .stream_defaults import (
+    DEFAULT_RECORDING_RETENTION_SECONDS,
+    resolve_ignore_first_seconds,
+    resolve_recording_retention_seconds,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -44,6 +49,7 @@ RECORDING_STARTED_MESSAGE = "Recording and transcription started"
 RECORDING_STOPPED_MESSAGE = "Recording and transcription stopped"
 UPSTREAM_DISCONNECTED_MESSAGE = "Lost connection to upstream stream"
 UPSTREAM_RECONNECTED_MESSAGE = "Reconnected to upstream stream"
+RETENTION_SWEEP_INTERVAL_SECONDS = 5 * 60
 
 
 class SystemEventTriggerType(str, Enum):
@@ -247,6 +253,8 @@ class StreamManager:
         self._last_event_timestamps: Dict[str, datetime] = {}
         self._event_locks: Dict[str, asyncio.Lock] = {}
         self._last_streams_signature: Optional[str] = None
+        self._retention_task: Optional[asyncio.Task[None]] = None
+        self._retention_stop: Optional[asyncio.Event] = None
 
     @staticmethod
     def _resolve_concurrency(value: Optional[int]) -> int:
@@ -318,6 +326,16 @@ class StreamManager:
             remote_upstreams=remote_upstreams,
         )
 
+    @staticmethod
+    def _resolve_stream_retention_from_config(
+        stream_config: StreamConfig,
+    ) -> Optional[float]:
+        if stream_config.source == StreamSource.PAGER:
+            return None
+        return resolve_recording_retention_seconds(
+            stream_config.recordingRetentionSeconds
+        )
+
     async def _ensure_stream_alignment(
         self, stream_id: str, trigger: SystemEventTrigger
     ) -> None:
@@ -372,6 +390,7 @@ class StreamManager:
         self, stream_config: StreamConfig, existing: Optional[Stream]
     ) -> Stream:
         pinned = bool(stream_config.pinned)
+        retention_seconds = self._resolve_stream_retention_from_config(stream_config)
         if stream_config.source == StreamSource.PAGER:
             url = (stream_config.url or f"/api/pager-feeds/{stream_config.id}").strip()
             enabled = bool(stream_config.enabled)
@@ -389,6 +408,7 @@ class StreamManager:
                 source=StreamSource.PAGER,
                 webhookToken=stream_config.webhookToken,
                 ignoreFirstSeconds=0.0,
+                recordingRetentionSeconds=retention_seconds,
                 baseLocation=stream_config.baseLocation,
             )
             return base.model_copy(
@@ -398,6 +418,7 @@ class StreamManager:
                     "source": StreamSource.PAGER,
                     "webhookToken": stream_config.webhookToken,
                     "ignoreFirstSeconds": 0.0,
+                    "recordingRetentionSeconds": retention_seconds,
                     "language": None,
                     "enabled": enabled,
                     "pinned": pinned,
@@ -428,6 +449,7 @@ class StreamManager:
                 source=StreamSource.AUDIO,
                 webhookToken=None,
                 ignoreFirstSeconds=ignore_seconds,
+                recordingRetentionSeconds=retention_seconds,
                 baseLocation=stream_config.baseLocation,
             )
         updates = {
@@ -441,6 +463,7 @@ class StreamManager:
             # Ensure enabled state reflects configuration even when a DB record exists
             "enabled": bool(stream_config.enabled),
             "baseLocation": stream_config.baseLocation,
+            "recordingRetentionSeconds": retention_seconds,
         }
         return existing.model_copy(update=updates)
 
@@ -449,6 +472,7 @@ class StreamManager:
         pinned = bool(stream_config.pinned)
         language = (stream_config.language or "").strip() or None
         ignore_seconds = resolve_ignore_first_seconds(StreamSource.REMOTE, url, stream_config.ignoreFirstSeconds)
+        retention_seconds = self._resolve_stream_retention_from_config(stream_config)
         base = existing or Stream(
             id=stream_config.id,
             name=stream_config.name,
@@ -462,6 +486,7 @@ class StreamManager:
             source=StreamSource.REMOTE,
             webhookToken=None,
             ignoreFirstSeconds=ignore_seconds,
+            recordingRetentionSeconds=retention_seconds,
             baseLocation=stream_config.baseLocation,
         )
         updates = {
@@ -474,6 +499,7 @@ class StreamManager:
             "pinned": pinned,
             "enabled": bool(stream_config.enabled),
             "baseLocation": stream_config.baseLocation,
+            "recordingRetentionSeconds": retention_seconds,
             # upstreams metadata populated at runtime
         }
         return base.model_copy(update=updates)
@@ -570,6 +596,8 @@ class StreamManager:
                     LOGGER.exception(
                         "Failed to record restart event for stream %s", stream.id
                     )
+        await self._prune_expired_recordings()
+        self._start_retention_task()
 
     def get_streams(self) -> List[Stream]:
         results: List[Stream] = []
@@ -782,6 +810,98 @@ class StreamManager:
                 file.unlink()
             except OSError:
                 LOGGER.warning("Failed to remove recording %s", file)
+
+    def _start_retention_task(self) -> None:
+        if self._retention_task and not self._retention_task.done():
+            return
+        stop_event = asyncio.Event()
+        self._retention_stop = stop_event
+        self._retention_task = asyncio.create_task(self._retention_loop(stop_event))
+
+    async def _stop_retention_task(self) -> None:
+        task = self._retention_task
+        if task is None:
+            return
+        stop_event = self._retention_stop
+        if stop_event is not None:
+            stop_event.set()
+        self._retention_task = None
+        self._retention_stop = None
+        try:
+            await task
+        except asyncio.CancelledError:  # pragma: no cover - shutdown cancellation
+            pass
+
+    async def _retention_loop(self, stop_event: asyncio.Event) -> None:
+        try:
+            while True:
+                await self._prune_expired_recordings()
+                try:
+                    await asyncio.wait_for(
+                        stop_event.wait(), timeout=RETENTION_SWEEP_INTERVAL_SECONDS
+                    )
+                    break
+                except asyncio.TimeoutError:
+                    continue
+        except asyncio.CancelledError:  # pragma: no cover - shutdown cancellation
+            pass
+
+    async def _prune_expired_recordings(self) -> None:
+        """Remove on-disk recordings once they exceed their retention window."""
+
+        directory = RECORDINGS_DIR
+        if not directory.exists():
+            return
+
+        async with self._lock:
+            retention_overrides = {
+                stream_id: stream.recordingRetentionSeconds
+                for stream_id, stream in self.streams.items()
+            }
+
+        now_ts = utcnow().timestamp()
+        for file_path in directory.glob("stream-*.wav"):
+            stream_id = self._extract_stream_id_from_recording(file_path)
+            if not stream_id:
+                continue
+            if stream_id in retention_overrides:
+                retention = retention_overrides[stream_id]
+            else:
+                retention = float(DEFAULT_RECORDING_RETENTION_SECONDS)
+            if retention is None:
+                continue
+            try:
+                stat_result = file_path.stat()
+            except OSError:
+                continue
+            age_seconds = now_ts - stat_result.st_mtime
+            if age_seconds < retention:
+                continue
+            try:
+                file_path.unlink()
+            except OSError:
+                LOGGER.warning("Failed to remove expired recording %s", file_path)
+            else:
+                LOGGER.debug(
+                    "Removed expired recording %s (age %.0fs >= %.0fs retention)",
+                    file_path,
+                    age_seconds,
+                    retention,
+                )
+
+    @staticmethod
+    def _extract_stream_id_from_recording(file_path: Path) -> Optional[str]:
+        """Return the stream id encoded in a recording filename."""
+
+        name = file_path.name if isinstance(file_path, Path) else str(file_path)
+        if not name.startswith("stream-") or not name.endswith(".wav"):
+            return None
+        stem = name[:-4]
+        remainder = stem[len("stream-") :]
+        stream_id, sep, timestamp = remainder.rpartition("-")
+        if not sep or not stream_id or not timestamp.isdigit():
+            return None
+        return stream_id
 
     async def _apply_default_preroll(self, stream: Stream) -> None:
         if stream.source != StreamSource.AUDIO:
@@ -1104,6 +1224,7 @@ class StreamManager:
         await self.broadcaster.publish(StreamEvent("streams_update", payload))
 
     async def shutdown(self) -> None:
+        await self._stop_retention_task()
         audio_streams: List[Stream] = []
         async with self._lock:
             workers = list(self.workers.items())
