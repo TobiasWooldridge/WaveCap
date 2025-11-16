@@ -7,11 +7,17 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $FixtureSet = $null
+$SkipRebuild = $false
+$VenvJustCreated = $false
 for ($i = 0; $i -lt $RemainingArgs.Count; $i++) {
     $arg = $RemainingArgs[$i]
     switch -Regex ($arg) {
         '^--screenshot-fixtures$' {
             $FixtureSet = 'screenshot'
+            continue
+        }
+        '^--no-rebuild$' {
+            $SkipRebuild = $true
             continue
         }
         '^--fixture-set$' {
@@ -52,6 +58,7 @@ try {
     Write-Host 'Setting up Python environment...'
     if (-not (Test-Path $VenvDir)) {
         python -m venv $VenvDir
+        $VenvJustCreated = $true
     }
 
     $ActivateScript = Join-Path (Join-Path $VenvDir 'Scripts') 'Activate.ps1'
@@ -62,10 +69,37 @@ try {
 
     . $ActivateScript
 
+    if ($SkipRebuild -and $VenvJustCreated) {
+        Write-Host '--no-rebuild requested but virtual environment was just created; installing dependencies.'
+        $SkipRebuild = $false
+    }
+
+    if ($SkipRebuild) {
+        $importScript = @"
+from __future__ import annotations
+
+import importlib.util
+import sys
+
+sys.exit(0 if importlib.util.find_spec("wavecap_backend") else 1)
+"@
+
+        python -c $importScript | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host '--no-rebuild requested but backend dependencies are missing; installing them.'
+            $SkipRebuild = $false
+        }
+    }
+
     Push-Location $BackendDir
     try {
-        python -m pip install --upgrade pip | Out-Null
-        python -m pip install -e .
+        if ($SkipRebuild) {
+            Write-Host 'Skipping backend dependency installation (--no-rebuild).'
+        }
+        else {
+            python -m pip install --upgrade pip | Out-Null
+            python -m pip install -e .
+        }
     }
     finally {
         Pop-Location
@@ -74,27 +108,43 @@ try {
     Write-Host ''
 
     Write-Host 'Installing frontend dependencies...'
-    Push-Location $FrontendDir
-    try {
-        npm install
+    $FrontendDist = Join-Path $FrontendDir 'dist'
+    if ($SkipRebuild -and -not (Test-Path $FrontendDist)) {
+        Write-Host "--no-rebuild requested but $FrontendDist is missing; rebuilding frontend."
+        $SkipRebuild = $false
     }
-    finally {
-        Pop-Location
+
+    if ($SkipRebuild) {
+        Write-Host 'Reusing existing frontend build (--no-rebuild).'
+    }
+    else {
+        Push-Location $FrontendDir
+        try {
+            npm install
+        }
+        finally {
+            Pop-Location
+        }
     }
 
     Write-Host ''
 
     Write-Host 'Building frontend bundle...'
-    Push-Location $FrontendDir
-    try {
-        npm run build
-        if ($LASTEXITCODE -ne 0) {
-            Write-Error 'Frontend build failed. Aborting.'
-            exit $LASTEXITCODE
-        }
+    if ($SkipRebuild) {
+        Write-Host 'Skipping frontend build (--no-rebuild).'
     }
-    finally {
-        Pop-Location
+    else {
+        Push-Location $FrontendDir
+        try {
+            npm run build
+            if ($LASTEXITCODE -ne 0) {
+                Write-Error 'Frontend build failed. Aborting.'
+                exit $LASTEXITCODE
+            }
+        }
+        finally {
+            Pop-Location
+        }
     }
 
     Write-Host ''

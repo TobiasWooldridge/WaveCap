@@ -42,6 +42,9 @@ chmod +x start-app.sh
 The helper script creates a Python virtual environment for the backend, installs dependencies, builds the frontend, and then
 launches `uvicorn` on the configured port (defaults to `8000`).
 
+Use `--no-rebuild` with either helper script to reuse installed dependencies and an existing frontend build when the workspace
+is already prepared. If required artifacts are missing, the scripts fall back to a full setup automatically.
+
 ### Git Hooks
 
 The repository ships the pre-commit hook under `.githooks/pre-commit`. Install it once per clone so commits run TypeScript and

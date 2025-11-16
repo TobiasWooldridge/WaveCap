@@ -8,7 +8,23 @@ from typing import Optional, Sequence
 
 import uvicorn
 
+from .config import load_config
+from .fixtures import available_fixture_sets, normalize_fixture_set_name
 from .server import FIXTURE_ENV_VAR
+
+
+def _resolve_fixture_set(fixture_set: Optional[str]) -> str:
+    if not fixture_set:
+        return ""
+
+    normalized = normalize_fixture_set_name(fixture_set)
+    available = set(available_fixture_sets())
+    if normalized not in available:
+        readable = ", ".join(sorted(available)) or "none"
+        raise SystemExit(
+            f"Unknown fixture set '{fixture_set}'. Available sets: {readable}."
+        )
+    return normalized
 
 
 def main(argv: Optional[Sequence[str]] = None) -> None:
@@ -34,14 +50,20 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     fixture_set = args.fixture_set
     if args.screenshot_fixtures:
         fixture_set = "screenshot"
-    if fixture_set:
-        os.environ[FIXTURE_ENV_VAR] = fixture_set
+
+    resolved_fixture_set = _resolve_fixture_set(fixture_set)
+    if resolved_fixture_set:
+        os.environ[FIXTURE_ENV_VAR] = resolved_fixture_set
+
+    config = load_config()
+    host = config.server.host
+    port = config.server.port
 
     uvicorn.run(
         "wavecap_backend.server:create_app",
         factory=True,
-        host="0.0.0.0",
-        port=8000,
+        host=host,
+        port=port,
         reload=args.reload,
     )
 
