@@ -8,6 +8,9 @@ BACKEND_DIR="$ROOT_DIR/backend"
 FRONTEND_DIR="$ROOT_DIR/frontend"
 VENV_DIR="$BACKEND_DIR/.venv"
 FIXTURE_SET=""
+SKIP_REBUILD=false
+SKIP_BACKEND_REBUILD=false
+SKIP_FRONTEND_REBUILD=false
 
 require_command() {
   local cmd="$1"
@@ -42,7 +45,9 @@ validate_fixture_set() {
   fi
 
   local normalized
-  if ! normalized=$(cd "$BACKEND_DIR" && python - <<'PY' "$name"); then
+  if ! normalized=$(
+    cd "$BACKEND_DIR" &&
+      python - "$name" <<'PY'
 from __future__ import annotations
 
 import sys
@@ -75,6 +80,10 @@ while (($#)); do
       FIXTURE_SET="screenshot"
       shift
       ;;
+    --no-rebuild)
+      SKIP_REBUILD=true
+      shift
+      ;;
     --fixture-set)
       if [ $# -lt 2 ]; then
         echo "--fixture-set requires a value" >&2
@@ -93,6 +102,11 @@ while (($#)); do
       ;;
   esac
 done
+
+if [ "$SKIP_REBUILD" = true ]; then
+  SKIP_BACKEND_REBUILD=true
+  SKIP_FRONTEND_REBUILD=true
+fi
 
 require_command "python3" "Install Python 3.10+ and ensure python3 is on your PATH."
 require_command "npm" "Install Node.js (which includes npm). Version 10+ is required."
@@ -136,48 +150,81 @@ if ! command -v pip >/dev/null 2>&1; then
 fi
 
 # Always invoke pip via the venv's python for reliability
-python -m pip install --upgrade pip >/dev/null
-(cd "$BACKEND_DIR" && python -m pip install -e .)
+if [ "$SKIP_BACKEND_REBUILD" = true ] && [ ! -f "$VENV_DIR/bin/activate" ]; then
+  echo "--no-rebuild requested but virtual environment missing; installing dependencies."
+  SKIP_BACKEND_REBUILD=false
+fi
+
+if [ "$SKIP_BACKEND_REBUILD" = true ]; then
+  if ! python - <<'PY' >/dev/null 2>&1
+from __future__ import annotations
+
+import importlib
+
+if importlib.util.find_spec("wavecap_backend") is None:
+    raise SystemExit(1)
+PY
+  then
+    echo "--no-rebuild requested but backend dependencies are missing; installing them."
+    SKIP_BACKEND_REBUILD=false
+  fi
+fi
+
+if [ "$SKIP_BACKEND_REBUILD" = true ]; then
+  echo "Skipping backend dependency installation (--no-rebuild)."
+else
+  python -m pip install --upgrade pip >/dev/null
+  (cd "$BACKEND_DIR" && python -m pip install -e .)
+fi
 echo
 
 validate_fixture_set "$FIXTURE_SET"
 
 echo "Installing frontend dependencies..."
-# Clean npm cache to avoid corruption issues
-if [ "$USE_NPX_NPM" = true ]; then
-  npx --yes npm@latest cache clean --force >/dev/null 2>&1
-else
-  npm cache clean --force >/dev/null 2>&1
+if [ "$SKIP_FRONTEND_REBUILD" = true ] && [ ! -d "$FRONTEND_DIR/dist" ]; then
+  echo "--no-rebuild requested but $FRONTEND_DIR/dist is missing; rebuilding frontend."
+  SKIP_FRONTEND_REBUILD=false
 fi
 
-if [ -d "$FRONTEND_DIR/node_modules" ]; then
-  echo "Removing existing node_modules for clean install..."
-  # Try normal rm first, if it fails use find with force delete
-  if ! rm -rf "$FRONTEND_DIR/node_modules" 2>/dev/null; then
-    echo "Standard removal failed, using alternative method..."
-    find "$FRONTEND_DIR/node_modules" -type f -delete 2>/dev/null || true
-    find "$FRONTEND_DIR/node_modules" -type d -delete 2>/dev/null || true
-    rm -rf "$FRONTEND_DIR/node_modules" 2>/dev/null || true
+if [ "$SKIP_FRONTEND_REBUILD" = true ]; then
+  echo "Reusing existing frontend build (--no-rebuild)."
+else
+  # Clean npm cache to avoid corruption issues
+  if [ "$USE_NPX_NPM" = true ]; then
+    npx --yes npm@latest cache clean --force >/dev/null 2>&1
+  else
+    npm cache clean --force >/dev/null 2>&1
   fi
-fi
 
-# Use npx npm@latest if local npm is too old
-if [ "$USE_NPX_NPM" = true ]; then
-  (cd "$FRONTEND_DIR" && npx --yes npm@latest ci --include=dev --legacy-peer-deps)
-else
-  # Install exact lockfile with dev deps to ensure TypeScript/Vite present
-  (cd "$FRONTEND_DIR" && npm ci --include=dev)
-fi
-echo
+  if [ -d "$FRONTEND_DIR/node_modules" ]; then
+    echo "Removing existing node_modules for clean install..."
+    # Try normal rm first, if it fails use find with force delete
+    if ! rm -rf "$FRONTEND_DIR/node_modules" 2>/dev/null; then
+      echo "Standard removal failed, using alternative method..."
+      find "$FRONTEND_DIR/node_modules" -type f -delete 2>/dev/null || true
+      find "$FRONTEND_DIR/node_modules" -type d -delete 2>/dev/null || true
+      rm -rf "$FRONTEND_DIR/node_modules" 2>/dev/null || true
+    fi
+  fi
 
-echo "Building frontend bundle..."
-if ! (cd "$FRONTEND_DIR" && npm run build); then
-  echo "Frontend build failed. Aborting." >&2
-  exit 1
-fi
-if [ ! -d "$FRONTEND_DIR/dist" ]; then
-  echo "Frontend build artifacts not found at $FRONTEND_DIR/dist after build." >&2
-  exit 1
+  # Use npx npm@latest if local npm is too old
+  if [ "$USE_NPX_NPM" = true ]; then
+    (cd "$FRONTEND_DIR" && npx --yes npm@latest ci --include=dev --legacy-peer-deps)
+  else
+    # Install exact lockfile with dev deps to ensure TypeScript/Vite present
+    (cd "$FRONTEND_DIR" && npm ci --include=dev)
+  fi
+  echo
+
+  echo "Building frontend bundle..."
+  if ! (cd "$FRONTEND_DIR" && npm run build); then
+    echo "Frontend build failed. Aborting." >&2
+    exit 1
+  fi
+  if [ ! -d "$FRONTEND_DIR/dist" ]; then
+    echo "Frontend build artifacts not found at $FRONTEND_DIR/dist after build." >&2
+    exit 1
+  fi
 fi
 echo
 

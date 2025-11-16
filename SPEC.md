@@ -128,6 +128,7 @@ transcribing multiple radio or pager feeds in real time.
 - **TranscriptionSegmentChip**: Clickable transcript segment that plays the matching audio slice.
 
 - Install prerequisites (Python 3.10+, Node.js, npm, ffmpeg). The `start-app.sh` or `.ps1` helpers create a virtual environment, install dependencies, build the frontend, and start the server; manual steps remain available.
+- Use `--no-rebuild` on the helper scripts to reuse existing dependencies and frontend build artifacts when restarting the application. If required assets are missing, the scripts automatically perform the full setup.
 - Tune defaults in `state/config.yaml`, including sample rate, speech model selection, allowed browser origins, and initial UI settings (theme, transcript tools, export defaults). Configuration is YAML-only.
 - When `state/config.yaml` does not exist, the backend copies the shipped defaults wholesale, rotating pager webhook tokens and shared passwords so every deployment starts with hardened secrets.
 - Define default keyword alerts in `state/config.yaml`. Operators can tweak rules during a session, but those tweaks persist only in memory until the backend restarts.
