@@ -241,6 +241,14 @@ async def load_screenshot_fixtures(database: StreamDatabase) -> None:
 
 async def load_fixture_set(name: str, database: StreamDatabase) -> None:
     """Dispatch to the requested fixture loader."""
+    loader = _fixture_loaders().get(normalize_fixture_set_name(name))
+    if loader is None:
+        raise ValueError(f"Unknown fixture set: {name}")
+    await loader(database)
+
+
+def normalize_fixture_set_name(name: str) -> str:
+    """Return the canonical fixture set name or raise when unknown."""
 
     normalized = name.strip().lower()
     aliases: Dict[str, str] = {
@@ -250,15 +258,24 @@ async def load_fixture_set(name: str, database: StreamDatabase) -> None:
         "screenshots": "screenshot",
     }
 
-    target = aliases.get(normalized, normalized)
-    loaders: Dict[str, Callable[[StreamDatabase], Awaitable[None]]] = {
+    return aliases.get(normalized, normalized)
+
+
+def available_fixture_sets() -> list[str]:
+    """List fixture sets that can be loaded without raising."""
+
+    return sorted(_fixture_loaders().keys())
+
+
+def _fixture_loaders() -> Dict[str, Callable[[StreamDatabase], Awaitable[None]]]:
+    return {
         "screenshot": load_screenshot_fixtures,
     }
 
-    loader = loaders.get(target)
-    if loader is None:
-        raise ValueError(f"Unknown fixture set: {name}")
-    await loader(database)
 
-
-__all__ = ["load_fixture_set", "load_screenshot_fixtures"]
+__all__ = [
+    "available_fixture_sets",
+    "load_fixture_set",
+    "load_screenshot_fixtures",
+    "normalize_fixture_set_name",
+]

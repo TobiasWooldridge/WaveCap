@@ -69,6 +69,7 @@ from .whisper_transcriber import (
     PassthroughTranscriber,
     WhisperTranscriber,
 )
+from .fixtures import available_fixture_sets, normalize_fixture_set_name
 # Note: Avoid importing the optional SDR module at import time.
 # Import lazily only when SDR is configured/used.
 
@@ -323,7 +324,18 @@ def create_app() -> FastAPI:
     ensure_logging_directories(config)
     configure_logging(config.logging)
 
-    fixture_request = os.getenv(FIXTURE_ENV_VAR)
+    fixture_request_raw = (os.getenv(FIXTURE_ENV_VAR) or "").strip()
+    fixture_request = ""
+    if fixture_request_raw:
+        normalized = normalize_fixture_set_name(fixture_request_raw)
+        available = set(available_fixture_sets())
+        if normalized not in available:
+            readable = ", ".join(sorted(available)) or "none"
+            raise RuntimeError(
+                f"Unknown fixture set '{fixture_request_raw}'. Available sets: {readable}."
+            )
+        fixture_request = normalized
+
     state = AppState(config, fixture_set=fixture_request)
     RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -334,7 +346,13 @@ def create_app() -> FastAPI:
         await state.database.initialize()
         if state.fixture_set:
             LOGGER.info("Applying fixture set '%s'", state.fixture_set)
-            await state.load_fixtures()
+            try:
+                await state.load_fixtures()
+            except Exception:
+                LOGGER.exception(
+                    "Failed to load fixture set '%s' during startup", state.fixture_set
+                )
+                raise
         await state.stream_manager.initialize()
         try:
             yield
@@ -910,6 +928,11 @@ def create_app() -> FastAPI:
     frontend_dir = get_frontend_dir()
     if frontend_dir.exists():
         app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
+    else:
+        LOGGER.warning(
+            "Frontend build directory missing at %s; serving API without UI assets.",
+            frontend_dir,
+        )
 
     return app
 
