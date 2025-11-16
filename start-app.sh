@@ -9,6 +9,66 @@ FRONTEND_DIR="$ROOT_DIR/frontend"
 VENV_DIR="$BACKEND_DIR/.venv"
 FIXTURE_SET=""
 
+require_command() {
+  local cmd="$1"
+  local help="$2"
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "Missing required command: $cmd" >&2
+    [ -n "$help" ] && echo "$help" >&2
+    exit 1
+  fi
+}
+
+check_python_version() {
+  local python_bin="$1"
+  local version
+  version=$("$python_bin" - <<'PY'
+import sys
+print(f"{sys.version_info.major}.{sys.version_info.minor}")
+PY
+  )
+  local major=${version%%.*}
+  local minor=${version#*.}
+  if [ -z "$major" ] || [ -z "$minor" ] || [ "$major" -lt 3 ] || { [ "$major" -eq 3 ] && [ "$minor" -lt 10 ]; }; then
+    echo "Python 3.10+ is required; detected $version from $python_bin" >&2
+    exit 1
+  fi
+}
+
+validate_fixture_set() {
+  local name="$1"
+  if [ -z "$name" ]; then
+    return
+  fi
+
+  local normalized
+  if ! normalized=$(cd "$BACKEND_DIR" && python - <<'PY' "$name"); then
+from __future__ import annotations
+
+import sys
+
+from wavecap_backend.fixtures import available_fixture_sets, normalize_fixture_set_name
+
+requested = sys.argv[1]
+canonical = normalize_fixture_set_name(requested)
+available = available_fixture_sets()
+if canonical not in available:
+    print(
+        f"Unknown fixture set '{requested}'. Available sets: {', '.join(available)}",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+print(canonical)
+PY
+  ); then
+    echo "Unable to validate fixture set '$name'." >&2
+    exit 1
+  fi
+
+  FIXTURE_SET="$normalized"
+}
+
 while (($#)); do
   case "$1" in
     --screenshot-fixtures)
@@ -34,10 +94,20 @@ while (($#)); do
   esac
 done
 
+require_command "python3" "Install Python 3.10+ and ensure python3 is on your PATH."
+require_command "npm" "Install Node.js (which includes npm). Version 10+ is required."
+require_command "curl" "Install curl so pip can be bootstrapped when needed."
+
+check_python_version "python3"
+
 printf "Starting Multi-Stream WaveCap Application...\n\n"
 
 # Check npm version
 NPM_VERSION=$(npm --version | cut -d. -f1)
+if ! [[ "$NPM_VERSION" =~ ^[0-9]+$ ]]; then
+  echo "Unable to determine npm version (got '$NPM_VERSION')." >&2
+  exit 1
+fi
 USE_NPX_NPM=false
 if [ "$NPM_VERSION" -lt 10 ]; then
   echo "npm version $NPM_VERSION detected. This project requires npm >=10.0.0."
@@ -53,6 +123,7 @@ if [ ! -d "$VENV_DIR" ]; then
 fi
 
 source "$VENV_DIR/bin/activate"
+check_python_version "python"
 # Ensure pip is available in the venv even on externally-managed systems
 # 1) Try ensurepip (may be unavailable on some Debian/Ubuntu installs)
 python -m ensurepip --upgrade >/dev/null 2>&1 || true
@@ -68,6 +139,8 @@ fi
 python -m pip install --upgrade pip >/dev/null
 (cd "$BACKEND_DIR" && python -m pip install -e .)
 echo
+
+validate_fixture_set "$FIXTURE_SET"
 
 echo "Installing frontend dependencies..."
 # Clean npm cache to avoid corruption issues
@@ -100,6 +173,10 @@ echo
 echo "Building frontend bundle..."
 if ! (cd "$FRONTEND_DIR" && npm run build); then
   echo "Frontend build failed. Aborting." >&2
+  exit 1
+fi
+if [ ! -d "$FRONTEND_DIR/dist" ]; then
+  echo "Frontend build artifacts not found at $FRONTEND_DIR/dist after build." >&2
   exit 1
 fi
 echo
