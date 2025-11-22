@@ -1629,20 +1629,22 @@ function App() {
     <>
       {loginOverlay}
       <div className="app-shell bg-body-secondary">
-        <AppHeader
-          isMobileViewport={isMobileViewport}
-          isMobileSidebarOpen={isMobileSidebarOpen}
-          onOpenMobileSidebar={openMobileSidebar}
-          transcriptCorrectionEnabled={transcriptCorrectionEnabled}
-          onTranscriptCorrectionToggle={handleTranscriptCorrectionToggle}
-          onOpenSettings={() => setShowSettings(true)}
-          settingsTriggerRef={settingsTriggerRef}
-          showSettings={showSettings}
-          isReadOnly={isReadOnly}
-          streamsLoading={showAuthLoading}
-          onRequestLogin={requestLogin}
-          onLogout={logout}
-        />
+        {isMobileViewport ? (
+          <AppHeader
+            isMobileViewport={isMobileViewport}
+            isMobileSidebarOpen={isMobileSidebarOpen}
+            onOpenMobileSidebar={openMobileSidebar}
+            transcriptCorrectionEnabled={transcriptCorrectionEnabled}
+            onTranscriptCorrectionToggle={handleTranscriptCorrectionToggle}
+            onOpenSettings={() => setShowSettings(true)}
+            settingsTriggerRef={settingsTriggerRef}
+            showSettings={showSettings}
+            isReadOnly={isReadOnly}
+            streamsLoading={showAuthLoading}
+            onRequestLogin={requestLogin}
+            onLogout={logout}
+          />
+        ) : null}
         <LiveAudioBanner />
 
         <SettingsModal
@@ -1683,6 +1685,7 @@ function App() {
             <StreamSidebar
               isReadOnly={isReadOnly}
               onRequestLogin={requestLogin}
+              onLogout={logout}
               items={streamSidebarItems}
               loading={sidebarLoading}
               onSelectStream={handleSelectStream}
@@ -1691,6 +1694,9 @@ function App() {
               onCloseMobileSidebar={closeMobileSidebar}
               sortMode={streamSortMode}
               onSortModeChange={handleStreamSortModeChange}
+              onOpenSettings={() => setShowSettings(true)}
+              settingsTriggerRef={settingsTriggerRef}
+              showSettings={showSettings}
             />
 
             {isMobileViewport && isMobileSidebarOpen ? (

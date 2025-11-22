@@ -1,5 +1,5 @@
-import { ChangeEvent, ReactNode } from "react";
-import { LogIn, Radio, Star, X } from "lucide-react";
+import { ChangeEvent, MutableRefObject, ReactNode } from "react";
+import { Activity, LogIn, LogOut, Radio, Settings, Star, X } from "lucide-react";
 import { Stream } from "@types";
 import Button from "./primitives/Button.react";
 import Badge from "./primitives/Badge.react";
@@ -26,6 +26,7 @@ export interface StreamSidebarItem {
 interface StreamSidebarProps {
   isReadOnly: boolean;
   onRequestLogin: () => void;
+  onLogout: () => Promise<void> | void;
   items: StreamSidebarItem[];
   loading: boolean;
   onSelectStream: (streamId: string) => void;
@@ -34,11 +35,15 @@ interface StreamSidebarProps {
   onCloseMobileSidebar: () => void;
   sortMode: StreamSortMode;
   onSortModeChange: (mode: StreamSortMode) => void;
+  onOpenSettings: () => void;
+  settingsTriggerRef: MutableRefObject<HTMLButtonElement | null>;
+  showSettings: boolean;
 }
 
 const StreamSidebar = ({
   isReadOnly,
   onRequestLogin,
+  onLogout,
   items,
   loading,
   onSelectStream,
@@ -47,6 +52,9 @@ const StreamSidebar = ({
   onCloseMobileSidebar,
   sortMode,
   onSortModeChange,
+  onOpenSettings,
+  settingsTriggerRef,
+  showSettings,
 }: StreamSidebarProps) => {
   const renderEmptyState = () => {
     if (loading) {
@@ -234,6 +242,54 @@ const StreamSidebar = ({
               </Flex>
             </Button>
           ))}
+        </div>
+
+        <div className="stream-sidebar__footer">
+          <Flex align="center" gap={2} className="stream-sidebar__branding">
+            <Activity className="text-warning" size={16} />
+            <span className="stream-sidebar__title">WaveCap</span>
+          </Flex>
+          <Flex align="center" gap={1}>
+            <Button
+              type="button"
+              ref={settingsTriggerRef}
+              onClick={onOpenSettings}
+              size="sm"
+              use="secondary"
+              appearance="outline"
+              aria-haspopup="dialog"
+              aria-expanded={showSettings}
+              aria-controls="app-settings-dialog"
+              aria-label="Settings"
+            >
+              <Settings size={16} />
+            </Button>
+            {isReadOnly ? (
+              <Button
+                type="button"
+                size="sm"
+                use="secondary"
+                appearance="outline"
+                onClick={onRequestLogin}
+                aria-label="Sign in"
+              >
+                <LogIn size={16} />
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                size="sm"
+                use="secondary"
+                appearance="outline"
+                onClick={() => {
+                  void onLogout();
+                }}
+                aria-label="Sign out"
+              >
+                <LogOut size={16} />
+              </Button>
+            )}
+          </Flex>
         </div>
       </aside>
     </div>
