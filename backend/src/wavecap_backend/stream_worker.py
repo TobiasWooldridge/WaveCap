@@ -51,6 +51,7 @@ from .stream_defaults import resolve_ignore_first_seconds
 from .transcription_postprocessor import PhraseCanonicalizer
 from .transcription_executor import TranscriptionExecutor
 from .whisper_transcriber import AbstractTranscriber, TranscriptionResultBundle
+from .llm_corrector import AbstractLLMCorrector, NoOpCorrector
 
 BLANK_AUDIO_TOKEN = "[BLANK_AUDIO]"
 UNABLE_TO_TRANSCRIBE_TOKEN = "[unable to transcribe]"
@@ -305,10 +306,12 @@ class StreamWorker:
         transcription_executor: Optional[TranscriptionExecutor] = None,
         initial_prompt: Optional[str] = None,
         remote_upstreams: Optional[list[RemoteUpstreamConfig]] = None,
+        llm_corrector: Optional[AbstractLLMCorrector] = None,
     ) -> None:
         self.stream = stream
         self.transcriber = transcriber
         self._transcription_executor = transcription_executor
+        self._llm_corrector: AbstractLLMCorrector = llm_corrector or NoOpCorrector()
         self.database = database
         self.alert_evaluator = alert_evaluator
         self.on_transcription = on_transcription
@@ -1327,10 +1330,37 @@ class StreamWorker:
         # Since we excluded prefix from the saved file, its local offset is 0
         recording_start_offset = None
 
+        # Apply LLM correction for real transcriptions (not placeholders)
+        corrected_text: Optional[str] = None
+        if text and text not in (BLANK_AUDIO_TOKEN, UNABLE_TO_TRANSCRIBE_TOKEN):
+            try:
+                correction_result = await self._llm_corrector.correct(text)
+                if correction_result.discard:
+                    # LLM detected nonsense/unintelligible audio - skip this transcription
+                    LOGGER.debug(
+                        "Stream %s LLM flagged as nonsense, skipping: %r",
+                        self.stream.id,
+                        text,
+                    )
+                    return
+                if correction_result.changed:
+                    corrected_text = correction_result.corrected_text
+                    LOGGER.debug(
+                        "Stream %s LLM corrected: %r -> %r",
+                        self.stream.id,
+                        text,
+                        corrected_text,
+                    )
+            except Exception as exc:
+                LOGGER.warning(
+                    "Stream %s LLM correction failed: %s", self.stream.id, exc
+                )
+
         transcription = TranscriptionResult(
             id=str(uuid.uuid4()),
             streamId=self.stream.id,
             text=text,
+            correctedText=corrected_text,
             timestamp=utcnow(),
             confidence=confidence,
             duration=duration,

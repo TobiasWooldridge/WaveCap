@@ -29,6 +29,8 @@ interface TranscriptSegmentListItemProps {
   displayOffsetSeconds?: number;
   recordingStartOffset?: number;
   trailingAction?: ReactNode;
+  /** Original text before LLM correction, shown in tooltip when present */
+  originalText?: string;
 }
 
 type SegmentData = TranscriptSegmentListItemProps["segment"];
@@ -206,6 +208,7 @@ export const TranscriptSegmentListItem = ({
   displayOffsetSeconds,
   recordingStartOffset,
   trailingAction,
+  originalText,
 }: TranscriptSegmentListItemProps) => {
   const { colorCodingEnabled } = useUISettings();
   const segmentConfidence = useMemo(
@@ -245,6 +248,9 @@ export const TranscriptSegmentListItem = ({
   };
 
   const tooltipParts: string[] = [];
+  if (originalText) {
+    tooltipParts.push(`Original: ${originalText}`);
+  }
   if (segmentConfidence !== null) {
     tooltipParts.push(`${Math.round(segmentConfidence * 100)}% confidence`);
   }

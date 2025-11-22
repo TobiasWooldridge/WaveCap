@@ -37,6 +37,7 @@ from .state_paths import RECORDINGS_DIR
 from .stream_worker import StreamWorker
 from .transcription_executor import TranscriptionExecutor
 from .whisper_transcriber import AbstractTranscriber
+from .llm_corrector import AbstractLLMCorrector, create_corrector
 from .stream_defaults import (
     DEFAULT_RECORDING_RETENTION_SECONDS,
     resolve_ignore_first_seconds,
@@ -248,6 +249,7 @@ class StreamManager:
             worker_count=concurrency, queue_size=queue_size
         )
         self._owns_executor = transcription_executor is None
+        self._llm_corrector: AbstractLLMCorrector = create_corrector(config.llm)
         self._start_triggers: Dict[str, SystemEventTrigger] = {}
         self._stop_triggers: Dict[str, SystemEventTrigger] = {}
         self._last_event_timestamps: Dict[str, datetime] = {}
@@ -324,6 +326,7 @@ class StreamManager:
             config=self.config.whisper,
             initial_prompt=prompt_override,
             remote_upstreams=remote_upstreams,
+            llm_corrector=self._llm_corrector,
         )
 
     @staticmethod

@@ -444,6 +444,28 @@ class WhisperConfig(APIModel):
         return seconds
 
 
+class LLMConfig(APIModel):
+    """Configuration for LLM-based transcription correction."""
+
+    enabled: bool = Field(default=False, alias="enabled")
+    # Model name (e.g., "llama-3.2-3b", "qwen-2.5-3b") or full HuggingFace repo path
+    model: str = Field(default="llama-3.2-3b", alias="model")
+    # Custom system prompt (if not set, uses default emergency services prompt)
+    systemPrompt: Optional[str] = Field(default=None, alias="systemPrompt")
+    # Additional domain-specific terms to include in the prompt
+    domainTerms: List[str] = Field(default_factory=list, alias="domainTerms")
+    # Max tokens to generate for correction
+    maxTokens: int = Field(default=256, alias="maxTokens")
+    # Temperature for generation (0.0 = deterministic)
+    temperature: float = Field(default=0.1, alias="temperature")
+    # Minimum text length to correct (skip very short texts)
+    minTextLength: int = Field(default=10, alias="minTextLength")
+    # Max concurrent LLM requests
+    maxConcurrentRequests: int = Field(default=1, alias="maxConcurrentRequests")
+    # Mode: "realtime" corrects during transcription, "background" corrects async
+    mode: str = Field(default="realtime", alias="mode")
+
+
 class ThemeMode(str, Enum):
     LIGHT = "light"
     DARK = "dark"
@@ -645,6 +667,7 @@ class AppConfig(APIModel):
     server: ServerConfig
     logging: LoggingConfig = LoggingConfig()
     whisper: WhisperConfig = WhisperConfig()
+    llm: Optional[LLMConfig] = Field(default=None, alias="llm")
     alerts: AlertsConfig = AlertsConfig()
     streams: List[StreamConfig] = Field(
         default_factory=list,

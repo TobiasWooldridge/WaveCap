@@ -212,6 +212,9 @@ const SegmentPlaybackChip = ({
         )
       : null;
 
+  // Show original text in tooltip when transcription was LLM-corrected
+  const originalText = transcription.correctedText ? transcription.text : undefined;
+
   return (
     <TranscriptSegmentListItem
       segment={segment}
@@ -222,6 +225,7 @@ const SegmentPlaybackChip = ({
       displayOffsetSeconds={displayOffsetSeconds}
       recordingStartOffset={transcription.recordingStartOffset}
       trailingAction={trailingAction ?? undefined}
+      originalText={originalText}
     />
   );
 };
