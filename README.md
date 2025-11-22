@@ -188,10 +188,20 @@ Note: Stream add/remove is configuration-only via YAML, not exposed via UI or pu
 ## Development
 
 ### Prerequisites
-- Python 3.10+
+- Python 3.10–3.13 (3.14+ is not yet supported due to dependency compatibility)
+- Node.js 20+
+- npm 10+
 - `ffmpeg`
-- Node.js 18+
-- npm
+
+**macOS (via Homebrew):**
+```bash
+brew install python@3.12 ffmpeg pkg-config
+```
+
+**Ubuntu/Debian:**
+```bash
+sudo apt install python3 python3-venv ffmpeg pkg-config
+```
 
 ### Backend
 ```bash
@@ -215,6 +225,7 @@ npm run dev
 - **WebSocket errors** – ensure the backend is running and the browser can reach `ws://localhost:8000/ws`.
 - **FFmpeg errors** – confirm `ffmpeg` is installed and the stream URL is reachable.
 - **Slow transcription** – adjust Whisper model/chunk settings in configuration or use GPU acceleration.
+- **PyAV/av build errors** – ensure `pkg-config` and `ffmpeg` are installed. On macOS: `brew install pkg-config ffmpeg`. If using Python 3.14+, downgrade to Python 3.12 or 3.13 as newer versions have compatibility issues with some dependencies.
 
 ## Notes
 

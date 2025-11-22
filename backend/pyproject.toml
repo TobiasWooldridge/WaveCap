@@ -23,6 +23,7 @@ dependencies = [
   "sqlmodel>=0.0.16",
   "aiosqlite>=0.19",
   "PyYAML>=6.0",
+  "greenlet>=3.0",
 ]
 
 [project.optional-dependencies]
