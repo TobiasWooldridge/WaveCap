@@ -43,8 +43,8 @@ const AppHeader = ({
         <div className="app-header__container app-container">
           <div className="app-header__layout">
             <div className="app-header__branding">
-              <Activity className="text-warning" size={32} />
-              <h1 className="h5 mb-0 text-white">WaveCap</h1>
+              <Activity className="text-warning" size={20} />
+              <h1 className="app-header__title mb-0 text-white">WaveCap</h1>
             </div>
 
             <Flex

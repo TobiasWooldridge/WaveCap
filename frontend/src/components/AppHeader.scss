@@ -54,8 +54,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding-top: clamp(1rem, 2.5vw, 1.5rem);
-  padding-bottom: clamp(1rem, 2.5vw, 1.5rem);
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.app-header__title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .app-header__layout {
@@ -82,8 +88,8 @@
 
 @media (max-width: 767.98px) {
   .app-header__container {
-    padding-top: 0.85rem;
-    padding-bottom: 0.85rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
   }
 
   .app-header__layout {
