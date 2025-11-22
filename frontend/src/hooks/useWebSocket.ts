@@ -20,6 +20,10 @@ interface PendingRequest {
 const COMMAND_TIMEOUT_MS = 10000;
 const IDLE_DISCONNECT_DELAY_MS = 15 * 60 * 1000;
 const IDLE_DISCONNECT_CLOSE_CODE = 4000;
+// If no message received for this long while tab is visible, reconnect
+const STALE_CONNECTION_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
+// How often to check for stale connections
+const STALE_CHECK_INTERVAL_MS = 30 * 1000; // 30 seconds
 
 const createRequestId = (): string => {
   if (
@@ -56,6 +60,8 @@ export const useWebSocket = (
   const idleDisconnectRef = useRef(false);
   const idleTimeoutRef = useRef<number>();
   const connectionIdRef = useRef(0);
+  const lastMessageTimeRef = useRef<number>(Date.now());
+  const staleCheckIntervalRef = useRef<number>();
   // Each WebSocket we create gets a monotonically increasing identifier. When
   // we reconnect (e.g. after the user logs in) the previous socket may close a
   // moment later. We ignore events from those stale sockets so they cannot wipe
@@ -74,6 +80,13 @@ export const useWebSocket = (
     if (idleTimeoutRef.current) {
       window.clearTimeout(idleTimeoutRef.current);
       idleTimeoutRef.current = undefined;
+    }
+  }, []);
+
+  const clearStaleCheckInterval = useCallback(() => {
+    if (staleCheckIntervalRef.current) {
+      window.clearInterval(staleCheckIntervalRef.current);
+      staleCheckIntervalRef.current = undefined;
     }
   }, []);
 
@@ -139,6 +152,8 @@ export const useWebSocket = (
           // state that belongs to the active connection.
           return;
         }
+        // Update last message time for stale connection detection
+        lastMessageTimeRef.current = Date.now();
         try {
           const message: ServerToClientMessage = JSON.parse(event.data);
           console.log("📨 WebSocket message received:", message.type, message);
@@ -361,6 +376,47 @@ export const useWebSocket = (
       window.removeEventListener("keydown", handleInteraction);
     };
   }, [clearIdleTimeout, connect, isConnected]);
+
+  // Stale connection detection: periodically check if we've received messages
+  // If connected but no messages for STALE_CONNECTION_TIMEOUT_MS, reconnect
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    // Clear any existing interval
+    clearStaleCheckInterval();
+
+    if (!isConnected) {
+      return;
+    }
+
+    // Reset the last message time when we first connect
+    lastMessageTimeRef.current = Date.now();
+
+    staleCheckIntervalRef.current = window.setInterval(() => {
+      // Only check when tab is visible
+      if (typeof document !== "undefined" && document.hidden) {
+        return;
+      }
+
+      const timeSinceLastMessage = Date.now() - lastMessageTimeRef.current;
+      if (timeSinceLastMessage > STALE_CONNECTION_TIMEOUT_MS) {
+        console.warn(
+          `🔌 WebSocket connection appears stale (no messages for ${Math.round(timeSinceLastMessage / 1000)}s), reconnecting...`
+        );
+        // Close and reconnect
+        if (socketRef.current) {
+          shouldReloadOnReconnectRef.current = true;
+          socketRef.current.close();
+        }
+      }
+    }, STALE_CHECK_INTERVAL_MS);
+
+    return () => {
+      clearStaleCheckInterval();
+    };
+  }, [clearStaleCheckInterval, isConnected]);
 
   const sendMessage = useCallback(
     (message: ClientToServerMessage) => {
