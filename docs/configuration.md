@@ -220,12 +220,6 @@ streams:
     baseLocation:
       state: SA
       country: AU
-  - id: broadcastify-34010
-    name: NSW - Primary Emergency Services
-    url: https://broadcastify.cdnstream1.com/34010
-    baseLocation:
-      state: NSW
-      country: AU
   - id: sa-ses-pager
     name: SA SES Pager Gateway
     source: pager

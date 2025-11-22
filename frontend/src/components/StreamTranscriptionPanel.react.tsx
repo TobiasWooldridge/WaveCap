@@ -57,7 +57,7 @@ export const StreamTranscriptionPanel = ({
 
   const visibleStreams = useMemo<Stream[]>(() => {
     if (focusStreamId) return baseVisibleStreams;
-    // Sort Z–A so SA… groups appear above NSW… per requested ordering
+    // Sort Z–A by name for consistent ordering
     return [...baseVisibleStreams].sort((a, b) => compareStreamsByName(b, a));
   }, [baseVisibleStreams, focusStreamId]);
 

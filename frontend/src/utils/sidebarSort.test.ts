@@ -39,7 +39,6 @@ const item = (id: string, title: string, source: Stream["source"] | "combined"):
 test("sidebar name sort groups base prefix and prioritises type within group", () => {
   const items: StreamSidebarItem[] = [
     item("marine", "Marine VHF Ch 16 (SDR)", "sdr"),
-    item("nsw", "NSW - Primary Emergency Services", "audio"),
     item("sa-pager", "SA SES Pager Gateway", "pager"),
     item("sa-radio", "SA SES Radio", "audio"),
     item("sa-combined", "SA SES Radio+pager", "combined"),
@@ -51,7 +50,6 @@ test("sidebar name sort groups base prefix and prioritises type within group", (
   const titles = sorted.map((i) => i.title);
   assert.deepStrictEqual(titles, [
     "Marine VHF Ch 16 (SDR)",
-    "NSW - Primary Emergency Services",
     "SA SES Radio+pager",
     "SA SES Radio",
     "SA SES Pager Gateway",
