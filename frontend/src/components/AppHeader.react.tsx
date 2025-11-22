@@ -35,119 +35,100 @@ const AppHeader = ({
   onLogout,
 }: AppHeaderProps) => {
   return (
-    <header className="app-header">
-      <div className="app-header__background">
-        <div className="app-header__scrim" />
-      </div>
-      <div className="app-header__content">
-        <div className="app-header__container app-container">
-          <div className="app-header__layout">
-            <div className="app-header__branding">
-              <Activity className="text-warning" size={20} />
-              <h1 className="app-header__title mb-0 text-white">WaveCap</h1>
-            </div>
-
-            <Flex
-              className="app-header__controls"
-              align="center"
-              justify="end"
-              wrap="wrap"
-              gap={{ base: 2, sm: 3 }}
-            >
-              {!isReadOnly ? (
-              <Flex
-                className="form-check form-check-inline m-0 ps-0 text-white"
-                align="center"
-                gap={2}
-                wrap="nowrap"
-              >
-                  <input
-                    id="transcript-correction-mode"
-                    type="checkbox"
-                    className="form-check-input m-0"
-                    checked={transcriptCorrectionEnabled}
-                    onChange={onTranscriptCorrectionToggle}
-                  />
-                  <Flex
-                    as="label"
-                    htmlFor="transcript-correction-mode"
-                    className="form-check-label fw-semibold small mb-0"
-                    align="center"
-                    gap={2}
-                  >
-                    Transcript correction mode
-                  </Flex>
-                </Flex>
-              ) : null}
-
-              {isMobileViewport ? (
-              <Button
-                size="sm"
-                use="light"
-                appearance="outline"
-                onClick={onOpenMobileSidebar}
-                  aria-controls="app-stream-sidebar"
-                  aria-expanded={isMobileSidebarOpen}
-                  aria-label="Open stream menu"
-                  startContent={<Menu size={18} />}
-                >
-                  <span>Streams</span>
-                </Button>
-              ) : null}
-
-              <Button
-                type="button"
-                ref={settingsTriggerRef}
-                onClick={onOpenSettings}
-                size="sm"
-                use="light"
-                appearance="outline"
-                aria-haspopup="dialog"
-                aria-expanded={showSettings}
-                aria-controls="app-settings-dialog"
-                startContent={<Settings size={16} />}
-              >
-                <span>Settings</span>
-              </Button>
-
-              <Flex align="center" gap={2}>
-                {streamsLoading ? (
-                  <Spinner
-                    size="sm"
-                    variant="light"
-                    label="Loading streams"
-                  />
-                ) : isReadOnly ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  use="light"
-                  appearance="outline"
-                    onClick={onRequestLogin}
-                    startContent={<LogIn size={16} />}
-                  >
-                    <span>Sign in</span>
-                  </Button>
-                ) : (
-                <Button
-                  type="button"
-                  size="sm"
-                  use="light"
-                  appearance="outline"
-                    onClick={() => {
-                      void onLogout();
-                    }}
-                    startContent={<LogOut size={16} />}
-                  >
-                    <span>Sign out</span>
-                  </Button>
-                )}
-              </Flex>
-            </Flex>
-          </div>
+    <div className="app-header app-header--floating">
+      <Flex
+        className="app-header__controls"
+        align="center"
+        justify="end"
+        wrap="nowrap"
+        gap={2}
+      >
+        <div className="app-header__branding">
+          <Activity className="text-warning" size={16} />
+          <span className="app-header__title">WaveCap</span>
         </div>
-      </div>
-    </header>
+
+        {!isReadOnly && !isMobileViewport ? (
+          <Flex
+            className="form-check form-check-inline m-0 ps-0"
+            align="center"
+            gap={2}
+            wrap="nowrap"
+          >
+            <input
+              id="transcript-correction-mode"
+              type="checkbox"
+              className="form-check-input m-0"
+              checked={transcriptCorrectionEnabled}
+              onChange={onTranscriptCorrectionToggle}
+            />
+            <Flex
+              as="label"
+              htmlFor="transcript-correction-mode"
+              className="form-check-label fw-semibold small mb-0"
+              align="center"
+              gap={2}
+            >
+              Correction
+            </Flex>
+          </Flex>
+        ) : null}
+
+        {isMobileViewport ? (
+          <Button
+            size="sm"
+            use="secondary"
+            appearance="outline"
+            onClick={onOpenMobileSidebar}
+            aria-controls="app-stream-sidebar"
+            aria-expanded={isMobileSidebarOpen}
+            aria-label="Open stream menu"
+            startContent={<Menu size={16} />}
+          />
+        ) : null}
+
+        <Button
+          type="button"
+          ref={settingsTriggerRef}
+          onClick={onOpenSettings}
+          size="sm"
+          use="secondary"
+          appearance="outline"
+          aria-haspopup="dialog"
+          aria-expanded={showSettings}
+          aria-controls="app-settings-dialog"
+          startContent={<Settings size={16} />}
+        />
+
+        {streamsLoading ? (
+          <Spinner
+            size="sm"
+            variant="secondary"
+            label="Loading streams"
+          />
+        ) : isReadOnly ? (
+          <Button
+            type="button"
+            size="sm"
+            use="secondary"
+            appearance="outline"
+            onClick={onRequestLogin}
+            startContent={<LogIn size={16} />}
+          />
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            use="secondary"
+            appearance="outline"
+            onClick={() => {
+              void onLogout();
+            }}
+            startContent={<LogOut size={16} />}
+          />
+        )}
+      </Flex>
+    </div>
   );
 };
 
