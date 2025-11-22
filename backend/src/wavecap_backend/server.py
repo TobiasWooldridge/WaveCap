@@ -78,6 +78,73 @@ TRANSCRIBER_ENV_FLAG = "WAVECAP_USE_PASSTHROUGH_TRANSCRIBER"
 LOGGER = logging.getLogger(__name__)
 
 
+class DependencyError(Exception):
+    """Raised when a required dependency is missing or misconfigured."""
+
+    pass
+
+
+def check_dependencies() -> None:
+    """Verify that required external dependencies are available.
+
+    Raises:
+        DependencyError: If a required dependency is missing or cannot be used.
+    """
+    import shutil
+    import subprocess
+
+    errors: list[str] = []
+
+    # Check for ffmpeg
+    ffmpeg_path = shutil.which("ffmpeg")
+    if not ffmpeg_path:
+        errors.append(
+            "ffmpeg is not installed or not in PATH. "
+            "Install with: brew install ffmpeg (macOS) or apt install ffmpeg (Ubuntu)"
+        )
+    else:
+        # Verify ffmpeg can execute
+        try:
+            result = subprocess.run(
+                [ffmpeg_path, "-version"],
+                capture_output=True,
+                timeout=5,
+            )
+            if result.returncode != 0:
+                errors.append(
+                    f"ffmpeg is installed at {ffmpeg_path} but failed to execute"
+                )
+        except subprocess.TimeoutExpired:
+            errors.append(f"ffmpeg at {ffmpeg_path} timed out during version check")
+        except Exception as exc:
+            errors.append(f"ffmpeg check failed: {exc}")
+
+    # Check for whisper backend availability
+    try:
+        from .whisper_transcriber import mlx_available
+
+        has_mlx = mlx_available()
+    except Exception:
+        has_mlx = False
+
+    try:
+        import faster_whisper  # noqa: F401
+
+        has_faster_whisper = True
+    except ImportError:
+        has_faster_whisper = False
+
+    if not has_mlx and not has_faster_whisper:
+        errors.append(
+            "No whisper backend available. Install faster-whisper (pip install faster-whisper) "
+            "or mlx-whisper for Apple Silicon (pip install mlx-whisper)"
+        )
+
+    if errors:
+        error_msg = "Dependency check failed:\n" + "\n".join(f"  - {e}" for e in errors)
+        raise DependencyError(error_msg)
+
+
 def _should_use_passthrough_transcriber() -> bool:
     env_value = os.getenv(TRANSCRIBER_ENV_FLAG)
     if env_value is None:
@@ -320,6 +387,9 @@ FIXTURE_ENV_VAR = "WAVECAP_FIXTURES"
 
 
 def create_app() -> FastAPI:
+    # Check dependencies before anything else
+    check_dependencies()
+
     config = load_config()
     ensure_logging_directories(config)
     configure_logging(config.logging)

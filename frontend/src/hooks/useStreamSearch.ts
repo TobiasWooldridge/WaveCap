@@ -53,7 +53,7 @@ export const useStreamSearch = (
         const data = await fetchTranscriptions({
           search: trimmed,
           limit: String(maxResults),
-          order: "asc",
+          order: "desc",
         });
         setState({
           query: trimmed,
