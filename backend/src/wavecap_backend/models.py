@@ -331,6 +331,7 @@ class ServerConfig(APIModel):
 
 class WhisperConfig(APIModel):
     model: str = "base"
+    backend: str = Field(default="auto", alias="backend")  # "auto", "faster-whisper", "mlx"
     cpuFallbackModel: Optional[str] = Field(default="base", alias="cpuFallbackModel")
     language: Optional[str] = None
     sampleRate: int = Field(default=16000, alias="sampleRate")

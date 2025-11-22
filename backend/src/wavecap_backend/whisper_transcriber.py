@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
+import platform
 import threading
 from typing import Any, List, Optional, Tuple
 
@@ -15,6 +16,11 @@ try:  # pragma: no cover - depends on optional CUDA runtime availability
     import ctranslate2  # type: ignore
 except Exception:  # pragma: no cover - absence of CUDA/ctranslate2 is expected on CPU-only envs
     ctranslate2 = None  # type: ignore[assignment]
+
+try:  # pragma: no cover - mlx-whisper is optional, only available on Apple Silicon
+    import mlx_whisper  # type: ignore
+except Exception:  # pragma: no cover
+    mlx_whisper = None  # type: ignore[assignment]
 
 from .models import TranscriptionSegment, WhisperConfig
 
@@ -331,9 +337,204 @@ class PassthroughTranscriber(AbstractTranscriber):
         return TranscriptionResultBundle(self.text, [], language)
 
 
+# Model name mapping from standard Whisper names to MLX Hub repos
+MLX_MODEL_MAP = {
+    "tiny": "mlx-community/whisper-tiny",
+    "tiny.en": "mlx-community/whisper-tiny.en",
+    "base": "mlx-community/whisper-base",
+    "base.en": "mlx-community/whisper-base.en",
+    "small": "mlx-community/whisper-small",
+    "small.en": "mlx-community/whisper-small.en",
+    "medium": "mlx-community/whisper-medium",
+    "medium.en": "mlx-community/whisper-medium.en",
+    "large": "mlx-community/whisper-large-v3",
+    "large-v1": "mlx-community/whisper-large",
+    "large-v2": "mlx-community/whisper-large-v2",
+    "large-v3": "mlx-community/whisper-large-v3",
+    "large-v3-turbo": "mlx-community/whisper-large-v3-turbo",
+}
+
+
+class MLXWhisperTranscriber(AbstractTranscriber):
+    """Whisper transcriber using MLX for Apple Silicon."""
+
+    def __init__(self, config: WhisperConfig, *, preload_model: bool = True):
+        if mlx_whisper is None:
+            raise RuntimeError("mlx-whisper is not installed. Install with: pip install mlx-whisper")
+        self.config = config
+        self._model_path = self._resolve_model_path(config.model)
+        concurrency = self._resolve_concurrency(config.maxConcurrentProcesses)
+        self._semaphore = threading.Semaphore(concurrency)
+        if preload_model:
+            LOGGER.info("Loading MLX Whisper model %s from %s", config.model, self._model_path)
+            # Trigger model download/cache by doing a dummy transcription
+            self._warmup_model()
+
+    @staticmethod
+    def _resolve_model_path(model_name: str) -> str:
+        """Map standard model names to MLX Hub repo paths."""
+        if model_name in MLX_MODEL_MAP:
+            return MLX_MODEL_MAP[model_name]
+        # If not in map, assume it's already a full path/repo
+        if "/" in model_name:
+            return model_name
+        # Try mlx-community prefix
+        return f"mlx-community/whisper-{model_name}"
+
+    @staticmethod
+    def _resolve_concurrency(value: Optional[int]) -> int:
+        try:
+            parsed = int(value) if value is not None else 0
+        except (TypeError, ValueError):
+            parsed = 0
+        return max(parsed, 1)
+
+    def _warmup_model(self) -> None:
+        """Pre-download the model by running a tiny transcription."""
+        try:
+            # Create 0.1s of silence at 16kHz
+            dummy_audio = np.zeros(1600, dtype=np.float32)
+            mlx_whisper.transcribe(
+                dummy_audio,
+                path_or_hf_repo=self._model_path,
+                verbose=False,
+            )
+            LOGGER.info("MLX Whisper model %s loaded successfully", self.config.model)
+        except Exception as exc:
+            LOGGER.warning("Failed to warmup MLX Whisper model: %s", exc)
+
+    async def transcribe(
+        self,
+        audio: np.ndarray,
+        sample_rate: int,
+        language: Optional[str],
+        *,
+        initial_prompt: Optional[str] = None,
+    ) -> TranscriptionResultBundle:
+        return await asyncio.to_thread(
+            self.transcribe_blocking, audio, sample_rate, language, initial_prompt=initial_prompt
+        )
+
+    def transcribe_blocking(
+        self,
+        audio: np.ndarray,
+        sample_rate: int,
+        language: Optional[str],
+        *,
+        initial_prompt: Optional[str] = None,
+    ) -> TranscriptionResultBundle:
+        with self._semaphore:
+            LOGGER.debug("Running MLX Whisper inference on %s samples", audio.shape[0])
+            result = self._run_transcription(audio, language, initial_prompt)
+        return self._build_result_bundle(result)
+
+    def _run_transcription(
+        self,
+        audio: np.ndarray,
+        language: Optional[str],
+        initial_prompt: Optional[str],
+    ) -> dict:
+        effective_language = language or self.config.language
+        effective_prompt = initial_prompt or self.config.initialPrompt
+
+        kwargs: dict[str, Any] = {
+            "path_or_hf_repo": self._model_path,
+            "verbose": False,
+            "temperature": float(self.config.decodeTemperature),
+            "condition_on_previous_text": bool(self.config.conditionOnPreviousText),
+        }
+
+        if effective_language:
+            kwargs["language"] = effective_language
+
+        if effective_prompt:
+            kwargs["initial_prompt"] = effective_prompt
+
+        return mlx_whisper.transcribe(audio, **kwargs)
+
+    @staticmethod
+    def _build_result_bundle(result: dict) -> TranscriptionResultBundle:
+        text = result.get("text", "").strip()
+        language = result.get("language")
+        raw_segments = result.get("segments", [])
+
+        segment_models: List[TranscriptionSegment] = []
+        for i, seg in enumerate(raw_segments):
+            segment_models.append(
+                TranscriptionSegment(
+                    id=seg.get("id", i),
+                    text=seg.get("text", ""),
+                    no_speech_prob=seg.get("no_speech_prob", 0.0),
+                    temperature=seg.get("temperature", 0.0),
+                    avg_logprob=seg.get("avg_logprob", 0.0),
+                    compression_ratio=seg.get("compression_ratio", 0.0),
+                    start=seg.get("start", 0.0),
+                    end=seg.get("end", 0.0),
+                    seek=seg.get("seek", 0),
+                )
+            )
+
+        # Extract aggregate metrics if available
+        no_speech_prob = None
+        avg_logprob = None
+        if segment_models:
+            no_speech_probs = [s.no_speech_prob for s in segment_models if s.no_speech_prob is not None]
+            avg_logprobs = [s.avg_logprob for s in segment_models if s.avg_logprob is not None]
+            if no_speech_probs:
+                no_speech_prob = sum(no_speech_probs) / len(no_speech_probs)
+            if avg_logprobs:
+                avg_logprob = sum(avg_logprobs) / len(avg_logprobs)
+
+        return TranscriptionResultBundle(text, segment_models, language, no_speech_prob, avg_logprob)
+
+
+def is_apple_silicon() -> bool:
+    """Check if running on Apple Silicon."""
+    return platform.system() == "Darwin" and platform.machine() == "arm64"
+
+
+def mlx_available() -> bool:
+    """Check if MLX Whisper is available."""
+    return mlx_whisper is not None and is_apple_silicon()
+
+
+def create_transcriber(config: WhisperConfig, *, preload_model: bool = True) -> AbstractTranscriber:
+    """Factory function to create the appropriate transcriber based on config and platform."""
+    backend = config.backend.lower()
+
+    if backend == "mlx":
+        if not mlx_available():
+            raise RuntimeError(
+                "MLX backend requested but not available. "
+                "MLX requires Apple Silicon and mlx-whisper to be installed."
+            )
+        LOGGER.info("Using MLX Whisper backend (explicitly configured)")
+        return MLXWhisperTranscriber(config, preload_model=preload_model)
+
+    if backend == "faster-whisper":
+        LOGGER.info("Using faster-whisper backend (explicitly configured)")
+        return WhisperTranscriber(config, preload_model=preload_model)
+
+    # Auto-detect best backend
+    if backend == "auto":
+        if mlx_available():
+            LOGGER.info("Using MLX Whisper backend (auto-detected Apple Silicon)")
+            return MLXWhisperTranscriber(config, preload_model=preload_model)
+        LOGGER.info("Using faster-whisper backend (auto-detected)")
+        return WhisperTranscriber(config, preload_model=preload_model)
+
+    # Unknown backend, default to faster-whisper
+    LOGGER.warning("Unknown backend '%s', falling back to faster-whisper", backend)
+    return WhisperTranscriber(config, preload_model=preload_model)
+
+
 __all__ = [
     "AbstractTranscriber",
     "WhisperTranscriber",
+    "MLXWhisperTranscriber",
     "PassthroughTranscriber",
     "TranscriptionResultBundle",
+    "create_transcriber",
+    "mlx_available",
+    "is_apple_silicon",
 ]

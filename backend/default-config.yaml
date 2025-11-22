@@ -18,6 +18,9 @@ whisper:
   # Try base.en or small for a balance of speed and accuracy. Larger checkpoints
   # (large-v2, large-v3, large-v3-turbo) need a strong GPU but minimise errors.
   model: large-v3-turbo
+  # Transcription backend: "auto" (detect best), "mlx" (Apple Silicon), or "faster-whisper" (CUDA/CPU)
+  # MLX provides ~10-50x speedup on Apple Silicon Macs. Install with: pip install mlx-whisper
+  backend: auto
   # Use a smaller checkpoint when the GPU is unavailable so CPU fallbacks stay
   # responsive. Set to null to reuse the primary model on CPU.
   cpuFallbackModel: base

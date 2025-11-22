@@ -67,7 +67,7 @@ from .stream_manager import StreamManager
 from .whisper_transcriber import (
     AbstractTranscriber,
     PassthroughTranscriber,
-    WhisperTranscriber,
+    create_transcriber,
 )
 from .fixtures import available_fixture_sets, normalize_fixture_set_name
 # Note: Avoid importing the optional SDR module at import time.
@@ -92,7 +92,7 @@ def _create_transcriber(config: AppConfig) -> AbstractTranscriber:
             "Using PassthroughTranscriber because %s is set.", TRANSCRIBER_ENV_FLAG
         )
         return PassthroughTranscriber()
-    return WhisperTranscriber(config.whisper)
+    return create_transcriber(config.whisper)
 
 
 class AppState:
