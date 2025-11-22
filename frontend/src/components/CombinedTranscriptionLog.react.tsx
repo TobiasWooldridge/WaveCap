@@ -227,7 +227,7 @@ export const CombinedTranscriptionLog: React.FC<CombinedTranscriptionLogProps> =
   }, [combinedItems]);
 
   return (
-    <section className="transcript-view">
+    <section className="transcript-view transcript-view--frameless">
       <StreamTranscriptList
         orderedTranscriptions={orderedForScroll}
         isTranscribing={true}
