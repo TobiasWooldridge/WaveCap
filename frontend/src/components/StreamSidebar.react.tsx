@@ -246,7 +246,7 @@ const StreamSidebar = ({
 
         <div className="stream-sidebar__footer">
           <Flex align="center" gap={2} className="stream-sidebar__branding">
-            <Activity className="text-warning" size={16} />
+            <Activity className="text-warning" size={18} />
             <span className="stream-sidebar__title">WaveCap</span>
           </Flex>
           <Flex align="center" gap={1}>
