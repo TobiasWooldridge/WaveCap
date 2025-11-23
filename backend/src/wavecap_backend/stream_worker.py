@@ -45,7 +45,6 @@ from .models import StreamSource
 # Remote upstream support
 from .models import RemoteUpstreamConfig
 from .remote_streams import MultiUpstreamSelector
-# Avoid importing SDR at module import time; we'll import lazily when needed.
 from .state_paths import RECORDINGS_DIR
 from .stream_defaults import resolve_ignore_first_seconds
 from .transcription_postprocessor import PhraseCanonicalizer

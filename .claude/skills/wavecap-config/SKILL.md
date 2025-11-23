@@ -97,7 +97,7 @@ streams:
   - id: unique-stream-id
     name: "Display Name"
     url: https://stream-url       # For audio streams
-    source: audio                 # audio, pager, remote, sdr
+    source: audio                 # audio, pager, remote, combined
     enabled: true
     pinned: false
     ignoreFirstSeconds: 30        # Skip initial audio

@@ -66,7 +66,7 @@ import { useStreamSelection } from "./hooks/useStreamSelection";
 import { useExportSettings } from "./hooks/useExportSettings";
 import { usePagerExport } from "./hooks/usePagerExport";
 import { useCombinedStreamViews } from "./hooks/useCombinedStreamViews";
-import { compareStreamsByName, getStreamTitle, getSdrFrequencyHz, formatFrequency } from "./utils/streams";
+import { compareStreamsByName, getStreamTitle } from "./utils/streams";
 import {
   getStoredLastViewedMap,
   LAST_VIEWED_STORAGE_KEY,
@@ -957,15 +957,6 @@ function App() {
     () => (selectedStream?.source ?? "audio") === "combined",
     [selectedStream],
   );
-  const selectedStreamIsSdr = useMemo(
-    () => (selectedStream?.source ?? "audio") === "sdr",
-    [selectedStream],
-  );
-  const selectedSdrFrequencyLabel = useMemo(() => {
-    if (!selectedStream || !selectedStreamIsSdr) return null;
-    const hz = getSdrFrequencyHz(selectedStream);
-    return hz ? formatFrequency(hz) : null;
-  }, [selectedStream, selectedStreamIsSdr]);
   const selectedCombinedMetadata = selectedStream
     ? combinedViewMap.get(selectedStream.id) ?? null
     : null;
@@ -1645,19 +1636,6 @@ function App() {
                                     </code>
                                   </InlineText>
                                 )}
-                              </>
-                            ) : selectedStreamIsSdr ? (
-                              <>
-                                <span className="mx-1">·</span>
-                                <span>SDR</span>
-                                {selectedSdrFrequencyLabel ? (
-                                  <InlineText marginStart={2} gap={1}>
-                                    <span>Frequency</span>
-                                    <code className="conversation-panel__meta-code">
-                                      {selectedSdrFrequencyLabel}
-                                    </code>
-                                  </InlineText>
-                                ) : null}
                               </>
                             ) : (
                               <>

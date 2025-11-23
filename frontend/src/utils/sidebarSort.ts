@@ -27,7 +27,7 @@ const typeWeight = (item: StreamSidebarItem): number => {
   const source: Stream["source"] = item.stream.source ?? "audio";
   if (source === "audio") return 1; // normal web/audio streams
   if (source === "pager") return 2; // pager feeds after combined/audio
-  if (source === "sdr") return 3; // SDR after others
+  if (source === "remote") return 3; // remote streams (e.g., from WaveCap-SDR)
   return 9;
 };
 

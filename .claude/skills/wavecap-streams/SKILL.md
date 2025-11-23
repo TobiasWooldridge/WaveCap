@@ -67,9 +67,9 @@ curl -s -X POST "http://localhost:8000/api/streams/{STREAM_ID}/reset" \
 ## Stream Source Types
 
 - `audio` - HTTP audio stream (web URL)
-- `sdr` - Software-defined radio source
 - `pager` - Pager webhook feed
-- `remote` - Push-mode remote audio source
+- `remote` - Remote audio source (e.g., from WaveCap-SDR)
+- `combined` - Virtual combined view of multiple streams
 
 ## Response Format
 

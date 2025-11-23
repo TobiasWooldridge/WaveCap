@@ -122,7 +122,7 @@ curl -o local_copy.wav "http://localhost:8000/recordings/FILENAME.wav"
 ### Stream live audio (if stream supports it)
 ```bash
 # Check if stream supports live audio
-curl -s http://localhost:8000/api/streams | jq '.[] | select(.source == "audio" or .source == "sdr") | {id, name, source}'
+curl -s http://localhost:8000/api/streams | jq '.[] | select(.source == "audio" or .source == "remote") | {id, name, source}'
 ```
 
 ## Clean Up Old Recordings

@@ -1,6 +1,6 @@
 export type StreamStatus = "stopped" | "queued" | "transcribing" | "error";
 
-export type StreamSource = "audio" | "pager" | "combined" | "sdr" | "remote";
+export type StreamSource = "audio" | "pager" | "combined" | "remote";
 
 export type ThemeMode = "light" | "dark" | "system";
 

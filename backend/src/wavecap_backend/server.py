@@ -70,8 +70,6 @@ from .whisper_transcriber import (
     create_transcriber,
 )
 from .fixtures import available_fixture_sets, normalize_fixture_set_name
-# Note: Avoid importing the optional SDR module at import time.
-# Import lazily only when SDR is configured/used.
 
 TRANSCRIBER_ENV_FLAG = "WAVECAP_USE_PASSTHROUGH_TRANSCRIBER"
 

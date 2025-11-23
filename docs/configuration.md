@@ -96,7 +96,7 @@ Leave the field at `0` (or omit it) to ingest audio from the very beginning.
 
 ## Recording retention
 
-WaveCap now prunes saved WAV files automatically so audio directories do not grow without bound. Each audio, remote, or SDR stream accepts an optional `recordingRetentionSeconds` field that declares how long to keep its recordings in `state/recordings`. When the field is omitted the backend keeps one week's worth of audio (604 800 seconds). Set the value to any positive duration to pick a different window or set it to `0`/`null` to retain recordings indefinitely. Pager streams ignore the field because they never emit audio clips.
+WaveCap now prunes saved WAV files automatically so audio directories do not grow without bound. Each audio or remote stream accepts an optional `recordingRetentionSeconds` field that declares how long to keep its recordings in `state/recordings`. When the field is omitted the backend keeps one week's worth of audio (604 800 seconds). Set the value to any positive duration to pick a different window or set it to `0`/`null` to retain recordings indefinitely. Pager streams ignore the field because they never emit audio clips.
 
 ```yaml
 streams:
@@ -259,69 +259,6 @@ Each rule must provide an `id` and at least one phrase. Optional fields customis
 Add multiple phrases to catch variations such as `"pan-pan"` and `"pan pan"`. When operators override the defaults,
 the Settings dialog in the UI also exposes a **Keyword alerts** section. From there you can toggle individual rules,
 adjust the phrases, and choose whether each rule plays a chime or only shows a banner. Updates made in the UI apply immediately for all connected browsers and persist until the backend restarts, but they are not written back to `state/config.yaml`. Edit the file directly when you need permanent changes.
-
-## SDR devices and streams
-
-By default, the generated configuration does not include an active `sdr` block.
-WaveCap only initialises SDR support when an `sdr.devices` list is present in
-your configuration. Uncomment or add the section below to enable SDR capture.
-
-WaveCap can ingest audio directly from a local SDR when available on the host machine. Devices are addressed via SoapySDR; for the SDRplay RSPdx install the SDRplay API and the `SoapySDRPlay3` module on the host or in the container, then define a device and one or more SDR-backed streams.
-
-1) Register devices in a top-level `sdr.devices` list:
-
-```yaml
-sdr:
-  devices:
-    - id: rspdx
-      soapy: "driver=sdrplay"   # SoapySDR device string
-      sampleRateHz: 240000       # IQ rate; 240 kS/s works well for voice
-      # gainDb: 40               # Optional fixed gain (dB)
-      # gainMode: auto           # 'auto' enables device AGC when supported
-      # rfBandwidthHz: 200000    # Optional hardware RF/IF bandwidth
-      # antenna: "RX"            # Optional antenna selection
-      # ppmCorrection: -0.8      # Optional frequency correction (ppm)
-      # loOffsetHz: 250000       # Optional LO offset used when tuning
-      # Note: The backend clamps LO offsets to keep the logical tuned
-      # frequency within the observable passband for the configured
-      # sample rate and requested channel bandwidth. As a rule of thumb,
-      # choose a sampleRateHz such that: sampleRateHz ≥ (bandwidth + 2×|loOffsetHz|)
-      # to avoid clipping or silence at the edges.
-```
-
-2) Add streams with `source: sdr` and a tuned frequency:
-
-```yaml
-streams:
-  - id: marine-ch16-sdr
-    name: Marine VHF Ch 16 (SDR)
-    source: sdr
-    sdrDeviceId: rspdx
-    sdrFrequencyHz: 156800000
-    sdrMode: nfm
-    sdrBandwidthHz: 15000
-    sdrSquelchDbFs: -65
-    enabled: false
-```
-
-- `sdrDeviceId`: Must match a defined device under `sdr.devices`.
-- `sdrFrequencyHz`: Absolute RF frequency to tune.
-- Optional fields:
-  - `sdrMode`: Demodulation mode (`nfm`, `wfm`, or `am`).
-  - `sdrBandwidthHz`: Complex channel filter width prior to demodulation. Leave unset to pull default values for each mode.
-  - `sdrSquelchDbFs`: Audio squelch threshold in dBFS (≤ 0). Suppresses low-level noise when no signal is present.
-  - `loOffsetHz`: Applies a local-oscillator offset when tuning to move DC away from baseband. If set too large for the device
-    sample rate and channel bandwidth, the backend automatically clamps it to a safe value so the desired channel remains inside
-    the capture span and audio continues to flow.
-
-### Inspecting SDR health
-
-Call `GET /api/sdr/status` to review currently configured devices, their tuning state, IQ levels, and per-stream audio statistics. The endpoint returns both active devices (including RMS/peak measurements, center frequency, and squelch state) and configured-but-idle devices so you can verify SoapySDR detected the hardware.
-
-Notes:
-- SDR streams behave like regular audio streams in the UI and support `language` and `ignoreFirstSeconds` (default 0 for SDR).
-- Multiple SDR streams on the same device are supported when the channels lie within the configured sample-rate span; the device is tuned to the average and each channel is mixed down and demodulated independently.
-- When SoapySDR or the required plugin is not available, SDR streams will fail to start and report an error in the UI.
 
 ## Tuning Whisper transcription
 

@@ -17,6 +17,8 @@
     "src/utils/playback.ts",
     "src/utils/playback.test.ts",
     "src/utils/unreadStorage.test.ts",
+    "src/utils/sidebarSort.ts",
+    "src/utils/sidebarSort.test.ts",
     "src/hooks/useTranscriptionAudioPlayback.ts",
     "src/hooks/useTranscriptionAudioPlayback.test.tsx",
     "src/hooks/useTranscriptions.ts",

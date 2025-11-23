@@ -84,15 +84,19 @@ const SidebarItemRow = memo(function SidebarItemRow({
                     </span>
                   );
                 }
+                const source = item.stream?.source ?? "audio";
+                if (source === "remote") {
+                  return (
+                    <span className="badge rounded-pill text-bg-warning-subtle text-warning-emphasis">
+                      Remote
+                    </span>
+                  );
+                }
                 const url = String(item.stream?.url || "");
                 const isWeb = /^https?:\/\//i.test(url);
                 return (
-                  <span className={`badge rounded-pill ${
-                    isWeb
-                      ? "text-bg-secondary-subtle text-secondary-emphasis"
-                      : "text-bg-warning-subtle text-warning-emphasis"
-                  }`}>
-                    {isWeb ? "Web" : "SDR"}
+                  <span className="badge rounded-pill text-bg-secondary-subtle text-secondary-emphasis">
+                    {isWeb ? "Web" : "Audio"}
                   </span>
                 );
               })()}
