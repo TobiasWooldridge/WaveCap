@@ -277,8 +277,12 @@ class MLXLLMCorrector(AbstractLLMCorrector):
         prefixes_to_remove = [
             "Corrected transcription:",
             "Corrected:",
+            "Here is the corrected transcription:",
             "Here is the corrected text:",
             "Here's the corrected transcription:",
+            "Here's the corrected text:",
+            "The corrected transcription is:",
+            "The corrected text is:",
         ]
         for prefix in prefixes_to_remove:
             if text.lower().startswith(prefix.lower()):
