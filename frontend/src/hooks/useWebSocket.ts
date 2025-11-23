@@ -136,14 +136,9 @@ export const useWebSocket = (
         setError(null);
         reconnectAttempts.current = 0;
         idleDisconnectRef.current = false;
-
-        if (shouldReloadOnReconnectRef.current) {
-          shouldReloadOnReconnectRef.current = false;
-          if (typeof window !== "undefined") {
-            window.location.reload();
-          }
-          return;
-        }
+        // Reset reload flag - we no longer do page reloads on reconnect
+        // The App component will refetch streams when wsConnected changes
+        shouldReloadOnReconnectRef.current = false;
       };
 
       ws.onmessage = (event) => {
@@ -255,15 +250,14 @@ export const useWebSocket = (
         if (
           reconnectAttempts.current < maxReconnectAttempts
         ) {
-          shouldReloadOnReconnectRef.current = true;
           reconnectAttempts.current++;
           const delay = Math.min(
             1000 * Math.pow(2, reconnectAttempts.current),
             30000,
           );
+          console.log(`🔌 WebSocket reconnecting in ${delay}ms (attempt ${reconnectAttempts.current}/${maxReconnectAttempts})...`);
           reconnectTimeoutRef.current = window.setTimeout(connect, delay);
         } else {
-          shouldReloadOnReconnectRef.current = false;
           setError("Failed to reconnect after multiple attempts");
         }
       };
@@ -405,9 +399,9 @@ export const useWebSocket = (
         console.warn(
           `🔌 WebSocket connection appears stale (no messages for ${Math.round(timeSinceLastMessage / 1000)}s), reconnecting...`
         );
-        // Close and reconnect
+        // Close and reconnect - the onclose handler will trigger reconnection
+        // and the App component will refetch streams when connection is restored
         if (socketRef.current) {
-          shouldReloadOnReconnectRef.current = true;
           socketRef.current.close();
         }
       }

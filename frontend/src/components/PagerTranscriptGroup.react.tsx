@@ -1,7 +1,7 @@
 import React from "react";
 import { ChevronDown, ChevronUp, MapPin } from "lucide-react";
 import { type CondensedPagerMessage } from "../utils/pagerMessages";
-import { getNotifiableAlerts } from "../utils/transcriptions";
+import { getNotifiableAlerts, getTranscriptionDisplayText } from "../utils/transcriptions";
 import Button from "./primitives/Button.react";
 import { AlertChips } from "./chips/AlertChips.react";
 
@@ -55,10 +55,12 @@ export const PagerTranscriptGroup: React.FC<PagerTranscriptGroupProps> = ({
             </span>
           ) : null;
 
+        const firstFragment = message.fragments[0];
+        const fragmentDisplayText = firstFragment ? getTranscriptionDisplayText(firstFragment) : null;
         const summaryText =
           message.summary ||
-          (message.fragments[0]?.text
-            ? message.fragments[0].text.split(/\r?\n/, 1)[0]
+          (fragmentDisplayText
+            ? fragmentDisplayText.split(/\r?\n/, 1)[0]
             : "Pager update");
         const isFragmentsOpen = Boolean(openMessageIds[message.id]);
         const fragmentCountLabel = `${message.fragments.length} ${

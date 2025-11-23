@@ -1,4 +1,4 @@
-import { ChangeEvent, MutableRefObject, ReactNode } from "react";
+import { ChangeEvent, memo, MutableRefObject, ReactNode, useCallback } from "react";
 import { Activity, LogIn, LogOut, Radio, Settings, Star, X } from "lucide-react";
 import { Stream } from "@types";
 import Button from "./primitives/Button.react";
@@ -22,6 +22,111 @@ export interface StreamSidebarItem {
   isActive: boolean;
   isPinned: boolean;
 }
+
+interface SidebarItemRowProps {
+  item: StreamSidebarItem;
+  onSelectStream: (streamId: string) => void;
+}
+
+const SidebarItemRow = memo(function SidebarItemRow({
+  item,
+  onSelectStream,
+}: SidebarItemRowProps) {
+  const handleClick = useCallback(() => {
+    onSelectStream(item.id);
+  }, [onSelectStream, item.id]);
+
+  return (
+    <Button
+      use="unstyled"
+      onClick={handleClick}
+      className={`stream-sidebar__item ${item.isActive ? "stream-sidebar__item--active" : ""}`}
+      aria-current={item.isActive ? "page" : undefined}
+    >
+      <Flex align="start" gap={3} className="stream-sidebar__item-layout">
+        <StreamStatusIndicator stream={item.stream} />
+        <Flex
+          className="stream-sidebar__item-main"
+          justify="between"
+          align="start"
+          gap={3}
+        >
+          <Flex
+            direction="column"
+            gap={2}
+            className="stream-sidebar__item-content"
+          >
+            <Flex align="baseline" gap={2} className="stream-sidebar__item-heading">
+              {item.isPinned ? (
+                <span
+                  className="stream-sidebar__pin"
+                  aria-label="Pinned stream"
+                  role="img"
+                >
+                  <Star size={14} fill="currentColor" aria-hidden="true" />
+                </span>
+              ) : null}
+              <span className="stream-sidebar__item-title">
+                {item.title}
+              </span>
+              {(() => {
+                if (item.type === "combined") {
+                  return (
+                    <span className="badge rounded-pill text-bg-primary-subtle text-primary-emphasis">
+                      Combined
+                    </span>
+                  );
+                }
+                if (item.isPager) {
+                  return (
+                    <span className="badge rounded-pill text-bg-info-subtle text-info-emphasis">
+                      Pager
+                    </span>
+                  );
+                }
+                const url = String(item.stream?.url || "");
+                const isWeb = /^https?:\/\//i.test(url);
+                return (
+                  <span className={`badge rounded-pill ${
+                    isWeb
+                      ? "text-bg-secondary-subtle text-secondary-emphasis"
+                      : "text-bg-warning-subtle text-warning-emphasis"
+                  }`}>
+                    {isWeb ? "Web" : "SDR"}
+                  </span>
+                );
+              })()}
+            </Flex>
+            <div className="stream-sidebar__item-preview text-body-secondary">
+              {item.previewText.trim().toLowerCase() === "no transcription" ? (
+                <em>No transcription</em>
+              ) : (
+                item.previewText
+              )}
+            </div>
+          </Flex>
+          <Flex
+            direction="column"
+            align="end"
+            gap={1}
+            className="stream-sidebar__item-meta"
+          >
+            <span className="stream-sidebar__item-time">
+              {item.previewTime}
+            </span>
+            {item.unreadCount > 0 ? (
+              <Badge
+                aria-label={`${item.unreadCount} new messages`}
+                value={item.unreadCount}
+                max={99}
+              />
+            ) : null}
+          </Flex>
+        </Flex>
+      </Flex>
+    </Button>
+  );
+});
 
 interface StreamSidebarProps {
   isReadOnly: boolean;
@@ -152,95 +257,11 @@ const StreamSidebar = ({
           {renderEmptyState()}
 
           {items.map((item) => (
-            <Button
+            <SidebarItemRow
               key={item.id}
-              use="unstyled"
-              onClick={() => onSelectStream(item.id)}
-              className={`stream-sidebar__item ${item.isActive ? "stream-sidebar__item--active" : ""}`}
-              aria-current={item.isActive ? "page" : undefined}
-            >
-              <Flex align="start" gap={3} className="stream-sidebar__item-layout">
-                <StreamStatusIndicator stream={item.stream} />
-                <Flex
-                  className="stream-sidebar__item-main"
-                  justify="between"
-                  align="start"
-                  gap={3}
-                >
-                  <Flex
-                    direction="column"
-                    gap={2}
-                    className="stream-sidebar__item-content"
-                  >
-                    <Flex align="baseline" gap={2} className="stream-sidebar__item-heading">
-                      {item.isPinned ? (
-                        <span
-                          className="stream-sidebar__pin"
-                          aria-label="Pinned stream"
-                          role="img"
-                        >
-                          <Star size={14} fill="currentColor" aria-hidden="true" />
-                        </span>
-                      ) : null}
-                      <span className="stream-sidebar__item-title">
-                        {item.title}
-                      </span>
-                      {(() => {
-                        if (item.type === "combined") {
-                          return (
-                            <span className="badge rounded-pill text-bg-primary-subtle text-primary-emphasis">
-                              Combined
-                            </span>
-                          );
-                        }
-                        if (item.isPager) {
-                          return (
-                            <span className="badge rounded-pill text-bg-info-subtle text-info-emphasis">
-                              Pager
-                            </span>
-                          );
-                        }
-                        const url = String(item.stream?.url || "");
-                        const isWeb = /^https?:\/\//i.test(url);
-                        return (
-                          <span className={`badge rounded-pill ${
-                            isWeb
-                              ? "text-bg-secondary-subtle text-secondary-emphasis"
-                              : "text-bg-warning-subtle text-warning-emphasis"
-                          }`}>
-                            {isWeb ? "Web" : "SDR"}
-                          </span>
-                        );
-                      })()}
-                    </Flex>
-                    <div className="stream-sidebar__item-preview text-body-secondary">
-                      {item.previewText.trim().toLowerCase() === "no transcription" ? (
-                        <em>No transcription</em>
-                      ) : (
-                        item.previewText
-                      )}
-                    </div>
-                  </Flex>
-                  <Flex
-                    direction="column"
-                    align="end"
-                    gap={1}
-                    className="stream-sidebar__item-meta"
-                  >
-                    <span className="stream-sidebar__item-time">
-                      {item.previewTime}
-                    </span>
-                    {item.unreadCount > 0 ? (
-                      <Badge
-                        aria-label={`${item.unreadCount} new messages`}
-                        value={item.unreadCount}
-                        max={99}
-                      />
-                    ) : null}
-                  </Flex>
-                </Flex>
-              </Flex>
-            </Button>
+              item={item}
+              onSelectStream={onSelectStream}
+            />
           ))}
         </div>
 

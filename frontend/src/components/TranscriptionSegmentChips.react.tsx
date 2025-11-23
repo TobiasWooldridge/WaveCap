@@ -158,6 +158,7 @@ interface SegmentPlaybackChipProps {
     endTime: number,
   ) => boolean;
   displayOffsetSeconds?: number;
+  originalText?: string;
 }
 
 const SegmentPlaybackChip = ({
@@ -169,6 +170,7 @@ const SegmentPlaybackChip = ({
   onPlay,
   isSegmentCurrentlyPlaying,
   displayOffsetSeconds,
+  originalText,
 }: SegmentPlaybackChipProps) => {
   const segmentIdentifier = buildSegmentIdentifier(
     recordingId,
@@ -212,8 +214,8 @@ const SegmentPlaybackChip = ({
         )
       : null;
 
-  // Show original text in tooltip when transcription was LLM-corrected
-  const originalText = transcription.correctedText ? transcription.text : undefined;
+  // Use passed originalText or derive from transcription if LLM-corrected
+  const effectiveOriginalText = originalText ?? (transcription.correctedText ? transcription.text : undefined);
 
   return (
     <TranscriptSegmentListItem
@@ -225,7 +227,7 @@ const SegmentPlaybackChip = ({
       displayOffsetSeconds={displayOffsetSeconds}
       recordingStartOffset={transcription.recordingStartOffset}
       trailingAction={trailingAction ?? undefined}
-      originalText={originalText}
+      originalText={effectiveOriginalText}
     />
   );
 };
@@ -302,6 +304,7 @@ interface SyntheticSegmentChipProps {
     startTime: number,
     endTime: number,
   ) => boolean;
+  originalText?: string;
 }
 
 const SyntheticSegmentChip = ({
@@ -312,6 +315,7 @@ const SyntheticSegmentChip = ({
   playingSegmentId,
   onPlay,
   isSegmentCurrentlyPlaying,
+  originalText,
 }: SyntheticSegmentChipProps) => {
   const fallbackStart =
     typeof transcription.recordingStartOffset === "number" &&
@@ -348,12 +352,14 @@ const SyntheticSegmentChip = ({
         onPlay={onPlay}
         isSegmentCurrentlyPlaying={isSegmentCurrentlyPlaying}
         displayOffsetSeconds={fallbackStart}
+        originalText={originalText}
       />
     );
   }
 
+  const tooltip = originalText ? `Original: ${originalText}` : "Transcription summary";
   return (
-    <span className="transcript-synthetic-chip" title="Transcription summary">
+    <span className="transcript-synthetic-chip" title={tooltip}>
       {displayText}
     </span>
   );
@@ -459,6 +465,8 @@ export const TranscriptionSegmentChips = ({
 
     const normalizedDisplayText = displayText?.trim();
     if (normalizedDisplayText) {
+      // Show original text in tooltip when transcription was LLM-corrected
+      const originalText = transcription.correctedText ? transcription.text : undefined;
       chipElements.push(
         <SyntheticSegmentChip
           key={`${transcription.id}-synthetic`}
@@ -469,6 +477,7 @@ export const TranscriptionSegmentChips = ({
           playingSegmentId={playingSegmentId}
           onPlay={onPlaySegment}
           isSegmentCurrentlyPlaying={isSegmentCurrentlyPlaying}
+          originalText={originalText}
         />,
       );
 

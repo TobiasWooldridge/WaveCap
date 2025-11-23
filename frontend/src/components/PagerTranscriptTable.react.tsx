@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { AlertTriangle, ChevronDown, ChevronRight, MapPin } from "lucide-react";
 import { type CondensedPagerMessage, getCondensedFieldValue } from "../utils/pagerMessages";
-import { getNotifiableAlerts } from "../utils/transcriptions";
+import { getNotifiableAlerts, getTranscriptionDisplayText } from "../utils/transcriptions";
 import { Timestamp } from "./primitives/Timestamp.react";
 import { TimeInterval } from "./primitives/TimeInterval.react";
 import { AlertChips } from "./chips/AlertChips.react";
@@ -69,10 +69,12 @@ export const PagerTranscriptTable: React.FC<PagerTranscriptTableProps> = ({
         <tbody>
           {messages.map((message, index) => {
             const isOpen = Boolean(openMessageIds[message.id]);
+            const firstFragment = message.fragments[0];
+            const fragmentDisplayText = firstFragment ? getTranscriptionDisplayText(firstFragment) : null;
             const summaryText =
               message.summary ||
-              (message.fragments[0]?.text
-                ? message.fragments[0].text.split(/\r?\n/, 1)[0]
+              (fragmentDisplayText
+                ? fragmentDisplayText.split(/\r?\n/, 1)[0]
                 : "Pager update");
 
             const address = getCondensedFieldValue(message, "address");

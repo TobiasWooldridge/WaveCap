@@ -103,7 +103,8 @@ curl -s http://localhost:8000/api/logging-config | jq
 
 ### Connection Refused
 - Backend server is not running
-- Start with: `cd /Users/thw/Projects/WaveCap && ./start-app.sh`
+- Check service status: `launchctl list | grep wavecap`
+- Start service: `launchctl load ~/Library/LaunchAgents/com.wavecap.server.plist`
 
 ### Stream Stuck in "queued"
 - May be waiting for concurrent process slot
@@ -121,17 +122,17 @@ curl -s http://localhost:8000/api/logging-config | jq
 
 ## Restart Backend
 
-If the backend needs to be restarted:
+WaveCap runs as a macOS Launch Agent. Use launchctl to manage it:
 
 ```bash
-# Kill existing process
-pkill -f "uvicorn.*wavecap"
+# Check service status
+launchctl list | grep wavecap
 
-# Start fresh
-cd /Users/thw/Projects/WaveCap/backend
-source .venv/bin/activate
-uvicorn wavecap_backend.server:create_app --factory --host 0.0.0.0 --port 8000
+# Restart the service
+launchctl unload ~/Library/LaunchAgents/com.wavecap.server.plist && launchctl load ~/Library/LaunchAgents/com.wavecap.server.plist
 ```
+
+For more service management options (start, stop, logs, troubleshooting), use the **wavecap-service** skill.
 
 ## API Response Codes
 

@@ -82,11 +82,16 @@ export const TranscriptionSummaryCard: React.FC<
   }, [silenceBounds]);
   const reviewStatus = transcription.reviewStatus ?? "pending";
   const showReview = transcriptCorrectionEnabled && reviewStatus !== "pending";
-  const finalText =
-    typeof transcription.correctedText === "string" &&
-    transcription.correctedText.trim().length > 0
-      ? transcription.correctedText.trim()
-      : transcription.text;
+  const correctedTextValue = transcription.correctedText;
+  const hasCorrectedText =
+    typeof correctedTextValue === "string" &&
+    correctedTextValue.trim().length > 0;
+  const finalText = hasCorrectedText
+    ? correctedTextValue.trim()
+    : transcription.text;
+  const originalTextTooltip = hasCorrectedText
+    ? `Original: ${transcription.text}`
+    : undefined;
   const alertTriggers = getNotifiableAlerts(transcription.alerts);
   const hasAlerts = alertTriggers.length > 0;
   const confidenceValue =
@@ -379,7 +384,7 @@ export const TranscriptionSummaryCard: React.FC<
             <audio ref={audioRef} preload="none" className="d-none" />
           </Flex>
         ) : (
-          <p className="timeline-entry__text mb-0">{finalText}</p>
+          <p className="timeline-entry__text mb-0" title={originalTextTooltip}>{finalText}</p>
         )}
       </Flex>
     </div>

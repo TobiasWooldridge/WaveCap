@@ -18,8 +18,10 @@ import {
   LogIn,
   Activity,
   Pencil,
+  Loader2,
 } from "lucide-react";
 import { useStreams, STREAM_TRANSCRIPTION_PREVIEW_LIMIT } from "./hooks/useTranscriptions";
+import { useCombinedViewData } from "./hooks/useCombinedViewData";
 import {
   useWebSocket,
   type WebSocketCommandResult,
@@ -36,10 +38,8 @@ import {
   TranscriptionResult,
   TranscriptionReviewStatus,
   StreamCommandState,
-  CombinedStreamView,
 } from "@types";
 import { CombinedTranscriptionLog } from "./components/CombinedTranscriptionLog.react";
-import { dedupeAndSortTranscriptions } from "./components/StreamTranscriptionPanel.logic";
 import { useUISettings } from "./contexts/UISettingsContext";
 import SettingsModal from "./components/SettingsModal.react";
 import { useToast } from "./hooks/useToast";
@@ -278,13 +278,6 @@ const renderStandaloneStatusIcon = (
   }
 };
 
-type CombinedViewInstance = {
-  view: CombinedStreamView;
-  stream: Stream;
-  members: Stream[];
-  missingStreamIds: string[];
-};
-
 function App() {
   const {
     themeMode,
@@ -461,12 +454,14 @@ function App() {
   useEffect(() => {
     if (!wsConnected) {
       if (hadWsConnectionRef.current) {
+        console.log("🔌 WebSocket disconnected, will refetch streams on reconnect");
         shouldRefetchStreamsRef.current = true;
       }
       return;
     }
 
     if (shouldRefetchStreamsRef.current) {
+      console.log("🔌 WebSocket reconnected, refetching streams to catch up on missed messages...");
       shouldRefetchStreamsRef.current = false;
       void fetchStreams();
     }
@@ -699,118 +694,13 @@ function App() {
     () => (Array.isArray(streams) ? streams : []),
     [streams],
   );
-  const combinedViewData = useMemo(() => {
-    const map = new Map<string, CombinedViewInstance>();
-    const virtualStreams: Stream[] = [];
-    const streamLookup = new Map(
-      normalizedStreams.map((stream) => [stream.id, stream]),
-    );
 
-    combinedStreamViews.forEach((view) => {
-      const members = view.streamIds
-        .map((streamId) => streamLookup.get(streamId))
-        .filter((stream): stream is Stream => Boolean(stream));
-      const missingStreamIds = view.streamIds.filter(
-        (streamId) => !streamLookup.has(streamId),
-      );
-
-      const combinedTranscriptions = dedupeAndSortTranscriptions(
-        members.flatMap((stream) => stream.transcriptions ?? []),
-      );
-      const trimmedTranscriptions =
-        combinedTranscriptions.length > STREAM_TRANSCRIPTION_PREVIEW_LIMIT
-          ? combinedTranscriptions.slice(
-              combinedTranscriptions.length -
-                STREAM_TRANSCRIPTION_PREVIEW_LIMIT,
-            )
-          : combinedTranscriptions;
-
-      const activityCandidates: number[] = [];
-      trimmedTranscriptions.forEach((transcription) => {
-        activityCandidates.push(safeTimestamp(transcription.timestamp));
-      });
-      members.forEach((stream) => {
-        const activity =
-          safeTimestamp(stream.lastActivityAt) ||
-          safeTimestamp(stream.createdAt);
-        if (activity > 0) {
-          activityCandidates.push(activity);
-        }
-      });
-      const lastActivityMs =
-        activityCandidates.length > 0 ? Math.max(...activityCandidates) : 0;
-      const lastActivityAt =
-        lastActivityMs > 0 ? new Date(lastActivityMs).toISOString() : null;
-
-      const createdCandidates = members
-        .map((stream) => safeTimestamp(stream.createdAt))
-        .filter((value) => value > 0);
-      const createdAtMs =
-        createdCandidates.length > 0
-          ? Math.min(...createdCandidates)
-          : Date.now();
-      const createdAt = new Date(createdAtMs).toISOString();
-
-      const anyTranscribing = members.some(
-        (stream) => stream.status === "transcribing",
-      );
-      const anyQueued = members.some((stream) => stream.status === "queued");
-      const anyEnabled = members.some((stream) => stream.enabled);
-      const anyError = members.some(
-        (stream) => stream.status === "error" || Boolean(stream.error),
-      );
-
-      let status: Stream["status"] = "stopped";
-      if (missingStreamIds.length > 0) {
-        status = "error";
-      } else if (anyError) {
-        status = "error";
-      } else if (anyTranscribing) {
-        status = "transcribing";
-      } else if (anyQueued) {
-        status = "queued";
-      }
-
-      const enabled =
-        status === "transcribing" || status === "queued" || anyEnabled;
-
-      const errorMessage =
-        missingStreamIds.length > 0
-          ? `Missing streams: ${missingStreamIds.join(", ")}`
-          : anyError
-          ? "One or more streams reporting errors"
-          : null;
-
-      const combinedStream: Stream = {
-        id: view.id,
-        name: view.name,
-        url: `combined:${view.id}`,
-        status,
-        enabled,
-        pinned: false,
-        createdAt,
-        transcriptions: trimmedTranscriptions,
-        source: "combined",
-        ignoreFirstSeconds: 0,
-        lastActivityAt,
-        error: errorMessage,
-        combinedStreamIds: [...view.streamIds],
-      };
-
-      map.set(view.id, {
-        view,
-        stream: combinedStream,
-        members,
-        missingStreamIds,
-      });
-      virtualStreams.push(combinedStream);
-    });
-
-    return { map, virtualStreams };
-  }, [combinedStreamViews, normalizedStreams]);
-
-  const combinedViewMap = combinedViewData.map;
-  const virtualStreams = combinedViewData.virtualStreams;
+  const { map: combinedViewMap, virtualStreams } = useCombinedViewData({
+    streams: normalizedStreams,
+    combinedStreamViews,
+    streamsInitialized,
+    loading,
+  });
 
   const displayStreams = useMemo(
     () => [...normalizedStreams, ...virtualStreams],
@@ -1625,6 +1515,19 @@ function App() {
     </div>
   ) : null;
 
+  // Show a loading screen until streams and combined views have loaded
+  const isInitializing = !streamsInitialized || !combinedViewsFetched;
+  if (isInitializing) {
+    return (
+      <div className="app-shell bg-body-secondary d-flex align-items-center justify-content-center">
+        <div className="text-center text-body-secondary">
+          <Loader2 size={32} className="animate-spin mb-3" />
+          <div>Loading…</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       {loginOverlay}
@@ -1804,6 +1707,11 @@ function App() {
                             </p>
                           ) : null}
                         </>
+                      ) : loading || !streamsInitialized ? (
+                        <div className="d-flex align-items-center gap-2 text-body-secondary">
+                          <Loader2 size={18} className="animate-spin" />
+                          <span>Loading streams…</span>
+                        </div>
                       ) : sortedConversations.length === 0 ? (
                         <>
                           <h2 className="h5 mb-1">No streams available</h2>
@@ -1995,7 +1903,12 @@ function App() {
                     )
                   ) : (
                     <div className="conversation-panel__placeholder text-body-secondary text-center">
-                      {sortedConversations.length === 0 ? (
+                      {loading || !streamsInitialized ? (
+                        <div className="d-flex align-items-center justify-content-center gap-2">
+                          <Loader2 size={18} className="animate-spin" />
+                          <span>Loading streams…</span>
+                        </div>
+                      ) : sortedConversations.length === 0 ? (
                         <>
                           <p className="fw-semibold mb-1">
                             No streams available

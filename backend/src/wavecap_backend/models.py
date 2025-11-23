@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Optional
@@ -84,6 +85,28 @@ class TranscriptionSegment(APIModel):
     end: float
     seek: int
 
+    @field_validator(
+        "no_speech_prob",
+        "temperature",
+        "avg_logprob",
+        "compression_ratio",
+        "start",
+        "end",
+        mode="before",
+    )
+    @classmethod
+    def _sanitize_float(cls, value: float) -> float:
+        """Replace NaN/Inf with 0.0 to ensure JSON serialization succeeds."""
+        if value is None:
+            return 0.0
+        try:
+            f = float(value)
+            if math.isnan(f) or math.isinf(f):
+                return 0.0
+            return f
+        except (TypeError, ValueError):
+            return 0.0
+
 
 class TranscriptionAlertTrigger(APIModel):
     ruleId: str = Field(alias="ruleId")
@@ -152,6 +175,20 @@ class TranscriptionResult(APIModel):
     pagerIncident: Optional["PagerIncidentDetails"] = Field(
         default=None, alias="pagerIncident"
     )
+
+    @field_validator("confidence", "duration", "recordingStartOffset", mode="before")
+    @classmethod
+    def _sanitize_optional_float(cls, value: Optional[float]) -> Optional[float]:
+        """Replace NaN/Inf with None to ensure JSON serialization succeeds."""
+        if value is None:
+            return None
+        try:
+            f = float(value)
+            if math.isnan(f) or math.isinf(f):
+                return None
+            return f
+        except (TypeError, ValueError):
+            return None
 
     @field_validator("recordingUrl", mode="before")
     @classmethod

@@ -267,6 +267,8 @@ const SearchResultCard: React.FC<SearchResultCardProps> = ({
   const displayText =
     getTranscriptionDisplayText(result)?.trim() ?? result.text ?? "";
   const blankAudio = isBlankAudioText(result.text ?? "");
+  // Show original text in tooltip when LLM-corrected
+  const originalTextTooltip = result.correctedText ? `Original: ${result.text}` : undefined;
   const alertTriggers = getNotifiableAlerts(result.alerts);
   const hasAlerts = alertTriggers.length > 0;
   const transcriptCorrectionEnabled =
@@ -327,7 +329,7 @@ const SearchResultCard: React.FC<SearchResultCardProps> = ({
           <div className="transcript-message__chips">{segmentChips}</div>
         ) : null}
         {displayText ? (
-          <p className="transcript-message__text">{displayText}</p>
+          <p className="transcript-message__text" title={originalTextTooltip}>{displayText}</p>
         ) : null}
         {recordingUrl && recordingId && recordingAudioRefs ? (
           <AudioElement

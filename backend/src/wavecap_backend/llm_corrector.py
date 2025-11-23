@@ -18,12 +18,14 @@ LOGGER = logging.getLogger(__name__)
 # Try to import MLX LLM libraries
 try:
     from mlx_lm import load, generate
+    from mlx_lm.sample_utils import make_sampler
 
     mlx_lm_available = True
 except ImportError:
     mlx_lm_available = False
     load = None
     generate = None
+    make_sampler = None
 
 
 # Model name to MLX Hub repo mapping
@@ -41,23 +43,36 @@ MLX_LLM_MODEL_MAP = {
     "deepseek-r1-8b": "mlx-community/DeepSeek-R1-Distill-Llama-8B-4bit",
 }
 
-DEFAULT_SYSTEM_PROMPT = """You are correcting radio transcriptions from South Australia emergency services dispatch.
+DEFAULT_SYSTEM_PROMPT = """You are correcting radio transcriptions from emergency services dispatch.
 
 Your task:
-1. Fix obvious transcription errors (mishearings, repeated words)
+1. Fix obvious transcription errors (mishearings, repeated words, garbled phrases)
 2. Add proper punctuation and capitalization
 3. Preserve the original meaning - do not add or remove information
 4. Keep domain-specific terms accurate
+5. Preserve colloquialisms and slang exactly as spoken (e.g., keep "Maccas" not "McDonald's", keep "arvo" not "afternoon")
+6. Correct misspelled proper nouns, especially place names (e.g., "Gula" -> "Goolwa", "Norlunga" -> "Noarlunga")
+7. Apply phonetic awareness: consider what was likely SAID vs what was transcribed (e.g., "sick rep" sounds like "SITREP", "your X receives" -> "your X received")
+8. Fix grammar issues that are clearly transcription errors, not speaker errors
 
-Common terms that may be misheard:
-- "SITREP" (situation report)
-- Unit callsigns (e.g., "Metro 2-1", "Noarlunga 3", "Sturt 1")
+General patterns to watch for:
+- Homophones and near-homophones (their/there, to/too/two, your/you're)
+- Words that sound similar when spoken quickly over radio
+- Run-on sentences that need punctuation breaks
+- Repeated words or phrases from transcription stuttering
+- Numbers and callsigns (often garbled)
+
+Common radio transcription errors:
+- "sick rep", "sit rep", "sitrep" -> "SITREP" (situation report)
+- "your [X] receives" -> "your [X] received" (acknowledgment phrase)
+- "LHQ" (Local Headquarters)
+- Unit callsigns (e.g., "Metro 2-1", "Unit 3", "Station 1")
 - Map references (e.g., "Map 147 D4")
 - "Roger", "Copy", "Over", "Out"
 
 Adelaide/SA specific terms:
 - "Adelaide fire out" - common sign-off phrase, usually at end of transmissions
-- Suburb names: Noarlunga, Aldinga, Para Hills, Gawler, Sturt, Modbury, Elizabeth, Salisbury, Port Adelaide, Henley Beach, Glenelg, Marion, Mitcham
+- Suburb names: Noarlunga, Aldinga, Para Hills, Gawler, Sturt, Modbury, Elizabeth, Salisbury, Port Adelaide, Henley Beach, Glenelg, Marion, Mitcham, Goolwa, Victor Harbor, Murray Bridge
 - Services: SAPOL (SA Police), SES (State Emergency Service), CFS (Country Fire Service), MFS (Metropolitan Fire Service), SAAS (SA Ambulance Service)
 
 Return ONLY the corrected text with no explanation or commentary."""
@@ -213,12 +228,13 @@ class MLXLLMCorrector(AbstractLLMCorrector):
             LOGGER.debug("Running MLX LLM correction on %d chars", len(text))
 
             try:
+                sampler = make_sampler(temp=self.config.temperature)
                 response = generate(
                     self._model,
                     self._tokenizer,
                     prompt=prompt,
                     max_tokens=self.config.maxTokens,
-                    temp=self.config.temperature,
+                    sampler=sampler,
                     verbose=False,
                 )
 
