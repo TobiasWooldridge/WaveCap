@@ -124,6 +124,11 @@ class TranscriptionRecord(SQLModel, table=True):
         default=None,
         sa_column=Column("pagerIncident", Text, nullable=True),
     )
+    # Hidden metadata for tracing event sources - stored as JSON
+    eventMetadata: Optional[str] = Field(
+        default=None,
+        sa_column=Column("eventMetadata", Text, nullable=True),
+    )
 
 
 class StreamDatabase:
@@ -163,6 +168,7 @@ class StreamDatabase:
                     "ALTER TABLE streams ADD COLUMN pinned BOOLEAN DEFAULT 0",
                     "ALTER TABLE transcriptions ADD COLUMN eventType TEXT DEFAULT 'transcription'",
                     "ALTER TABLE transcriptions ADD COLUMN pagerIncident TEXT",
+                    "ALTER TABLE transcriptions ADD COLUMN eventMetadata TEXT",
                     "CREATE INDEX IF NOT EXISTS ix_streams_last_activity ON streams (lastActivityAt)",
                     "CREATE INDEX IF NOT EXISTS ix_transcriptions_stream_timestamp ON transcriptions (streamId, timestamp)",
                     "CREATE INDEX IF NOT EXISTS ix_transcriptions_timestamp ON transcriptions (timestamp)",
@@ -291,6 +297,11 @@ class StreamDatabase:
             else:
                 incident_json = None
             record.pagerIncident = incident_json
+            # Store eventMetadata as JSON for tracing/debugging
+            if transcription.eventMetadata:
+                record.eventMetadata = json.dumps(transcription.eventMetadata)
+            else:
+                record.eventMetadata = None
             session.add(record)
 
     async def load_recent_transcriptions(

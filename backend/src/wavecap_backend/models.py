@@ -174,6 +174,10 @@ class TranscriptionResult(APIModel):
     pagerIncident: Optional["PagerIncidentDetails"] = Field(
         default=None, alias="pagerIncident"
     )
+    # Hidden metadata for debugging/tracing - not exposed to frontend by default
+    eventMetadata: Optional[Dict[str, str]] = Field(
+        default=None, alias="eventMetadata", exclude=True
+    )
 
     @field_validator("confidence", "duration", "recordingStartOffset", mode="before")
     @classmethod

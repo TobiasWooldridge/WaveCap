@@ -586,19 +586,9 @@ class StreamManager:
                     )
                 else:
                     resumed_streams.append(stream)
-            for stream in resumed_streams:
-                try:
-                    trigger = self._start_triggers.get(stream.id) or SystemEventTrigger.automatic_resume()
-                    await self._record_system_event(
-                        stream,
-                        TranscriptionEventType.RECORDING_STARTED,
-                        RECORDING_STARTED_MESSAGE,
-                        trigger=trigger,
-                    )
-                except Exception:  # pragma: no cover - defensive startup
-                    LOGGER.exception(
-                        "Failed to record restart event for stream %s", stream.id
-                    )
+            # Note: RECORDING_STARTED events are emitted by _handle_status_change()
+            # when the worker transitions to TRANSCRIBING status. We no longer
+            # emit them explicitly here to avoid duplicates.
         await self._prune_expired_recordings()
         self._start_retention_task()
 
@@ -942,6 +932,8 @@ class StreamManager:
         event_type: TranscriptionEventType,
         message: str,
         trigger: Optional[SystemEventTrigger],
+        *,
+        source: Optional[str] = None,
     ) -> None:
         trigger_suffix = _format_trigger_suffix(trigger)
         event_text = f"{message} ({trigger_suffix})"
@@ -960,12 +952,21 @@ class StreamManager:
         if last_activity is not None and timestamp <= last_activity:
             timestamp = last_activity + timedelta(microseconds=1)
 
+        # Build eventMetadata for tracing where this event originated
+        event_metadata = {
+            "trigger_type": trigger.type.value if trigger else "unspecified",
+            "source": source or "status_change",
+        }
+        if trigger and trigger.detail:
+            event_metadata["trigger_detail"] = trigger.detail
+
         transcription = TranscriptionResult(
             id=str(uuid.uuid4()),
             streamId=stream.id,
             text=event_text,
             timestamp=timestamp,
             eventType=event_type,
+            eventMetadata=event_metadata,
         )
         self._last_event_timestamps[stream.id] = timestamp
         try:
@@ -1107,6 +1108,7 @@ class StreamManager:
                     event_type,
                     message,
                     trigger=trigger_reason,
+                    source="handle_status_change",
                 )
             except Exception:
                 if swallow_exception:  # pragma: no cover - defensive logging
@@ -1153,6 +1155,7 @@ class StreamManager:
             TranscriptionEventType.UPSTREAM_DISCONNECTED,
             message,
             trigger,
+            source="upstream_disconnect",
         )
 
     async def _handle_upstream_reconnect(self, stream: Stream, attempt: int) -> None:
@@ -1171,6 +1174,7 @@ class StreamManager:
             TranscriptionEventType.UPSTREAM_RECONNECTED,
             message,
             trigger,
+            source="upstream_reconnect",
         )
 
     async def _broadcast_streams(self, include_transcriptions: bool = False) -> None:
@@ -1256,6 +1260,7 @@ class StreamManager:
                     TranscriptionEventType.RECORDING_STOPPED,
                     RECORDING_STOPPED_MESSAGE,
                     trigger=trigger_reason,
+                    source="shutdown",
                 )
             except Exception:  # pragma: no cover - defensive logging
                 LOGGER.exception(
