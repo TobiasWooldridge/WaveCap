@@ -25,7 +25,8 @@ async def test_load_screenshot_fixtures_populates_database() -> None:
         assert operations.enabled is True
 
         pager = streams["ses-pager"]
-        assert pager.webhookToken == "demo-ses-token-451"
+        # webhookToken is loaded from config.yaml, not persisted to DB
+        assert pager.webhookToken is None
         assert pager.enabled is True
 
         adelaide_transcriptions = await database.load_recent_transcriptions(

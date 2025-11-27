@@ -224,21 +224,29 @@ class StreamDatabase:
             return [self._record_to_stream(record) for record in records]
 
     async def save_stream(self, stream: Stream) -> None:
+        """Persist stream runtime state to database.
+
+        Only runtime state (status, error, timestamps) is saved. Configuration
+        fields (name, url, enabled, etc.) live in config.yaml and are loaded
+        fresh on each startup.
+        """
         async with self._session() as session:
             record = await session.get(StreamRecord, stream.id)
             if record is None:
                 record = StreamRecord(id=stream.id)
-            record.name = stream.name
-            record.url = stream.url
+                # Set required fields with placeholders for new records.
+                # These will be overwritten by config on next startup.
+                record.name = stream.name
+                record.url = stream.url or ""
+                record.source = StreamSource(stream.source)
+                record.enabled = bool(stream.enabled)
+                record.pinned = bool(stream.pinned)
+                record.language = stream.language
+                record.ignoreFirstSeconds = float(stream.ignoreFirstSeconds)
+            # Only persist runtime state - config comes from config.yaml
             record.status = StreamStatus(stream.status)
-            record.enabled = bool(stream.enabled)
-            record.pinned = bool(stream.pinned)
-            record.createdAt = stream.createdAt
-            record.language = stream.language
             record.error = stream.error
-            record.source = StreamSource(stream.source)
-            record.webhookToken = stream.webhookToken
-            record.ignoreFirstSeconds = float(stream.ignoreFirstSeconds)
+            record.createdAt = stream.createdAt
             record.lastActivityAt = stream.lastActivityAt
             session.add(record)
 
@@ -515,23 +523,29 @@ class StreamDatabase:
             return [self._record_to_transcription(record) for record in records]
 
     def _record_to_stream(self, record: StreamRecord) -> Stream:
-        # Database no longer dictates enabled state; default to False.
-        enabled = bool(record.enabled) if record.enabled is not None else False
+        """Convert a database record to a Stream model.
+
+        The database stores only runtime state (status, error, timestamps).
+        Configuration fields (name, url, enabled, etc.) are placeholders that
+        get overwritten from config.yaml during initialization.
+        """
         return Stream(
             id=record.id,
+            # Config fields - these are placeholders, actual values from config.yaml
             name=record.name,
             url=record.url,
-            status=StreamStatus(record.status),
-            enabled=bool(enabled),
+            enabled=bool(record.enabled) if record.enabled is not None else False,
             pinned=bool(record.pinned),
-            createdAt=record.createdAt,
             language=record.language,
-            error=record.error,
-            transcriptions=[],
             source=StreamSource(record.source) if record.source else StreamSource.AUDIO,
-            webhookToken=record.webhookToken,
+            webhookToken=None,  # Always from config.yaml
             ignoreFirstSeconds=float(record.ignoreFirstSeconds or 0.0),
+            # Runtime state - these are the authoritative values from DB
+            status=StreamStatus(record.status),
+            error=record.error,
+            createdAt=record.createdAt,
             lastActivityAt=record.lastActivityAt,
+            transcriptions=[],
         )
 
 

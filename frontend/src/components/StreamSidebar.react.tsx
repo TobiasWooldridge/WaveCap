@@ -96,7 +96,7 @@ const SidebarItemRow = memo(function SidebarItemRow({
                 const isWeb = /^https?:\/\//i.test(url);
                 return (
                   <span className="badge rounded-pill text-bg-secondary-subtle text-secondary-emphasis">
-                    {isWeb ? "Web" : "Audio"}
+                    {isWeb ? "Transcript" : "Audio"}
                   </span>
                 );
               })()}

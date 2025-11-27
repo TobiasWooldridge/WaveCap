@@ -164,31 +164,48 @@ async def test_export_pager_messages_requires_pager_stream(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_ignore_first_seconds_persistence(tmp_path):
+async def test_config_fields_set_on_initial_save_only(tmp_path):
+    """Config fields (ignoreFirstSeconds, enabled, etc.) are set on initial
+    save but not updated afterward - they come from config.yaml at startup."""
     db = StreamDatabase(tmp_path / "runtime.sqlite")
-    stream = _make_stream()
+    stream = _make_stream(enabled=True)
     stream.ignoreFirstSeconds = 12.5
     await db.save_stream(stream)
 
+    # Initial save sets config fields
     loaded = await db.load_streams()
     assert loaded[0].ignoreFirstSeconds == 12.5
+    assert loaded[0].enabled is True
+
+    # Subsequent saves do NOT update config fields
+    stream.ignoreFirstSeconds = 99.0
+    stream.enabled = False
+    await db.save_stream(stream)
+
+    reloaded = await db.load_streams()
+    # Values remain from initial save, not updated
+    assert reloaded[0].ignoreFirstSeconds == 12.5
+    assert reloaded[0].enabled is True
 
     await db.close()
 
 
 @pytest.mark.asyncio
-async def test_stream_enabled_round_trips(tmp_path):
+async def test_runtime_state_persists_on_save(tmp_path):
+    """Runtime state (status, error, timestamps) is always persisted."""
     db = StreamDatabase(tmp_path / "runtime.sqlite")
-    stream = _make_stream(enabled=True)
+    stream = _make_stream()
+    stream.error = None
     await db.save_stream(stream)
 
     loaded = await db.load_streams()
-    assert loaded[0].enabled is True
+    assert loaded[0].error is None
 
-    stream.enabled = False
+    # Update runtime state
+    stream.error = "Connection failed"
     await db.save_stream(stream)
 
     reloaded = await db.load_streams()
-    assert reloaded[0].enabled is False
+    assert reloaded[0].error == "Connection failed"
 
     await db.close()
