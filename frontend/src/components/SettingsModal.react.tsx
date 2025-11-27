@@ -1,5 +1,5 @@
 import type { ChangeEventHandler } from "react";
-import { Download, LogIn, Wifi, WifiOff, X } from "lucide-react";
+import { Download, LogIn, Terminal, Wifi, WifiOff, X } from "lucide-react";
 import type { Stream, ThemeMode, TranscriptionReviewStatus } from "@types";
 
 import KeywordAlertsSettingsSection from "./KeywordAlertsSettingsSection.react";
@@ -35,6 +35,7 @@ type SettingsModalProps = {
   onExportPagerFeed: () => void;
   isReadOnly: boolean;
   onRequestLogin: () => void;
+  onOpenBackendLogs: () => void;
 };
 
 const SettingsModal = ({
@@ -63,6 +64,7 @@ const SettingsModal = ({
   onExportPagerFeed,
   isReadOnly,
   onRequestLogin,
+  onOpenBackendLogs,
 }: SettingsModalProps) => {
   if (!open) {
     return null;
@@ -350,6 +352,49 @@ const SettingsModal = ({
                   ) : null}
                 </div>
               </div>
+            )}
+          </section>
+
+          <section className="app-header-info__section">
+            <h3 className="app-header-info__section-title text-uppercase small fw-semibold text-body-secondary">
+              System
+            </h3>
+            {isReadOnly ? (
+              <Flex
+                className="alert alert-info"
+                direction="column"
+                gap={2}
+                role="note"
+              >
+                <div className="small mb-0">
+                  Sign in with editor access to view backend logs.
+                </div>
+                <Button
+                  size="sm"
+                  use="primary"
+                  className="align-self-start"
+                  onClick={onRequestLogin}
+                  startContent={<LogIn size={16} />}
+                >
+                  <span>Sign in</span>
+                </Button>
+              </Flex>
+            ) : (
+              <Flex direction="column" gap={2}>
+                <span className="text-body-secondary small">
+                  View server errors and application logs for troubleshooting.
+                </span>
+                <Button
+                  onClick={onOpenBackendLogs}
+                  className="fw-semibold align-self-start"
+                  size="sm"
+                  use="secondary"
+                  appearance="outline"
+                  startContent={<Terminal size={16} />}
+                >
+                  View backend logs
+                </Button>
+              </Flex>
             )}
           </section>
         </div>

@@ -1,0 +1,73 @@
+.waveform-display {
+  position: relative;
+  display: block;
+  border-radius: 4px;
+  background-color: rgba(var(--app-surface-muted-rgb), 0.85);
+  overflow: hidden;
+  user-select: none;
+
+  &:hover {
+    background-color: rgba(var(--app-surface-muted-rgb), 0.95);
+  }
+
+  &--playing {
+    background-color: rgba(var(--app-surface-muted-rgb), 0.95);
+  }
+
+  &--overlay {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10;
+  }
+}
+
+.waveform-display__bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  width: 100%;
+  height: 100%;
+  padding: 2px 4px;
+  gap: 1px;
+  box-sizing: border-box;
+}
+
+.waveform-display__bar {
+  flex: 1;
+  min-width: 1px;
+  max-width: 4px;
+  background-color: rgba(var(--app-accent-rgb), 0.6);
+  border-radius: 1px;
+
+  // Bars within speech region are brighter
+  &--speech {
+    background-color: rgba(var(--app-accent-rgb), 0.9);
+  }
+}
+
+.waveform-display__playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: white;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  z-index: 1;
+}
+
+// Compact variant for inline use
+.waveform-display--compact {
+  height: 24px;
+
+  .waveform-display__bars {
+    padding: 0 2px;
+    gap: 0;
+  }
+
+  .waveform-display__bar {
+    max-width: 2px;
+  }
+}

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WaveCap</title>
+    <meta name="description" content="WaveCap is a FastAPI + React app for real-time, multi-stream audio transcription with a live operator console." />
+    <meta name="theme-color" content="#111827" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="WaveCap" />
+    <meta property="og:description" content="Real-time multi-stream audio transcription. Monitor radio and pager feeds with live updates and replay." />
+    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="WaveCap — Real-time multi-stream audio transcription" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="WaveCap" />
+    <meta name="twitter:description" content="Real-time multi-stream audio transcription. Monitor radio and pager feeds with live updates and replay." />
+    <meta name="twitter:image" content="/og-image.png" />
+    <meta name="twitter:image:alt" content="WaveCap — Real-time multi-stream audio transcription" />
+    <script>
+      (function () {
+        try {
+          const themeStorageKey = 'wavecap-theme-mode';
+          const storedTheme = window.localStorage.getItem(themeStorageKey);
+          const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          const theme = storedTheme === 'light' || storedTheme === 'dark'
+            ? storedTheme
+            : prefersDark
+              ? 'dark'
+              : 'light';
+
+          const root = document.documentElement;
+          const body = document.body;
+          if (theme === 'dark') {
+            root.classList.add('dark');
+          } else {
+            root.classList.remove('dark');
+          }
+          root.dataset.theme = theme;
+          root.style.colorScheme = theme;
+          if (body) {
+            body.style.colorScheme = theme;
+          }
+        } catch (error) {
+          console.warn('Unable to restore saved theme', error);
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-eee50fa2.js"></script>
+    <link rel="stylesheet" href="/assets/index-df090d93.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    
+  </body>
+</html>

@@ -97,6 +97,17 @@ class TranscriptionRecord(SQLModel, table=True):
     recordingUrl: Optional[str] = Field(
         default=None, sa_column=Column("recordingUrl", String, nullable=True)
     )
+    # Speech boundary offsets for optimized playback (seconds from recording start)
+    speechStartOffset: Optional[float] = Field(
+        default=None, sa_column=Column("speechStartOffset", Float, nullable=True)
+    )
+    speechEndOffset: Optional[float] = Field(
+        default=None, sa_column=Column("speechEndOffset", Float, nullable=True)
+    )
+    # Precomputed amplitude waveform for UI visualization (JSON array of 0.0-1.0 floats)
+    waveform: Optional[str] = Field(
+        default=None, sa_column=Column("waveform", Text, nullable=True)
+    )
     correctedText: Optional[str] = Field(
         default=None, sa_column=Column("correctedText", Text, nullable=True)
     )
@@ -169,6 +180,9 @@ class StreamDatabase:
                     "ALTER TABLE transcriptions ADD COLUMN eventType TEXT DEFAULT 'transcription'",
                     "ALTER TABLE transcriptions ADD COLUMN pagerIncident TEXT",
                     "ALTER TABLE transcriptions ADD COLUMN eventMetadata TEXT",
+                    "ALTER TABLE transcriptions ADD COLUMN speechStartOffset REAL",
+                    "ALTER TABLE transcriptions ADD COLUMN speechEndOffset REAL",
+                    "ALTER TABLE transcriptions ADD COLUMN waveform TEXT",
                     "CREATE INDEX IF NOT EXISTS ix_streams_last_activity ON streams (lastActivityAt)",
                     "CREATE INDEX IF NOT EXISTS ix_transcriptions_stream_timestamp ON transcriptions (streamId, timestamp)",
                     "CREATE INDEX IF NOT EXISTS ix_transcriptions_timestamp ON transcriptions (timestamp)",
@@ -280,6 +294,13 @@ class StreamDatabase:
             record.duration = transcription.duration
             record.segments = segments_json
             record.recordingUrl = transcription.recordingUrl
+            record.speechStartOffset = transcription.speechStartOffset
+            record.speechEndOffset = transcription.speechEndOffset
+            # Store waveform as JSON array
+            if transcription.waveform:
+                record.waveform = json.dumps(transcription.waveform)
+            else:
+                record.waveform = None
             record.correctedText = transcription.correctedText
             record.reviewStatus = transcription.reviewStatus
             record.reviewedAt = transcription.reviewedAt
@@ -359,6 +380,9 @@ class StreamDatabase:
             pager_incident = PagerIncidentDetails.model_validate(pager_incident_data)
         else:
             pager_incident = None
+        waveform_data: Optional[List[float]] = (
+            json.loads(record.waveform) if record.waveform else None
+        )
         return TranscriptionResult(
             id=record.id,
             streamId=record.streamId,
@@ -368,6 +392,9 @@ class StreamDatabase:
             duration=record.duration,
             segments=segments,
             recordingUrl=record.recordingUrl,
+            speechStartOffset=record.speechStartOffset,
+            speechEndOffset=record.speechEndOffset,
+            waveform=waveform_data,
             correctedText=record.correctedText,
             reviewStatus=TranscriptionReviewStatus(record.reviewStatus),
             reviewedAt=record.reviewedAt,

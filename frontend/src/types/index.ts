@@ -63,6 +63,12 @@ export interface TranscriptionResult {
   segments?: TranscriptionSegment[];
   recordingUrl?: string;
   recordingStartOffset?: number;
+  /** Seconds from recording start where speech begins (for optimized playback) */
+  speechStartOffset?: number | null;
+  /** Seconds from recording start where speech ends */
+  speechEndOffset?: number | null;
+  /** Precomputed amplitude waveform for UI visualization (0.0-1.0 normalized values) */
+  waveform?: number[] | null;
   correctedText?: string | null;
   reviewStatus?: TranscriptionReviewStatus;
   reviewedAt?: IsoDateTimeString | null;

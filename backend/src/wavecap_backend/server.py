@@ -61,7 +61,7 @@ from .models import (
     UpdateStreamRequest,
 )
 from .pager_formats import parse_pager_webhook_payload
-from .state_paths import PROJECT_ROOT, RECORDINGS_DIR, resolve_state_path
+from .state_paths import LOG_DIR, PROJECT_ROOT, RECORDINGS_DIR, resolve_state_path
 from .request_utils import describe_remote_client
 from .stream_manager import StreamManager
 from .whisper_transcriber import (
@@ -384,6 +384,32 @@ async def stream_events(
 FIXTURE_ENV_VAR = "WAVECAP_FIXTURES"
 
 
+def _read_log_tail(path: Path, max_lines: int) -> list[str]:
+    """Read the last N lines from a log file efficiently."""
+    import collections
+
+    if not path.exists():
+        return []
+
+    result: collections.deque[str] = collections.deque(maxlen=max_lines)
+    try:
+        with path.open("r", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                stripped = line.rstrip("\n\r")
+                if stripped:
+                    result.append(stripped)
+    except Exception:
+        # Fall back to reading whole file if streaming fails
+        try:
+            content = path.read_text(encoding="utf-8", errors="replace")
+            lines = [l for l in content.splitlines() if l.strip()]
+            return lines[-max_lines:]
+        except Exception:
+            return []
+
+    return list(result)
+
+
 def create_app() -> FastAPI:
     # Check dependencies before anything else
     check_dependencies()
@@ -537,6 +563,57 @@ def create_app() -> FastAPI:
     ) -> Response:
         record_frontend_event(payload, state.config.logging)
         return Response(status_code=204)
+
+    @app.get("/api/logs/backend")
+    async def get_backend_logs(
+        state: AppState = Depends(get_state),
+        _: AccessRole = Depends(require_editor_role),
+        lines: int = Query(500, ge=1, le=5000),
+        source: str = Query("all", regex="^(all|app|stderr)$"),
+    ) -> dict:
+        """Fetch recent backend log entries. Requires editor role.
+
+        Args:
+            lines: Maximum number of lines to return (default 500, max 5000)
+            source: Log source - "all" (both), "app" (backend.log), "stderr" (service stderr)
+        """
+        from pathlib import Path
+        import os
+
+        log_entries: list[dict] = []
+
+        # Application log (state/logs/backend.log)
+        if source in ("all", "app"):
+            app_log_path = LOG_DIR / state.config.logging.backend.fileName
+            if app_log_path.exists():
+                try:
+                    app_lines = _read_log_tail(app_log_path, lines)
+                    for line in app_lines:
+                        log_entries.append({"source": "app", "line": line})
+                except Exception as exc:
+                    log_entries.append({"source": "app", "line": f"[Error reading log: {exc}]"})
+
+        # Service stderr log (launchd output)
+        if source in ("all", "stderr"):
+            stderr_log_path = Path.home() / "Library" / "Logs" / "wavecap-server-error.log"
+            if stderr_log_path.exists():
+                try:
+                    stderr_lines = _read_log_tail(stderr_log_path, lines)
+                    for line in stderr_lines:
+                        log_entries.append({"source": "stderr", "line": line})
+                except Exception as exc:
+                    log_entries.append({"source": "stderr", "line": f"[Error reading log: {exc}]"})
+
+        # Sort by rough timestamp if present, otherwise keep order
+        # Filter to most recent `lines` entries total
+        if source == "all" and len(log_entries) > lines:
+            log_entries = log_entries[-lines:]
+
+        return {
+            "entries": log_entries,
+            "total": len(log_entries),
+            "maxLines": lines,
+        }
 
     @app.get("/api/alerts")
     async def get_alerts(state: AppState = Depends(get_state)) -> dict:

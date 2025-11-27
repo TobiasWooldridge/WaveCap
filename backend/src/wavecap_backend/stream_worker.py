@@ -34,6 +34,7 @@ from .alerts import TranscriptionAlertEvaluator
 from .database import StreamDatabase
 from .datetime_utils import utcnow
 from .audio_processing import AudioFrontEndConfig, AudioFrontEndProcessor
+from .waveform import compute_waveform
 from .models import (
     Stream,
     StreamStatus,
@@ -56,6 +57,11 @@ BLANK_AUDIO_TOKEN = "[BLANK_AUDIO]"
 UNABLE_TO_TRANSCRIBE_TOKEN = "[unable to transcribe]"
 
 RECONNECT_BACKOFF_SECONDS = 600.0
+
+# Number of consecutive transcription failures before stopping the stream.
+# Individual failures are logged and the chunk is skipped; only persistent
+# failures trigger a stream stop.
+MAX_CONSECUTIVE_TRANSCRIPTION_FAILURES = 5
 
 
 @dataclass
@@ -445,6 +451,8 @@ class StreamWorker:
         self._chunk_queue: Optional[asyncio.Queue[Optional[PreparedChunk]]] = None
         self._worker_tasks: List[asyncio.Task[None]] = []
         self._worker_failure: Optional[BaseException] = None
+        self._consecutive_failures = 0
+        self._consecutive_failures_lock = asyncio.Lock()
         self._worker_count = self._resolve_concurrency(config.maxConcurrentProcesses)
         self._blocking_supported: Optional[bool] = None
         bytes_per_sample = 2  # s16le output from ffmpeg
@@ -628,6 +636,7 @@ class StreamWorker:
             raise RuntimeError("Transcription workers already running")
         self._chunk_queue = asyncio.Queue(maxsize=self._queue_maxsize)
         self._worker_failure = None
+        self._consecutive_failures = 0
         self._worker_tasks = [
             asyncio.create_task(
                 self._transcription_worker(index),
@@ -1126,14 +1135,51 @@ class StreamWorker:
                 break
             try:
                 await self._transcribe_chunk(chunk)
+                # Reset consecutive failure counter on success
+                async with self._consecutive_failures_lock:
+                    self._consecutive_failures = 0
             except Exception as exc:  # pylint: disable=broad-except
-                if self._worker_failure is None:
-                    self._worker_failure = exc
-                self._stop_event.set()
+                should_stop = await self._handle_transcription_failure(exc)
                 queue.task_done()
-                raise
+                if should_stop:
+                    raise
+                # Log and continue processing - don't stop the stream for isolated failures
+                continue
             else:
                 queue.task_done()
+
+    async def _handle_transcription_failure(self, exc: BaseException) -> bool:
+        """Handle a transcription failure, returning True if stream should stop.
+
+        Tracks consecutive failures and only triggers a stream stop after
+        exceeding MAX_CONSECUTIVE_TRANSCRIPTION_FAILURES. Individual failures
+        are logged and skipped to keep the stream running.
+        """
+        async with self._consecutive_failures_lock:
+            self._consecutive_failures += 1
+            failure_count = self._consecutive_failures
+
+        if failure_count >= MAX_CONSECUTIVE_TRANSCRIPTION_FAILURES:
+            LOGGER.error(
+                "Stream %s stopping after %d consecutive transcription failures: %s",
+                self.stream.id,
+                failure_count,
+                exc,
+            )
+            if self._worker_failure is None:
+                self._worker_failure = exc
+            self._stop_event.set()
+            return True
+
+        # Log the failure but continue processing
+        LOGGER.warning(
+            "Stream %s transcription failed (failure %d/%d, continuing): %s",
+            self.stream.id,
+            failure_count,
+            MAX_CONSECUTIVE_TRANSCRIPTION_FAILURES,
+            exc,
+        )
+        return False
 
     async def _run_transcription(
         self, audio: np.ndarray, sample_rate: int, language: Optional[str]
@@ -1355,6 +1401,24 @@ class StreamWorker:
                     "Stream %s LLM correction failed: %s", self.stream.id, exc
                 )
 
+        # Calculate speech boundary offsets from segment timing for optimized playback
+        speech_start_offset: Optional[float] = None
+        speech_end_offset: Optional[float] = None
+        if segments:
+            valid_starts = [s.start for s in segments if s.start >= 0]
+            valid_ends = [s.end for s in segments if s.end > 0]
+            if valid_starts:
+                speech_start_offset = min(valid_starts)
+            if valid_ends:
+                speech_end_offset = max(valid_ends)
+
+        # Generate amplitude waveform for UI visualization
+        waveform_data: Optional[List[float]] = None
+        if should_store_recording and record_samples.size > 0:
+            waveform_data = await asyncio.to_thread(
+                compute_waveform, record_samples, duration=duration
+            )
+
         transcription = TranscriptionResult(
             id=str(uuid.uuid4()),
             streamId=self.stream.id,
@@ -1370,6 +1434,9 @@ class StreamWorker:
                 else None
             ),
             recordingStartOffset=recording_start_offset,
+            speechStartOffset=speech_start_offset,
+            speechEndOffset=speech_end_offset,
+            waveform=waveform_data,
         )
 
         if text != BLANK_AUDIO_TOKEN:

@@ -182,7 +182,7 @@ export const TranscriptMessageRow: React.FC<TranscriptMessageRowProps> = ({
 
   return (
     <article
-      className={`transcript-message${hasAlerts ? " transcript-message--alert" : ""}${compact ? " transcript-message--compact" : ""}`}
+      className={`transcript-message${hasAlerts ? " transcript-message--alert" : ""}${compact ? " transcript-message--compact" : ""}${isRecordingActive ? " transcript-message--playing" : ""}`}
     >
       <div className="transcript-message__avatar" aria-hidden="true">
         {stream ? (

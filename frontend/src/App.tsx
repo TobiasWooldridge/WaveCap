@@ -42,6 +42,7 @@ import {
 import { CombinedTranscriptionLog } from "./components/CombinedTranscriptionLog.react";
 import { useUISettings } from "./contexts/UISettingsContext";
 import SettingsModal from "./components/SettingsModal.react";
+import BackendLogsPanel from "./components/BackendLogsPanel.react";
 import { useToast } from "./hooks/useToast";
 import { useAuth } from "./contexts/AuthContext";
 import AppHeader from "./components/AppHeader.react";
@@ -290,6 +291,7 @@ function App() {
   } = useUISettings();
   const [showSettings, setShowSettings] = useState(false);
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
+  const [showBackendLogs, setShowBackendLogs] = useState(false);
   const settingsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const settingsCloseButtonRef = useRef<HTMLButtonElement | null>(null);
   const {
@@ -1567,11 +1569,18 @@ function App() {
           onExportPagerFeed={exportPagerFeed}
           isReadOnly={isReadOnly}
           onRequestLogin={requestLogin}
+          onOpenBackendLogs={() => setShowBackendLogs(true)}
         />
 
         <KeyboardShortcutsDialog
           open={showKeyboardShortcuts}
           onClose={() => setShowKeyboardShortcuts(false)}
+        />
+
+        <BackendLogsPanel
+          open={showBackendLogs}
+          onClose={() => setShowBackendLogs(false)}
+          authFetch={authFetch}
         />
 
         <main className="app-main">

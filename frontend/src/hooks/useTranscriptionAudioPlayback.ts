@@ -8,6 +8,32 @@ import {
 import { setAudioElementSource } from "../utils/audio";
 import { computePlaybackRange } from "../utils/playback";
 
+const VOLUME_STORAGE_KEY = "wavecap-playback-volume";
+const DEFAULT_VOLUME = 1.0;
+
+function getStoredVolume(): number {
+  try {
+    const stored = localStorage.getItem(VOLUME_STORAGE_KEY);
+    if (stored !== null) {
+      const parsed = parseFloat(stored);
+      if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) {
+        return parsed;
+      }
+    }
+  } catch {
+    // localStorage may be unavailable
+  }
+  return DEFAULT_VOLUME;
+}
+
+function storeVolume(volume: number): void {
+  try {
+    localStorage.setItem(VOLUME_STORAGE_KEY, volume.toString());
+  } catch {
+    // localStorage may be unavailable
+  }
+}
+
 export interface SegmentPlayOptions {
   recordingStartOffset?: number;
 }
@@ -19,6 +45,8 @@ export interface UseTranscriptionAudioPlayback {
   playingSegment: string | null;
   currentPlayTime: number;
   playbackQueue: PlaybackQueueState | null;
+  volume: number;
+  setVolume: (volume: number) => void;
   playRecording: (
     transcription: TranscriptionResult,
     options?: { queue?: PlaybackQueueState },
@@ -46,11 +74,15 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
   const [playingSegment, _setPlayingSegment] = useState<string | null>(null);
   const [currentPlayTime, setCurrentPlayTime] = useState<number>(0);
   const [playbackQueue, _setPlaybackQueue] = useState<PlaybackQueueState | null>(null);
+  const [volume, _setVolume] = useState<number>(getStoredVolume);
+  const volumeRef = useRef<number>(volume);
 
   const playbackQueueRef = useRef<PlaybackQueueState | null>(null);
   const playingRecordingRef = useRef<string | null>(null);
   const playingTranscriptionIdRef = useRef<string | null>(null);
   const playingSegmentRef = useRef<string | null>(null);
+  // Ref to hold the latest playRecording function for use in handleEnded callback
+  const playRecordingRef = useRef<((transcription: TranscriptionResult, options?: { queue?: PlaybackQueueState; isQueueTransition?: boolean }) => void) | null>(null);
 
   const setPlayingRecording = useCallback((value: string | null) => {
     playingRecordingRef.current = value;
@@ -72,12 +104,25 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
     _setPlaybackQueue(queue);
   }, []);
 
+  const setVolume = useCallback((newVolume: number) => {
+    const clampedVolume = Math.max(0, Math.min(1, newVolume));
+    volumeRef.current = clampedVolume;
+    _setVolume(clampedVolume);
+    storeVolume(clampedVolume);
+    // Apply to all audio elements
+    Object.values(recordingAudioRefs.current).forEach((audio) => {
+      if (audio) {
+        audio.volume = clampedVolume;
+      }
+    });
+  }, []);
+
   useEffect(() => {
     playbackQueueRef.current = playbackQueue;
   }, [playbackQueue]);
 
   const resetAudioPlaybackState = useCallback(
-    (audio: HTMLAudioElement | null, options?: { clearQueue?: boolean }) => {
+    (audio: HTMLAudioElement | null, options?: { clearQueue?: boolean; keepPlayTime?: boolean }) => {
       if (audio) {
         audio.loop = false;
         audio.ontimeupdate = null;
@@ -87,7 +132,9 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
       setPlayingRecording(null);
       setPlayingTranscriptionId(null);
       setPlayingSegment(null);
-      setCurrentPlayTime(0);
+      if (!options?.keepPlayTime) {
+        setCurrentPlayTime(0);
+      }
       if (options?.clearQueue ?? true) {
         setPlaybackQueue(null);
       }
@@ -123,7 +170,7 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
   );
 
   const playRecording = useCallback(
-    (transcription: TranscriptionResult, options?: { queue?: PlaybackQueueState }) => {
+    (transcription: TranscriptionResult, options?: { queue?: PlaybackQueueState; isQueueTransition?: boolean }) => {
       if (!transcription.recordingUrl) {
         console.warn("⚠️ No recording available for this transcription");
         return;
@@ -137,7 +184,11 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
       }
 
       setAudioElementSource(audio, transcription.recordingUrl);
-      const startOffset = Math.max(0, transcription.recordingStartOffset ?? 0);
+      // Prefer speechStartOffset for instant speech playback, fall back to recordingStartOffset
+      const startOffset = Math.max(
+        0,
+        transcription.speechStartOffset ?? transcription.recordingStartOffset ?? 0,
+      );
 
       const currentRecordingId = playingRecordingRef.current;
       const currentTranscriptionId = playingTranscriptionIdRef.current;
@@ -147,13 +198,26 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
         return;
       }
 
+      // During queue transitions, just pause the old audio without full reset
       if (currentRecordingId && currentRecordingId !== recordingId) {
-        stopCurrentRecording();
+        if (options?.isQueueTransition) {
+          // Just pause without resetting state
+          const oldAudio = recordingAudioRefs.current[currentRecordingId];
+          if (oldAudio) {
+            try {
+              oldAudio.pause();
+            } catch {
+              /* ignore */
+            }
+          }
+        } else {
+          stopCurrentRecording();
+        }
       }
 
       if (options?.queue) {
         setPlaybackQueue(options.queue);
-      } else {
+      } else if (!options?.isQueueTransition) {
         setPlaybackQueue(null);
       }
 
@@ -162,15 +226,25 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
       setPlayingSegment(null);
 
       const handleEnded = () => {
-        const advance = advancePlaybackQueue(playbackQueueRef.current, transcription);
+        const queue = playbackQueueRef.current;
+        const advance = advancePlaybackQueue(queue, transcription);
         if (advance) {
-          resetAudioPlaybackState(audio, { clearQueue: false });
-          setPlaybackQueue(advance.nextQueue);
-          setTimeout(() => {
-            playRecording(advance.nextTranscription, { queue: advance.nextQueue });
-          }, 0);
+          // Clean up current audio handlers but keep play time during transition
+          if (audio) {
+            audio.ontimeupdate = null;
+            audio.onended = null;
+            audio.onerror = null;
+          }
+          // Use ref to get latest playRecording function (avoid stale closure)
+          if (playRecordingRef.current) {
+            playRecordingRef.current(advance.nextTranscription, { queue: advance.nextQueue, isQueueTransition: true });
+          } else {
+            console.error("❌ playRecordingRef.current is null, cannot advance queue");
+            resetAudioPlaybackState(audio);
+          }
           return;
         }
+        // No more items in queue, or queue was cleared
         resetAudioPlaybackState(audio);
       };
 
@@ -193,6 +267,7 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
 
       const startPlayback = () => {
         audio.loop = false;
+        audio.volume = volumeRef.current;
         audio.currentTime = startOffset;
         setCurrentPlayTime(startOffset);
         audio.ontimeupdate = updateTime;
@@ -221,6 +296,9 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
     },
     [resetAudioPlaybackState, setPlaybackQueue, setPlayingRecording, setPlayingSegment, setPlayingTranscriptionId, stopCurrentRecording],
   );
+
+  // Keep ref updated with latest playRecording function (synchronous to avoid timing issues)
+  playRecordingRef.current = playRecording;
 
   const playSegment = useCallback(
     (
@@ -299,6 +377,7 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
 
       const startPlayback = () => {
         audio.loop = false;
+        audio.volume = volumeRef.current;
         audio.currentTime = Math.max(0, playbackStart);
         setCurrentPlayTime(Math.max(0, playbackStart));
         audio.ontimeupdate = handleSegmentTimeUpdate;
@@ -333,6 +412,8 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
     playingSegment,
     currentPlayTime,
     playbackQueue,
+    volume,
+    setVolume,
     playRecording,
     playSegment,
     stopCurrentRecording,

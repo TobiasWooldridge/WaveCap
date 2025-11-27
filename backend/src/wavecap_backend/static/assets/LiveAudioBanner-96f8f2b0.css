@@ -1,0 +1,100 @@
+.live-audio-banner {
+  position: relative;
+  background: linear-gradient(120deg, rgba(255, 193, 7, 0.15) 0%, rgba(255, 87, 34, 0.15) 100%), var(--bs-body-bg);
+  border-bottom: 1px solid rgba(255, 193, 7, 0.35);
+  color: var(--bs-body-color);
+}
+
+.live-audio-banner__container {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.live-audio-banner__content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: nowrap;
+}
+
+.live-audio-banner__info {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  font-weight: 600;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.live-audio-banner__label {
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  color: var(--bs-warning-text-emphasis, #7c5300);
+}
+
+.live-audio-banner__stream {
+  max-width: clamp(8rem, 32vw, 18rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.live-audio-banner__stream:hover,
+.live-audio-banner__stream:focus-visible {
+  text-decoration: underline;
+}
+
+.live-audio-banner__stream:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.live-audio-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.live-audio-banner__error {
+  font-size: 0.825rem;
+  color: var(--bs-danger-text-emphasis);
+  max-width: clamp(12rem, 40vw, 24rem);
+}
+
+.live-audio-banner__icon {
+  color: var(--bs-warning-text-emphasis, #7c5300);
+}
+
+.live-audio-banner__icon--error {
+  color: var(--bs-danger-text-emphasis);
+}
+
+@media (max-width: 575.98px) {
+  .live-audio-banner__content {
+    flex-wrap: wrap;
+    justify-content: center;
+    text-align: center;
+  }
+  .live-audio-banner__info {
+    justify-content: center;
+    gap: 0.5rem;
+  }
+  .live-audio-banner__label,
+  .live-audio-banner__stream {
+    text-align: center;
+  }
+  .live-audio-banner__actions {
+    justify-content: center;
+    gap: 0.5rem;
+  }
+}

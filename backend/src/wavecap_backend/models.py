@@ -164,6 +164,11 @@ class TranscriptionResult(APIModel):
     recordingStartOffset: Optional[float] = Field(
         default=None, alias="recordingStartOffset"
     )
+    # Speech boundary offsets (seconds from recording start) for optimized playback
+    speechStartOffset: Optional[float] = Field(default=None, alias="speechStartOffset")
+    speechEndOffset: Optional[float] = Field(default=None, alias="speechEndOffset")
+    # Precomputed amplitude waveform for UI visualization (list of 0.0-1.0 normalized values)
+    waveform: Optional[List[float]] = Field(default=None, alias="waveform")
     correctedText: Optional[str] = Field(default=None, alias="correctedText")
     reviewStatus: TranscriptionReviewStatus = Field(
         default=TranscriptionReviewStatus.PENDING, alias="reviewStatus"
@@ -179,7 +184,7 @@ class TranscriptionResult(APIModel):
         default=None, alias="eventMetadata", exclude=True
     )
 
-    @field_validator("confidence", "duration", "recordingStartOffset", mode="before")
+    @field_validator("confidence", "duration", "recordingStartOffset", "speechStartOffset", "speechEndOffset", mode="before")
     @classmethod
     def _sanitize_optional_float(cls, value: Optional[float]) -> Optional[float]:
         """Replace NaN/Inf with None to ensure JSON serialization succeeds."""

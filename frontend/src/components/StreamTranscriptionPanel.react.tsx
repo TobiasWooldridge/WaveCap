@@ -5,6 +5,7 @@ import { compareStreamsByName } from "../utils/streams";
 import { buildPlaybackQueue } from "./StreamTranscriptionPanel.logic";
 import { useTranscriptionAudioPlayback } from "../hooks/useTranscriptionAudioPlayback";
 import StreamSection from "./StreamSection.react";
+import { PlaybackBar } from "./PlaybackBar.react";
 import "./StreamTranscriptionPanel.scss";
 import type { StandaloneStreamControls } from "./streamControls";
 
@@ -43,6 +44,9 @@ export const StreamTranscriptionPanel = ({
     playingRecording,
     playingTranscriptionId,
     playingSegment,
+    currentPlayTime,
+    volume,
+    setVolume,
     playRecording,
     playSegment,
     stopCurrentRecording,
@@ -64,6 +68,20 @@ export const StreamTranscriptionPanel = ({
   const focusedVisibleStream = visibleStreams.length === 1 ? visibleStreams[0] : null;
   const focusedVisibleStreamId = focusedVisibleStream?.id ?? null;
   const isStandaloneView = Boolean(focusedVisibleStreamId);
+
+  // Find the currently playing transcription and its stream
+  const playingInfo = useMemo(() => {
+    if (!playingTranscriptionId) return null;
+    for (const stream of streams) {
+      const transcription = stream.transcriptions?.find(
+        (t) => t.id === playingTranscriptionId,
+      );
+      if (transcription) {
+        return { transcription, streamName: stream.name };
+      }
+    }
+    return null;
+  }, [streams, playingTranscriptionId]);
 
   const handlePlayAll = (
     streamId: string,
@@ -104,6 +122,13 @@ export const StreamTranscriptionPanel = ({
     );
   }
 
+  const handleTogglePlayback = () => {
+    if (playingInfo?.transcription) {
+      // For now, toggle acts as stop since we don't have pause state
+      stopCurrentRecording();
+    }
+  };
+
   return (
     <section className="transcript-view transcript-view--stacked transcript-view--frameless">
       <div className="transcript-view__scroller transcript-view__scroller--stacked">
@@ -129,6 +154,17 @@ export const StreamTranscriptionPanel = ({
           />
         ))}
       </div>
+      <PlaybackBar
+        transcription={playingInfo?.transcription ?? null}
+        streamName={playingInfo?.streamName ?? null}
+        currentPlayTime={currentPlayTime}
+        recordingAudioRefs={recordingAudioRefs}
+        playingRecordingId={playingRecording}
+        volume={volume}
+        onTogglePlayback={handleTogglePlayback}
+        onStop={stopCurrentRecording}
+        onVolumeChange={setVolume}
+      />
     </section>
   );
 };

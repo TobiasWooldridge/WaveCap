@@ -333,7 +333,7 @@ const StreamTranscriptThread: React.FC<StreamTranscriptThreadProps> = ({
 
   return (
     <article
-      className={`transcript-thread${groupHasAlerts ? " transcript-thread--alert" : ""}`}
+      className={`transcript-thread${groupHasAlerts ? " transcript-thread--alert" : ""}${isGroupPlaying ? " transcript-thread--playing" : ""}`}
     >
       <div className="transcript-thread__body">
         <header className="transcript-thread__header">

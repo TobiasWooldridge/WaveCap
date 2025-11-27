@@ -358,6 +358,17 @@ MLX_MODEL_MAP = {
 class MLXWhisperTranscriber(AbstractTranscriber):
     """Whisper transcriber using MLX for Apple Silicon."""
 
+    # Metal GPU errors that indicate transient failures worth retrying
+    METAL_ERROR_PATTERNS = (
+        "uncommitted encoder",
+        "commit command buffer",
+        "MTLCommandBuffer",
+        "IOGPUMetalCommandBuffer",
+        "completed handler provided after commit",
+        "failed assertion",
+        "metal",
+    )
+
     def __init__(self, config: WhisperConfig, *, preload_model: bool = True):
         if mlx_whisper is None:
             raise RuntimeError("mlx-whisper is not installed. Install with: pip install mlx-whisper")
@@ -365,6 +376,8 @@ class MLXWhisperTranscriber(AbstractTranscriber):
         self._model_path = self._resolve_model_path(config.model)
         concurrency = self._resolve_concurrency(config.maxConcurrentProcesses)
         self._semaphore = threading.Semaphore(concurrency)
+        self._max_retries = 3
+        self._retry_delay_seconds = 0.5
         if preload_model:
             LOGGER.info("Loading MLX Whisper model %s from %s", config.model, self._model_path)
             # Trigger model download/cache by doing a dummy transcription
@@ -425,8 +438,59 @@ class MLXWhisperTranscriber(AbstractTranscriber):
     ) -> TranscriptionResultBundle:
         with self._semaphore:
             LOGGER.debug("Running MLX Whisper inference on %s samples", audio.shape[0])
-            result = self._run_transcription(audio, language, initial_prompt)
+            result = self._run_transcription_with_retry(audio, language, initial_prompt)
         return self._build_result_bundle(result)
+
+    def _is_metal_error(self, exc: BaseException) -> bool:
+        """Check if an exception appears to be a Metal GPU error."""
+        message = str(exc).lower()
+        exc_type = type(exc).__name__.lower()
+        combined = f"{exc_type}: {message}"
+        return any(pattern.lower() in combined for pattern in self.METAL_ERROR_PATTERNS)
+
+    def _run_transcription_with_retry(
+        self,
+        audio: np.ndarray,
+        language: Optional[str],
+        initial_prompt: Optional[str],
+    ) -> dict:
+        """Run transcription with retry logic for transient Metal GPU errors."""
+        import time
+
+        last_exception: Optional[BaseException] = None
+        for attempt in range(self._max_retries + 1):
+            try:
+                return self._run_transcription(audio, language, initial_prompt)
+            except Exception as exc:
+                last_exception = exc
+                if not self._is_metal_error(exc):
+                    # Non-Metal error, don't retry
+                    LOGGER.warning(
+                        "MLX Whisper transcription failed with non-retryable error: %s",
+                        exc,
+                    )
+                    raise
+
+                if attempt < self._max_retries:
+                    delay = self._retry_delay_seconds * (2 ** attempt)  # Exponential backoff
+                    LOGGER.warning(
+                        "MLX Whisper Metal GPU error (attempt %d/%d), retrying in %.1fs: %s",
+                        attempt + 1,
+                        self._max_retries + 1,
+                        delay,
+                        exc,
+                    )
+                    time.sleep(delay)
+                else:
+                    LOGGER.error(
+                        "MLX Whisper transcription failed after %d attempts: %s",
+                        self._max_retries + 1,
+                        exc,
+                    )
+
+        # If we get here, all retries failed
+        assert last_exception is not None
+        raise last_exception
 
     def _run_transcription(
         self,

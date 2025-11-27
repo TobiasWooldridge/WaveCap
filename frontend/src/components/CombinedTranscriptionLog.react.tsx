@@ -20,6 +20,7 @@ import StreamStatusIndicator from "./StreamStatusIndicator.react";
 import { Timestamp } from "./primitives/Timestamp.react";
 import { TimeInterval } from "./primitives/TimeInterval.react";
 import { getStreamAccentColor } from "../utils/streamColors";
+import { PlaybackBar } from "./PlaybackBar.react";
 
 interface CombinedTranscriptionLogProps {
   streams: Stream[];
@@ -65,8 +66,12 @@ export const CombinedTranscriptionLog: React.FC<CombinedTranscriptionLogProps> =
     playingRecording,
     playingTranscriptionId,
     playingSegment,
+    currentPlayTime,
+    volume,
+    setVolume,
     playRecording,
     playSegment,
+    stopCurrentRecording,
     isSegmentCurrentlyPlaying,
   } = useTranscriptionAudioPlayback();
   const { authFetch } = useAuth();
@@ -141,6 +146,29 @@ export const CombinedTranscriptionLog: React.FC<CombinedTranscriptionLogProps> =
     });
     return map;
   }, [streams]);
+
+  // Find the currently playing transcription and its stream
+  const playingInfo = useMemo(() => {
+    if (!playingTranscriptionId) return null;
+    for (const stream of streams) {
+      const transcription = stream.transcriptions?.find(
+        (t) => t.id === playingTranscriptionId,
+      );
+      if (transcription) {
+        return { transcription, streamName: stream.name };
+      }
+    }
+    // Also check extra history
+    for (const [streamId, transcriptions] of Object.entries(extraByStream)) {
+      const transcription = transcriptions.find((t) => t.id === playingTranscriptionId);
+      if (transcription) {
+        const stream = streams.find((s) => s.id === streamId);
+        return { transcription, streamName: stream?.name ?? "Unknown" };
+      }
+    }
+    return null;
+  }, [streams, extraByStream, playingTranscriptionId]);
+
   // number of items available for display
 
   const hasMoreHistory = useMemo(() => {
@@ -406,6 +434,17 @@ export const CombinedTranscriptionLog: React.FC<CombinedTranscriptionLogProps> =
           </div>
         )}
       </StreamTranscriptList>
+      <PlaybackBar
+        transcription={playingInfo?.transcription ?? null}
+        streamName={playingInfo?.streamName ?? null}
+        currentPlayTime={currentPlayTime}
+        recordingAudioRefs={recordingAudioRefs}
+        playingRecordingId={playingRecording}
+        volume={volume}
+        onTogglePlayback={stopCurrentRecording}
+        onStop={stopCurrentRecording}
+        onVolumeChange={setVolume}
+      />
     </section>
   );
 };

@@ -273,7 +273,7 @@ class MLXLLMCorrector(AbstractLLMCorrector):
         """
         text = response.strip()
 
-        # Remove common prefixes
+        # Remove common prefixes (may have newlines after them)
         prefixes_to_remove = [
             "Corrected transcription:",
             "Corrected:",
@@ -283,10 +283,20 @@ class MLXLLMCorrector(AbstractLLMCorrector):
             "Here's the corrected text:",
             "The corrected transcription is:",
             "The corrected text is:",
+            "Here is the corrected version:",
+            "The corrected version is:",
+            "Corrected version:",
         ]
-        for prefix in prefixes_to_remove:
-            if text.lower().startswith(prefix.lower()):
-                text = text[len(prefix) :].strip()
+        # Keep trying to remove prefixes until none match (handles nested cases)
+        changed = True
+        while changed:
+            changed = False
+            text_lower = text.lower()
+            for prefix in prefixes_to_remove:
+                if text_lower.startswith(prefix.lower()):
+                    text = text[len(prefix):].strip()
+                    changed = True
+                    break
 
         # Remove quotes if the entire response is quoted
         if (text.startswith('"') and text.endswith('"')) or (
