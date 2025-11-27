@@ -852,6 +852,14 @@ class StreamWorker:
                             await self.on_upstream_reconnect(
                                 self.stream, attempt_value
                             )
+                            # Reset ad-skip counter so ignoreFirstSeconds applies
+                            # to reconnects (e.g. Broadcastify pre-roll ads).
+                            ignore_seconds = getattr(
+                                self.stream, "ignoreFirstSeconds", 0.0
+                            )
+                            self._ignore_initial_samples = max(
+                                int(round(ignore_seconds * self.sample_rate)), 0
+                            )
                         had_audio = await self._ingest_pcm_bytes(chunk)
                         # Check inactivity window (no audio seen)
                         if self._check_audio_inactivity(had_audio):
