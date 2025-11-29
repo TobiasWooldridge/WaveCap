@@ -1529,6 +1529,10 @@ class StreamWorker:
         normalized = self._normalize_hallucination_phrase(text)
         if not normalized:
             return False
+        # Extreme repetitions (10+ consecutive) are always hallucinations,
+        # regardless of audio energy level. No real speech repeats this much.
+        if self._has_extreme_repetition(normalized):
+            return True
         if not (
             self._matches_hallucination_phrase(normalized)
             or self._has_excessive_repetition(normalized)
@@ -1603,6 +1607,38 @@ class StreamWorker:
                     and coverage_ratio >= 0.8
                     and covered_tokens >= ngram_size * 2
                 ):
+                    return True
+        return False
+
+    @staticmethod
+    def _has_extreme_repetition(normalized_text: str) -> bool:
+        """Detect extreme repetition (10+ identical phrases) that are always hallucinations.
+
+        Unlike _has_excessive_repetition which requires low-energy audio to discard,
+        extreme repetitions (10+ consecutive repeats) are unconditionally discarded
+        because no real speech contains phrases repeated this many times.
+        """
+        tokens = normalized_text.split()
+        total_tokens = len(tokens)
+        if total_tokens < 10:  # Need at least 10 tokens for 10 single-word repeats
+            return False
+        # Check 1, 2, and 3-gram repetitions
+        for ngram_size in range(1, 4):
+            min_tokens_needed = ngram_size * 10
+            if total_tokens < min_tokens_needed:
+                continue
+            for start in range(total_tokens - ngram_size * 2 + 1):
+                base = tokens[start : start + ngram_size]
+                if not all(base):
+                    continue
+                repetitions = 1
+                idx = start + ngram_size
+                while idx + ngram_size <= total_tokens and tokens[
+                    idx : idx + ngram_size
+                ] == base:
+                    repetitions += 1
+                    idx += ngram_size
+                if repetitions >= 10:
                     return True
         return False
 

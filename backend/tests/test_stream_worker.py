@@ -1484,6 +1484,85 @@ async def test_worker_discards_repetitive_silence_hallucination(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_worker_discards_extreme_repetition_on_active_audio(tmp_path):
+    """Extreme repetitions (10+) should be discarded even on active audio."""
+    config = WhisperConfig(
+        sampleRate=16000,
+        chunkLength=4,
+        minChunkDurationSeconds=1.0,
+        contextSeconds=0.0,
+        silenceThreshold=0.01,
+        silenceLookbackSeconds=0.25,
+        silenceHoldSeconds=0.25,
+        activeSamplesInLookbackPct=0.1,
+        blankAudioMinDurationSeconds=0.5,
+        blankAudioMinActiveRatio=0.0,
+        blankAudioMinRms=0.0,
+        silenceHallucinationPhrases=[],
+    )
+
+    # 15 repetitions of "I'm sorry" - should trigger extreme repetition filter
+    bundle = TranscriptionResultBundle(
+        "I'm sorry. " * 15,
+        [],
+        "en",
+        no_speech_prob=0.1,  # Low no_speech_prob = confident transcription
+    )
+    transcriber = StubTranscriber([bundle])
+
+    stream = Stream(
+        id="stream-hallucination-extreme-repetition",
+        name="Hallucination",
+        url="http://example.com/audio",
+        status=StreamStatus.STOPPED,
+        createdAt=datetime.utcnow(),
+        transcriptions=[],
+        source=StreamSource.AUDIO,
+    )
+
+    db = StreamDatabase(tmp_path / "runtime.sqlite")
+    evaluator = TranscriptionAlertEvaluator(AlertsConfig(enabled=False, rules=[]))
+    captured: List[TranscriptionResult] = []
+
+    async def capture(transcription: TranscriptionResult) -> None:
+        captured.append(transcription)
+
+    async def noop_status(_stream: Stream, _status: StreamStatus) -> None:
+        return
+
+    worker = StreamWorker(
+        stream=stream,
+        transcriber=transcriber,
+        database=db,
+        alert_evaluator=evaluator,
+        on_transcription=capture,
+        on_status_change=noop_status,
+        config=config,
+    )
+
+    # Audio with significant energy (not silent) - simulates real speech content
+    # that Whisper incorrectly transcribed as repetitive hallucination.
+    # We need enough audio to hit minChunkDurationSeconds, then silence to
+    # trigger the chunk emission.
+    rng = np.random.default_rng(42)
+    # 2 seconds of active audio (above the 1s minimum)
+    active_audio = (rng.random(32000) * 0.2 - 0.1).astype(np.float32)
+    active_audio_int16 = (active_audio * 32767).astype(np.int16).tobytes()
+    # Then 1 second of silence to trigger chunk emission
+    silence = np.zeros(16000, dtype=np.int16).tobytes()
+
+    await worker._ingest_pcm_bytes(active_audio_int16)
+    await worker._ingest_pcm_bytes(silence)
+
+    # Should still be discarded despite active audio
+    assert len(captured) == 1
+    result = captured[0]
+    assert result.text == BLANK_AUDIO_TOKEN
+    assert result.segments is None
+    assert len(transcriber.calls) == 1
+
+
+@pytest.mark.asyncio
 async def test_worker_trims_leading_silence_from_recording(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ):
