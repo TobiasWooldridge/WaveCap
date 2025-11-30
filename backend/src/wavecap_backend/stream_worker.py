@@ -652,7 +652,14 @@ class StreamWorker:
         try:
             if flush and self._worker_failure is None:
                 await self._flush_pending_chunks()
-                await queue.join()
+                try:
+                    await asyncio.wait_for(queue.join(), timeout=30.0)
+                except asyncio.TimeoutError:
+                    LOGGER.warning(
+                        "Timed out waiting for transcription queue to drain for stream %s; "
+                        "continuing with shutdown",
+                        self.stream.id,
+                    )
             else:
                 # Drop any buffered audio to avoid re-processing when resuming.
                 self._chunker.flush()
@@ -906,7 +913,15 @@ class StreamWorker:
                                     self.stream.id,
                                 )
                                 process.kill()
-                                await process.wait()
+                                try:
+                                    await asyncio.wait_for(process.wait(), timeout=2)
+                                except asyncio.TimeoutError:
+                                    LOGGER.error(
+                                        "FFmpeg process %s for stream %s did not terminate after kill; "
+                                        "possible zombie process",
+                                        process.pid,
+                                        self.stream.id,
+                                    )
                         session_returncode = process.returncode
                 if worker_failed or worker_failure is not None:
                     break

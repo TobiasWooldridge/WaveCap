@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
@@ -25,6 +26,12 @@ from .models import (
     TranscriptionReviewStatus,
     TranscriptionSegment,
 )
+
+LOGGER = logging.getLogger(__name__)
+
+# Retry configuration for database lock contention
+DB_RETRY_MAX_ATTEMPTS = 3
+DB_RETRY_BASE_DELAY = 0.1  # seconds
 
 
 class StreamRecord(SQLModel, table=True):
@@ -205,10 +212,38 @@ class StreamDatabase:
             try:
                 yield session
                 if commit:
-                    await session.commit()
+                    await self._commit_with_retry(session)
             except Exception:
-                await session.rollback()
+                try:
+                    await session.rollback()
+                except Exception:
+                    LOGGER.error(
+                        "Failed to rollback database session after error",
+                        exc_info=True,
+                    )
                 raise
+
+    async def _commit_with_retry(self, session: AsyncSession) -> None:
+        """Commit with retry on database lock contention."""
+        for attempt in range(DB_RETRY_MAX_ATTEMPTS):
+            try:
+                await session.commit()
+                return
+            except Exception as exc:
+                error_message = str(exc).lower()
+                is_locked = "database is locked" in error_message
+                is_last_attempt = attempt >= DB_RETRY_MAX_ATTEMPTS - 1
+                if is_locked and not is_last_attempt:
+                    delay = DB_RETRY_BASE_DELAY * (2**attempt)
+                    LOGGER.warning(
+                        "Database locked, retry %d/%d in %.2fs",
+                        attempt + 1,
+                        DB_RETRY_MAX_ATTEMPTS,
+                        delay,
+                    )
+                    await asyncio.sleep(delay)
+                else:
+                    raise
 
     async def close(self) -> None:
         await self._engine.dispose()

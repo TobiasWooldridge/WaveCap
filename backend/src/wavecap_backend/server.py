@@ -240,17 +240,41 @@ async def stream_events(
         period without any frames. Sending a lightweight application-level heartbeat ensures
         there is regular activity so long-lived dashboards stay connected.
         """
+        consecutive_failures = 0
+        max_consecutive_failures = 3
         try:
             while True:
                 await asyncio.sleep(max(interval_seconds, 5.0))
                 try:
                     payload = {"type": "ping", "timestamp": int(time.time() * 1000)}
                     await websocket.send_text(json.dumps(payload))
+                    consecutive_failures = 0  # Reset on success
                 except WebSocketDisconnect:
+                    LOGGER.info(
+                        "WebSocket disconnected during heartbeat for %s",
+                        client_label,
+                    )
                     break
                 except Exception as exc:  # pragma: no cover - defensive
-                    # Log and continue; heartbeat failures should not tear down the connection.
-                    LOGGER.debug("Heartbeat send failed for %s: %s", client_label, exc)
+                    consecutive_failures += 1
+                    LOGGER.warning(
+                        "Heartbeat send failed for %s (failure %d/%d): %s",
+                        client_label,
+                        consecutive_failures,
+                        max_consecutive_failures,
+                        exc,
+                    )
+                    if consecutive_failures >= max_consecutive_failures:
+                        LOGGER.warning(
+                            "Closing unhealthy WebSocket connection for %s after %d consecutive heartbeat failures",
+                            client_label,
+                            consecutive_failures,
+                        )
+                        try:
+                            await websocket.close(code=1011, reason="Heartbeat failed")
+                        except Exception:
+                            pass  # Connection may already be closed
+                        break
         except asyncio.CancelledError:
             # Task cancelled during shutdown/cleanup
             pass

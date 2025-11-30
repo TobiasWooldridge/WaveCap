@@ -203,7 +203,7 @@ class StreamEventBroadcaster:
             except asyncio.QueueEmpty:
                 LOGGER.debug("WebSocket queue overflow resolved without drop")
             else:
-                LOGGER.debug("Dropping websocket event for slow subscriber")
+                LOGGER.warning("Dropping oldest websocket event for slow subscriber")
         try:
             queue.put_nowait(event)
         except asyncio.QueueFull:
@@ -602,6 +602,11 @@ class StreamManager:
                     try:
                         states = worker.get_remote_upstream_states()
                     except Exception:
+                        LOGGER.warning(
+                            "Failed to get remote upstream states for stream %s",
+                            copy.id,
+                            exc_info=True,
+                        )
                         states = []
                     copy.upstreams = states or None
                 else:
@@ -1188,6 +1193,11 @@ class StreamManager:
                     try:
                         states = worker.get_remote_upstream_states()
                     except Exception:
+                        LOGGER.warning(
+                            "Failed to get remote upstream states for stream %s during broadcast",
+                            stream.id,
+                            exc_info=True,
+                        )
                         states = []
                     if states:
                         summary["upstreams"] = [s.model_dump(by_alias=True) for s in states]
@@ -1200,6 +1210,11 @@ class StreamManager:
                         try:
                             states = worker.get_remote_upstream_states()
                         except Exception:
+                            LOGGER.warning(
+                                "Failed to get remote upstream states for stream %s during detailed broadcast",
+                                stream.id,
+                                exc_info=True,
+                            )
                             states = []
                         if states:
                             stream_data["upstreams"] = [s.model_dump(by_alias=True) for s in states]
