@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 from pathlib import Path
 from typing import Iterable
@@ -409,3 +410,27 @@ async def test_broadcaster_emits_system_events(minimal_config, tmp_path):
         assert any(UPSTREAM_RECONNECTED_MESSAGE in text for text in texts)
     finally:
         await _shutdown_manager(manager)
+
+
+@pytest.mark.asyncio
+async def test_broadcaster_logs_warning_on_queue_overflow(caplog):
+    """Verify that queue overflow logs a warning (not just debug)."""
+    # Use small queue size to make testing easier
+    broadcaster = StreamEventBroadcaster(max_queue_size=10)
+    queue = await broadcaster.register()
+
+    # Fill the queue to capacity
+    for i in range(10):
+        event = StreamEvent(event_type="test", payload={"index": i})
+        await broadcaster.publish(event)
+
+    # Now publish one more to trigger overflow
+    with caplog.at_level(logging.WARNING):
+        overflow_event = StreamEvent(event_type="overflow", payload={"overflow": True})
+        await broadcaster.publish(overflow_event)
+
+    # Verify warning was logged
+    warning_logs = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert any("Dropping oldest websocket event" in r.message for r in warning_logs)
+
+    await broadcaster.unregister(queue)

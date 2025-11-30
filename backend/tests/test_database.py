@@ -1,9 +1,14 @@
 from datetime import datetime, timedelta
+from unittest.mock import AsyncMock, patch
 import uuid
 
 import pytest
 
-from wavecap_backend.database import StreamDatabase
+from wavecap_backend.database import (
+    StreamDatabase,
+    DB_RETRY_MAX_ATTEMPTS,
+    DB_RETRY_BASE_DELAY,
+)
 from wavecap_backend.datetime_utils import utcnow
 from wavecap_backend.models import (
     Stream,
@@ -208,4 +213,94 @@ async def test_runtime_state_persists_on_save(tmp_path):
     reloaded = await db.load_streams()
     assert reloaded[0].error == "Connection failed"
 
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_commit_with_retry_retries_on_database_locked(tmp_path):
+    """Verify that _commit_with_retry retries on 'database is locked' errors."""
+    db = StreamDatabase(tmp_path / "runtime.sqlite")
+    await db.initialize()
+
+    commit_attempts = []
+
+    class MockSession:
+        async def commit(self):
+            commit_attempts.append(1)
+            if len(commit_attempts) < DB_RETRY_MAX_ATTEMPTS:
+                raise Exception("database is locked")
+            # Succeed on final attempt
+
+    mock_session = MockSession()
+
+    # Patch asyncio.sleep to speed up the test
+    with patch("wavecap_backend.database.asyncio.sleep", new_callable=AsyncMock):
+        await db._commit_with_retry(mock_session)
+
+    assert len(commit_attempts) == DB_RETRY_MAX_ATTEMPTS
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_commit_with_retry_raises_after_max_attempts(tmp_path):
+    """Verify that _commit_with_retry raises after exhausting all retry attempts."""
+    db = StreamDatabase(tmp_path / "runtime.sqlite")
+    await db.initialize()
+
+    commit_attempts = []
+
+    class MockSession:
+        async def commit(self):
+            commit_attempts.append(1)
+            raise Exception("database is locked")
+
+    mock_session = MockSession()
+
+    with patch("wavecap_backend.database.asyncio.sleep", new_callable=AsyncMock):
+        with pytest.raises(Exception, match="database is locked"):
+            await db._commit_with_retry(mock_session)
+
+    assert len(commit_attempts) == DB_RETRY_MAX_ATTEMPTS
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_commit_with_retry_no_retry_on_other_errors(tmp_path):
+    """Verify that non-lock errors are raised immediately without retrying."""
+    db = StreamDatabase(tmp_path / "runtime.sqlite")
+    await db.initialize()
+
+    commit_attempts = []
+
+    class MockSession:
+        async def commit(self):
+            commit_attempts.append(1)
+            raise Exception("UNIQUE constraint failed")
+
+    mock_session = MockSession()
+
+    with pytest.raises(Exception, match="UNIQUE constraint failed"):
+        await db._commit_with_retry(mock_session)
+
+    # Should only attempt once - no retries for non-lock errors
+    assert len(commit_attempts) == 1
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_commit_with_retry_succeeds_immediately(tmp_path):
+    """Verify that successful commits don't retry."""
+    db = StreamDatabase(tmp_path / "runtime.sqlite")
+    await db.initialize()
+
+    commit_attempts = []
+
+    class MockSession:
+        async def commit(self):
+            commit_attempts.append(1)
+
+    mock_session = MockSession()
+    await db._commit_with_retry(mock_session)
+
+    assert len(commit_attempts) == 1
     await db.close()
