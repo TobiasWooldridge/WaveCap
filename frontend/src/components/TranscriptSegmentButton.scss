@@ -73,6 +73,12 @@
   color: rgb(var(--app-accent-strong-rgb));
 }
 
+.transcript-segment--waveform-hovered {
+  background-color: rgba(var(--app-accent-rgb), 0.15);
+  border-color: rgba(var(--app-accent-rgb), 0.4);
+  box-shadow: 0 0 0 2px rgba(var(--app-accent-rgb), 0.25);
+}
+
 .transcript-segment__inline-action {
   display: inline-flex;
   align-items: center;

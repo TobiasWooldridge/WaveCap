@@ -4,6 +4,7 @@ import type { Stream, TranscriptionResult, TranscriptionReviewStatus } from "@ty
 import { compareStreamsByName } from "../utils/streams";
 import { buildPlaybackQueue } from "./StreamTranscriptionPanel.logic";
 import { useTranscriptionAudioPlayback } from "../hooks/useTranscriptionAudioPlayback";
+import { HoveredSegmentProvider } from "../contexts/HoveredSegmentContext";
 import StreamSection from "./StreamSection.react";
 import { PlaybackBar } from "./PlaybackBar.react";
 import "./StreamTranscriptionPanel.scss";
@@ -130,42 +131,44 @@ export const StreamTranscriptionPanel = ({
   };
 
   return (
-    <section className="transcript-view transcript-view--stacked transcript-view--frameless">
-      <div className="transcript-view__scroller transcript-view__scroller--stacked">
-        {visibleStreams.map((stream) => (
-          <StreamSection
-            key={stream.id}
-            stream={stream}
-            isStandalone={isStandaloneView && stream.id === focusedVisibleStreamId}
-            recordingAudioRefs={recordingAudioRefs}
-            playingRecording={playingRecording}
-            playingTranscriptionId={playingTranscriptionId}
-            playingSegmentId={playingSegment}
-            onPlayAll={handlePlayAll}
-            onPlaySegment={playSegment}
-            isSegmentCurrentlyPlaying={isSegmentCurrentlyPlaying}
-            onStopPlayback={stopCurrentRecording}
-            onReviewTranscription={onReviewTranscription}
-            onResetStream={onResetStream}
-            onStandaloneControlsChange={onStandaloneControlsChange}
-            onExportPagerFeed={onExportPagerFeed}
-            onSelectPagerExportStream={onSelectPagerExportStream}
-            pagerExporting={pagerExporting}
-          />
-        ))}
-      </div>
-      <PlaybackBar
-        transcription={playingInfo?.transcription ?? null}
-        streamName={playingInfo?.streamName ?? null}
-        currentPlayTime={currentPlayTime}
-        recordingAudioRefs={recordingAudioRefs}
-        playingRecordingId={playingRecording}
-        volume={volume}
-        onTogglePlayback={handleTogglePlayback}
-        onStop={stopCurrentRecording}
-        onVolumeChange={setVolume}
-      />
-    </section>
+    <HoveredSegmentProvider>
+      <section className="transcript-view transcript-view--stacked transcript-view--frameless">
+        <div className="transcript-view__scroller transcript-view__scroller--stacked">
+          {visibleStreams.map((stream) => (
+            <StreamSection
+              key={stream.id}
+              stream={stream}
+              isStandalone={isStandaloneView && stream.id === focusedVisibleStreamId}
+              recordingAudioRefs={recordingAudioRefs}
+              playingRecording={playingRecording}
+              playingTranscriptionId={playingTranscriptionId}
+              playingSegmentId={playingSegment}
+              onPlayAll={handlePlayAll}
+              onPlaySegment={playSegment}
+              isSegmentCurrentlyPlaying={isSegmentCurrentlyPlaying}
+              onStopPlayback={stopCurrentRecording}
+              onReviewTranscription={onReviewTranscription}
+              onResetStream={onResetStream}
+              onStandaloneControlsChange={onStandaloneControlsChange}
+              onExportPagerFeed={onExportPagerFeed}
+              onSelectPagerExportStream={onSelectPagerExportStream}
+              pagerExporting={pagerExporting}
+            />
+          ))}
+        </div>
+        <PlaybackBar
+          transcription={playingInfo?.transcription ?? null}
+          streamName={playingInfo?.streamName ?? null}
+          currentPlayTime={currentPlayTime}
+          recordingAudioRefs={recordingAudioRefs}
+          playingRecordingId={playingRecording}
+          volume={volume}
+          onTogglePlayback={handleTogglePlayback}
+          onStop={stopCurrentRecording}
+          onVolumeChange={setVolume}
+        />
+      </section>
+    </HoveredSegmentProvider>
   );
 };
 

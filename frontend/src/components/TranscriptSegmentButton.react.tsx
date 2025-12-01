@@ -1,6 +1,10 @@
 import { ReactNode, useMemo } from "react";
 import clsx from "clsx";
 import { useUISettings } from "../contexts/UISettingsContext";
+import {
+  useHoveredSegmentOptional,
+  buildHoveredSegmentId,
+} from "../contexts/HoveredSegmentContext";
 import Button from "./primitives/Button.react";
 import "./TranscriptSegmentButton.scss";
 
@@ -105,6 +109,7 @@ interface TranscriptSegmentPlaybackButtonProps {
   disabled: boolean;
   tooltip?: string;
   confidenceClass: string;
+  isWaveformHovered?: boolean;
   children: ReactNode;
 }
 
@@ -114,6 +119,7 @@ const TranscriptSegmentPlaybackButton = ({
   disabled,
   tooltip,
   confidenceClass,
+  isWaveformHovered,
   children,
 }: TranscriptSegmentPlaybackButtonProps) => {
   const segmentClassName = clsx(
@@ -121,6 +127,7 @@ const TranscriptSegmentPlaybackButton = ({
     confidenceClass,
     isPlaying && "transcript-segment--playing",
     disabled && "transcript-segment--static",
+    isWaveformHovered && "transcript-segment--waveform-hovered",
   );
 
   const core = disabled ? (
@@ -211,6 +218,7 @@ export const TranscriptSegmentListItem = ({
   originalText,
 }: TranscriptSegmentListItemProps) => {
   const { colorCodingEnabled } = useUISettings();
+  const hoveredContext = useHoveredSegmentOptional();
   const segmentConfidence = useMemo(
     () => calculateSegmentConfidence(segment),
     [segment],
@@ -219,6 +227,13 @@ export const TranscriptSegmentListItem = ({
     () => getConfidenceStyles(segmentConfidence, colorCodingEnabled),
     [segmentConfidence, colorCodingEnabled],
   );
+
+  // Check if this segment is hovered from the waveform
+  const isWaveformHovered = useMemo(() => {
+    if (!hoveredContext?.hoveredSegmentId || segment.id < 0) return false;
+    const thisSegmentId = buildHoveredSegmentId(transcriptionId, segment.id);
+    return hoveredContext.hoveredSegmentId === thisSegmentId;
+  }, [hoveredContext?.hoveredSegmentId, transcriptionId, segment.id]);
 
   const segmentStart = Math.max(
     0,
@@ -268,6 +283,7 @@ export const TranscriptSegmentListItem = ({
       tooltip={tooltipParts.join(" • ") || undefined}
       confidenceClass={confidenceClass}
       isPlaying={isPlaying}
+      isWaveformHovered={isWaveformHovered}
     >
       <TranscriptSegmentContent
         startTime={segmentStart}

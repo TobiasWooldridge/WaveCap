@@ -17,6 +17,8 @@
   border: 1px solid var(--bs-border-color);
   border-radius: 0;
   padding: 1.25rem;
+  /* Add safe area inset for iOS devices */
+  padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -25,6 +27,7 @@
   max-height: 100%;
   overflow: hidden;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch; /* Enable momentum scrolling on iOS */
   align-self: stretch;
 }
 
@@ -36,15 +39,15 @@
 }
 
 .stream-sidebar__list {
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  overflow-y: auto;
+  /* Remove scroll from list - let parent sidebar handle scrolling */
+  overflow: visible;
   padding-right: 0.25rem;
   min-height: 0;
   min-width: 0;
-  overflow-x: hidden;
 }
 
 .stream-sidebar__footer {
@@ -307,6 +310,8 @@
     border-right: 1px solid var(--bs-border-color);
     overflow-y: auto;
     padding: clamp(1rem, 4vw, 1.5rem);
+    /* Add safe area inset for iOS devices with home indicator */
+    padding-bottom: calc(clamp(1rem, 4vw, 1.5rem) + env(safe-area-inset-bottom, 0px));
     background-color: rgba(var(--app-surface-inset-rgb), 1);
   }
 
@@ -317,6 +322,7 @@
   .stream-sidebar__list {
     flex: 1 1 auto;
     max-height: none;
+    overflow: visible;
   }
 
   .stream-sidebar__close {

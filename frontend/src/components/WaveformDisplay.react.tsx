@@ -1,4 +1,6 @@
 import React, { useMemo } from "react";
+import type { TranscriptionSegment } from "@types";
+import { WaveformSegmentOverlay } from "./WaveformSegmentOverlay.react";
 import "./WaveformDisplay.scss";
 
 export interface WaveformDisplayProps {
@@ -22,6 +24,12 @@ export interface WaveformDisplayProps {
   className?: string;
   /** If true, waveform will be positioned as an overlay */
   overlay?: boolean;
+  /** Optional transcription segments for segment overlay visualization */
+  segments?: TranscriptionSegment[];
+  /** ID of the parent transcription (required if segments provided) */
+  transcriptionId?: string;
+  /** Callback when a segment is clicked (for seek-to-segment) */
+  onSegmentClick?: (segment: TranscriptionSegment) => void;
 }
 
 /**
@@ -39,6 +47,9 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
   height = 32,
   className,
   overlay = false,
+  segments,
+  transcriptionId,
+  onSegmentClick,
 }) => {
   const numBars = waveform.length;
 
@@ -99,6 +110,15 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
           );
         })}
       </div>
+      {segments && segments.length > 0 && transcriptionId && (
+        <WaveformSegmentOverlay
+          segments={segments}
+          transcriptionId={transcriptionId}
+          duration={duration}
+          onSegmentClick={onSegmentClick}
+          height={height}
+        />
+      )}
       {progressBar > 0 && progressBar < numBars && (
         <div
           className={`waveform-display__playhead${isPlaying ? "" : " waveform-display__playhead--paused"}`}

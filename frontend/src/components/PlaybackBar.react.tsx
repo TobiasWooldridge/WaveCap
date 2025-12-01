@@ -71,6 +71,8 @@ export const PlaybackBar: React.FC<PlaybackBarProps> = ({
   const speechStartOffset = transcription?.speechStartOffset;
   const speechEndOffset = transcription?.speechEndOffset;
   const timestamp = transcription?.timestamp;
+  const segments = transcription?.segments;
+  const transcriptionId = transcription?.id;
 
   return (
     <div className={`playback-bar${isPlaying ? " playback-bar--active" : ""}`}>
@@ -127,6 +129,8 @@ export const PlaybackBar: React.FC<PlaybackBarProps> = ({
             isPlaying={isPlaying}
             onSeek={handleSeek}
             height={40}
+            segments={segments}
+            transcriptionId={transcriptionId}
           />
         ) : (
           <div className="playback-bar__empty">
