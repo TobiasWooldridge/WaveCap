@@ -593,7 +593,7 @@ def create_app() -> FastAPI:
         state: AppState = Depends(get_state),
         _: AccessRole = Depends(require_editor_role),
         lines: int = Query(500, ge=1, le=5000),
-        source: str = Query("all", regex="^(all|app|stderr)$"),
+        source: str = Query("all", pattern="^(all|app|stderr)$"),
     ) -> dict:
         """Fetch recent backend log entries. Requires editor role.
 

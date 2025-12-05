@@ -29,7 +29,9 @@ def make_test_client(minimal_config, monkeypatch):
             def __init__(self, *_args, **_kwargs):
                 pass
 
-        monkeypatch.setattr(server_module, "WhisperTranscriber", StubTranscriber)
+        monkeypatch.setattr(
+            server_module, "_create_transcriber", lambda _config: StubTranscriber()
+        )
 
         class StubWorker:
             def __init__(self, stream, **_):

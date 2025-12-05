@@ -7,7 +7,10 @@ import inspect
 import logging
 import platform
 import threading
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import multiprocessing
 
 import numpy as np
 from faster_whisper import WhisperModel
@@ -369,6 +372,14 @@ class MLXWhisperTranscriber(AbstractTranscriber):
         "metal",
     )
 
+    # Fatal Metal errors that indicate unrecoverable GPU state (don't retry excessively)
+    METAL_FATAL_PATTERNS = (
+        "out of memory",
+        "device lost",
+        "gpu hang",
+        "allocation failed",
+    )
+
     def __init__(self, config: WhisperConfig, *, preload_model: bool = True):
         if mlx_whisper is None:
             raise RuntimeError("mlx-whisper is not installed. Install with: pip install mlx-whisper")
@@ -376,8 +387,9 @@ class MLXWhisperTranscriber(AbstractTranscriber):
         self._model_path = self._resolve_model_path(config.model)
         concurrency = self._resolve_concurrency(config.maxConcurrentProcesses)
         self._semaphore = threading.Semaphore(concurrency)
-        self._max_retries = 3
-        self._retry_delay_seconds = 0.5
+        self._max_retries = 5  # More retries for transient Metal GPU errors
+        self._max_retries_fatal = 2  # Fewer retries for fatal errors
+        self._base_retry_delay = 1.0  # Base delay in seconds (exponential backoff)
         if preload_model:
             LOGGER.info("Loading MLX Whisper model %s from %s", config.model, self._model_path)
             # Trigger model download/cache by doing a dummy transcription
@@ -448,21 +460,36 @@ class MLXWhisperTranscriber(AbstractTranscriber):
         combined = f"{exc_type}: {message}"
         return any(pattern.lower() in combined for pattern in self.METAL_ERROR_PATTERNS)
 
+    def _is_fatal_metal_error(self, exc: BaseException) -> bool:
+        """Check if this is a fatal Metal error that's unlikely to recover."""
+        message = str(exc).lower()
+        return any(pattern.lower() in message for pattern in self.METAL_FATAL_PATTERNS)
+
     def _run_transcription_with_retry(
         self,
         audio: np.ndarray,
         language: Optional[str],
         initial_prompt: Optional[str],
     ) -> dict:
-        """Run transcription with retry logic for transient Metal GPU errors."""
+        """Run transcription with retry logic for transient Metal GPU errors.
+
+        Uses adaptive retry counts:
+        - Fatal errors (OOM, device lost): limited retries with longer delays
+        - Transient errors (encoder issues): more retries with exponential backoff
+        - Non-Metal errors: no retry
+        """
+        import gc
         import time
 
         last_exception: Optional[BaseException] = None
-        for attempt in range(self._max_retries + 1):
+        attempt = 0
+
+        while True:
             try:
                 return self._run_transcription(audio, language, initial_prompt)
             except Exception as exc:
                 last_exception = exc
+
                 if not self._is_metal_error(exc):
                     # Non-Metal error, don't retry
                     LOGGER.warning(
@@ -471,26 +498,37 @@ class MLXWhisperTranscriber(AbstractTranscriber):
                     )
                     raise
 
-                if attempt < self._max_retries:
-                    delay = self._retry_delay_seconds * (2 ** attempt)  # Exponential backoff
-                    LOGGER.warning(
-                        "MLX Whisper Metal GPU error (attempt %d/%d), retrying in %.1fs: %s",
-                        attempt + 1,
-                        self._max_retries + 1,
-                        delay,
-                        exc,
-                    )
-                    time.sleep(delay)
-                else:
-                    LOGGER.error(
-                        "MLX Whisper transcription failed after %d attempts: %s",
-                        self._max_retries + 1,
-                        exc,
-                    )
+                # Determine max retries based on error severity
+                is_fatal = self._is_fatal_metal_error(exc)
+                max_retries = self._max_retries_fatal if is_fatal else self._max_retries
+                error_type = "fatal" if is_fatal else "transient"
 
-        # If we get here, all retries failed
-        assert last_exception is not None
-        raise last_exception
+                attempt += 1
+                if attempt > max_retries:
+                    LOGGER.error(
+                        "MLX Whisper transcription failed after %d attempts (%s Metal error): %s",
+                        attempt,
+                        error_type,
+                        exc,
+                    )
+                    raise
+
+                # Exponential backoff: 1s, 2s, 4s, 8s, 16s (capped at 30s)
+                delay = min(self._base_retry_delay * (2 ** (attempt - 1)), 30.0)
+
+                LOGGER.warning(
+                    "MLX Whisper %s Metal GPU error (attempt %d/%d), retrying in %.1fs: %s",
+                    error_type,
+                    attempt,
+                    max_retries + 1,
+                    delay,
+                    exc,
+                )
+
+                # Try to help GPU recover by forcing garbage collection
+                gc.collect()
+
+                time.sleep(delay)
 
     def _run_transcription(
         self,
@@ -562,8 +600,360 @@ def mlx_available() -> bool:
     return mlx_whisper is not None and is_apple_silicon()
 
 
+# ============================================================================
+# Subprocess-isolated MLX Transcriber
+# ============================================================================
+# This runs MLX in a separate process to isolate Metal GPU crashes from the
+# main application. When Metal crashes the subprocess, the main app survives
+# and can spawn a new subprocess.
+
+
+def _mlx_worker_process(
+    request_queue: "multiprocessing.Queue[Any]",
+    response_queue: "multiprocessing.Queue[Any]",
+    model_path: str,
+    config_dict: dict,
+) -> None:
+    """Worker process that runs MLX transcription in isolation.
+
+    This function runs in a separate process. If Metal crashes, only this
+    process dies - the main application continues.
+    """
+    import signal
+
+    # Ignore SIGINT in worker - let parent handle it
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+    try:
+        import mlx_whisper as mlx  # Import here to keep Metal in subprocess
+
+        # Load model once at startup
+        LOGGER.info("MLX subprocess: Loading model %s", model_path)
+        dummy_audio = np.zeros(1600, dtype=np.float32)
+        mlx.transcribe(dummy_audio, path_or_hf_repo=model_path, verbose=False)
+        LOGGER.info("MLX subprocess: Model loaded successfully")
+
+        # Signal ready
+        response_queue.put({"type": "ready"})
+
+        # Process requests
+        while True:
+            try:
+                request = request_queue.get(timeout=1.0)
+            except Exception:
+                continue
+
+            if request is None:  # Shutdown signal
+                break
+
+            request_id = request.get("id")
+            try:
+                audio = request["audio"]
+                language = request.get("language")
+                initial_prompt = request.get("initial_prompt")
+                temperature = config_dict.get("decodeTemperature", 0.0)
+                condition_on_previous = config_dict.get("conditionOnPreviousText", True)
+
+                kwargs: dict = {
+                    "path_or_hf_repo": model_path,
+                    "verbose": False,
+                    "temperature": float(temperature),
+                    "condition_on_previous_text": bool(condition_on_previous),
+                }
+                if language:
+                    kwargs["language"] = language
+                if initial_prompt:
+                    kwargs["initial_prompt"] = initial_prompt
+
+                result = mlx.transcribe(audio, **kwargs)
+                response_queue.put({
+                    "type": "result",
+                    "id": request_id,
+                    "result": result,
+                })
+            except Exception as exc:
+                response_queue.put({
+                    "type": "error",
+                    "id": request_id,
+                    "error": str(exc),
+                    "error_type": type(exc).__name__,
+                })
+
+    except Exception as exc:
+        LOGGER.error("MLX subprocess fatal error: %s", exc)
+        try:
+            response_queue.put({"type": "fatal", "error": str(exc)})
+        except Exception:
+            pass
+
+
+class SubprocessMLXTranscriber(AbstractTranscriber):
+    """MLX transcriber that runs in a separate process for crash isolation.
+
+    When Metal/MLX crashes due to GPU issues, only the subprocess dies.
+    The main application detects the crash and spawns a new subprocess,
+    allowing transcription to continue.
+    """
+
+    SUBPROCESS_TIMEOUT = 120.0  # Max time for a single transcription
+    STARTUP_TIMEOUT = 60.0  # Max time to wait for subprocess startup
+    MAX_RESPAWN_ATTEMPTS = 3  # Max respawns before giving up
+
+    def __init__(self, config: WhisperConfig, *, preload_model: bool = True):
+        import multiprocessing
+
+        if mlx_whisper is None:
+            raise RuntimeError("mlx-whisper is not installed")
+
+        self.config = config
+        self._model_path = MLXWhisperTranscriber._resolve_model_path(config.model)
+        self._config_dict = {
+            "decodeTemperature": config.decodeTemperature,
+            "conditionOnPreviousText": config.conditionOnPreviousText,
+            "language": config.language,
+            "initialPrompt": config.initialPrompt,
+        }
+
+        # Use spawn context for clean subprocess (fork can cause Metal issues)
+        self._mp_context = multiprocessing.get_context("spawn")
+        self._request_queue: Optional[multiprocessing.Queue] = None
+        self._response_queue: Optional[multiprocessing.Queue] = None
+        self._process: Optional[multiprocessing.Process] = None
+        self._request_counter = 0
+        self._lock = threading.Lock()
+        self._respawn_count = 0
+
+        concurrency = MLXWhisperTranscriber._resolve_concurrency(config.maxConcurrentProcesses)
+        self._semaphore = threading.Semaphore(concurrency)
+
+        if preload_model:
+            self._ensure_subprocess()
+
+    def _ensure_subprocess(self) -> bool:
+        """Ensure the subprocess is running. Returns True if ready."""
+        with self._lock:
+            if self._process is not None and self._process.is_alive():
+                return True
+
+            # Clean up dead process
+            if self._process is not None:
+                LOGGER.warning("MLX subprocess died, respawning...")
+                self._cleanup_subprocess()
+                self._respawn_count += 1
+                if self._respawn_count > self.MAX_RESPAWN_ATTEMPTS:
+                    LOGGER.error(
+                        "MLX subprocess respawn limit (%d) exceeded",
+                        self.MAX_RESPAWN_ATTEMPTS,
+                    )
+                    return False
+
+            return self._spawn_subprocess()
+
+    def _spawn_subprocess(self) -> bool:
+        """Spawn a new subprocess. Must be called with lock held."""
+        try:
+            LOGGER.info("Spawning MLX subprocess...")
+            self._request_queue = self._mp_context.Queue()
+            self._response_queue = self._mp_context.Queue()
+
+            self._process = self._mp_context.Process(
+                target=_mlx_worker_process,
+                args=(
+                    self._request_queue,
+                    self._response_queue,
+                    self._model_path,
+                    self._config_dict,
+                ),
+                daemon=True,
+            )
+            self._process.start()
+
+            # Wait for ready signal
+            try:
+                response = self._response_queue.get(timeout=self.STARTUP_TIMEOUT)
+                if response.get("type") == "ready":
+                    LOGGER.info("MLX subprocess ready (PID: %d)", self._process.pid)
+                    self._respawn_count = 0  # Reset on successful start
+                    return True
+                elif response.get("type") == "fatal":
+                    LOGGER.error("MLX subprocess failed to start: %s", response.get("error"))
+                    self._cleanup_subprocess()
+                    return False
+            except Exception as exc:
+                LOGGER.error("MLX subprocess startup timeout: %s", exc)
+                self._cleanup_subprocess()
+                return False
+
+        except Exception as exc:
+            LOGGER.error("Failed to spawn MLX subprocess: %s", exc)
+            self._cleanup_subprocess()
+            return False
+
+        return False
+
+    def _cleanup_subprocess(self) -> None:
+        """Clean up subprocess resources. Must be called with lock held."""
+        if self._process is not None:
+            if self._process.is_alive():
+                self._process.terminate()
+                self._process.join(timeout=5.0)
+                if self._process.is_alive():
+                    self._process.kill()
+            self._process = None
+
+        # Clear queues
+        for queue in (self._request_queue, self._response_queue):
+            if queue is not None:
+                try:
+                    while not queue.empty():
+                        queue.get_nowait()
+                except Exception:
+                    pass
+
+        self._request_queue = None
+        self._response_queue = None
+
+    def close(self) -> None:
+        """Shut down the subprocess."""
+        with self._lock:
+            if self._request_queue is not None:
+                try:
+                    self._request_queue.put(None)  # Shutdown signal
+                except Exception:
+                    pass
+            self._cleanup_subprocess()
+
+    def __del__(self) -> None:
+        try:
+            self.close()
+        except Exception:
+            pass
+
+    async def transcribe(
+        self,
+        audio: np.ndarray,
+        sample_rate: int,
+        language: Optional[str],
+        *,
+        initial_prompt: Optional[str] = None,
+    ) -> TranscriptionResultBundle:
+        return await asyncio.to_thread(
+            self.transcribe_blocking, audio, sample_rate, language, initial_prompt=initial_prompt
+        )
+
+    def transcribe_blocking(
+        self,
+        audio: np.ndarray,
+        sample_rate: int,
+        language: Optional[str],
+        *,
+        initial_prompt: Optional[str] = None,
+    ) -> TranscriptionResultBundle:
+        with self._semaphore:
+            return self._transcribe_with_retry(audio, language, initial_prompt)
+
+    def _transcribe_with_retry(
+        self,
+        audio: np.ndarray,
+        language: Optional[str],
+        initial_prompt: Optional[str],
+        max_retries: int = 2,
+    ) -> TranscriptionResultBundle:
+        """Transcribe with automatic retry on subprocess crash."""
+        last_error: Optional[Exception] = None
+
+        for attempt in range(max_retries + 1):
+            if not self._ensure_subprocess():
+                raise RuntimeError("Failed to start MLX subprocess")
+
+            try:
+                return self._send_transcription_request(audio, language, initial_prompt)
+            except RuntimeError as exc:
+                last_error = exc
+                error_msg = str(exc).lower()
+
+                # Check if this is a subprocess crash
+                if "subprocess" in error_msg or "crashed" in error_msg or "died" in error_msg:
+                    if attempt < max_retries:
+                        LOGGER.warning(
+                            "MLX subprocess crashed (attempt %d/%d), retrying...",
+                            attempt + 1,
+                            max_retries + 1,
+                        )
+                        continue
+
+                # Non-retryable error
+                raise
+
+        assert last_error is not None
+        raise last_error
+
+    def _send_transcription_request(
+        self,
+        audio: np.ndarray,
+        language: Optional[str],
+        initial_prompt: Optional[str],
+    ) -> TranscriptionResultBundle:
+        """Send a transcription request to the subprocess."""
+        with self._lock:
+            if self._request_queue is None or self._response_queue is None:
+                raise RuntimeError("MLX subprocess not running")
+
+            if self._process is None or not self._process.is_alive():
+                raise RuntimeError("MLX subprocess crashed")
+
+            self._request_counter += 1
+            request_id = self._request_counter
+
+        effective_language = language or self._config_dict.get("language")
+        effective_prompt = initial_prompt or self._config_dict.get("initialPrompt")
+
+        # Send request
+        self._request_queue.put({
+            "id": request_id,
+            "audio": audio,
+            "language": effective_language,
+            "initial_prompt": effective_prompt,
+        })
+
+        # Wait for response
+        start_time = threading.Event()
+        deadline = self.SUBPROCESS_TIMEOUT
+
+        while deadline > 0:
+            # Check if subprocess is still alive
+            with self._lock:
+                if self._process is None or not self._process.is_alive():
+                    raise RuntimeError("MLX subprocess died during transcription")
+
+            try:
+                response = self._response_queue.get(timeout=min(1.0, deadline))
+
+                if response.get("id") != request_id:
+                    continue  # Response for different request (shouldn't happen with semaphore)
+
+                if response.get("type") == "result":
+                    return MLXWhisperTranscriber._build_result_bundle(response["result"])
+                elif response.get("type") == "error":
+                    raise RuntimeError(f"MLX transcription error: {response.get('error')}")
+                elif response.get("type") == "fatal":
+                    raise RuntimeError(f"MLX subprocess crashed: {response.get('error')}")
+
+            except Exception as exc:
+                if "Empty" in type(exc).__name__:
+                    deadline -= 1.0
+                    continue
+                raise
+
+        raise RuntimeError("MLX transcription timeout")
+
+
 def create_transcriber(config: WhisperConfig, *, preload_model: bool = True) -> AbstractTranscriber:
-    """Factory function to create the appropriate transcriber based on config and platform."""
+    """Factory function to create the appropriate transcriber based on config and platform.
+
+    For MLX on Apple Silicon, uses subprocess isolation to protect the main
+    application from Metal GPU crashes.
+    """
     backend = config.backend.lower()
 
     if backend == "mlx":
@@ -572,8 +962,8 @@ def create_transcriber(config: WhisperConfig, *, preload_model: bool = True) -> 
                 "MLX backend requested but not available. "
                 "MLX requires Apple Silicon and mlx-whisper to be installed."
             )
-        LOGGER.info("Using MLX Whisper backend (explicitly configured)")
-        return MLXWhisperTranscriber(config, preload_model=preload_model)
+        LOGGER.info("Using subprocess-isolated MLX Whisper backend (explicitly configured)")
+        return SubprocessMLXTranscriber(config, preload_model=preload_model)
 
     if backend == "faster-whisper":
         LOGGER.info("Using faster-whisper backend (explicitly configured)")
@@ -582,8 +972,8 @@ def create_transcriber(config: WhisperConfig, *, preload_model: bool = True) -> 
     # Auto-detect best backend
     if backend == "auto":
         if mlx_available():
-            LOGGER.info("Using MLX Whisper backend (auto-detected Apple Silicon)")
-            return MLXWhisperTranscriber(config, preload_model=preload_model)
+            LOGGER.info("Using subprocess-isolated MLX Whisper backend (auto-detected Apple Silicon)")
+            return SubprocessMLXTranscriber(config, preload_model=preload_model)
         LOGGER.info("Using faster-whisper backend (auto-detected)")
         return WhisperTranscriber(config, preload_model=preload_model)
 
@@ -596,6 +986,7 @@ __all__ = [
     "AbstractTranscriber",
     "WhisperTranscriber",
     "MLXWhisperTranscriber",
+    "SubprocessMLXTranscriber",
     "PassthroughTranscriber",
     "TranscriptionResultBundle",
     "create_transcriber",

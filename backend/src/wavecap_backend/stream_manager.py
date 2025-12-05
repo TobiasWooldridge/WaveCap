@@ -52,6 +52,14 @@ UPSTREAM_DISCONNECTED_MESSAGE = "Lost connection to upstream stream"
 UPSTREAM_RECONNECTED_MESSAGE = "Reconnected to upstream stream"
 RETENTION_SWEEP_INTERVAL_SECONDS = 5 * 60
 
+# Auto-restart configuration for streams that enter ERROR state
+AUTO_RESTART_DELAY_SECONDS = 30.0  # Initial delay before restart attempt
+AUTO_RESTART_MAX_DELAY_SECONDS = 300.0  # Cap exponential backoff at 5 minutes
+AUTO_RESTART_MAX_ATTEMPTS = 5  # Maximum restart attempts before giving up
+
+# Shutdown configuration
+WORKER_STOP_TIMEOUT_SECONDS = 10.0  # Max time to wait for each worker to stop
+
 
 class SystemEventTriggerType(str, Enum):
     """Enumerates reasons that can trigger system logging events."""
@@ -59,6 +67,7 @@ class SystemEventTriggerType(str, Enum):
     USER_REQUEST = "user_request"
     AUTOMATIC_RESUME = "automatic_resume_after_restart"
     AUTOMATIC_SYNCHRONIZATION = "automatic_synchronization"
+    AUTOMATIC_RESTART_AFTER_ERROR = "automatic_restart_after_error"
     SERVICE_SHUTDOWN = "service_shutdown"
     SOURCE_STREAM_ENDED = "source_stream_ended"
     STREAM_ERROR = "stream_error"
@@ -120,6 +129,13 @@ class SystemEventTrigger:
     @classmethod
     def automatic_synchronization(cls) -> "SystemEventTrigger":
         return cls(SystemEventTriggerType.AUTOMATIC_SYNCHRONIZATION)
+
+    @classmethod
+    def automatic_restart_after_error(cls, attempt: int) -> "SystemEventTrigger":
+        return cls(
+            SystemEventTriggerType.AUTOMATIC_RESTART_AFTER_ERROR,
+            detail=f"attempt {attempt}",
+        )
 
     @classmethod
     def service_shutdown(cls) -> "SystemEventTrigger":
@@ -257,6 +273,10 @@ class StreamManager:
         self._last_streams_signature: Optional[str] = None
         self._retention_task: Optional[asyncio.Task[None]] = None
         self._retention_stop: Optional[asyncio.Event] = None
+        # Auto-restart tracking for streams that fail with errors
+        self._restart_attempts: Dict[str, int] = {}
+        self._restart_tasks: Dict[str, asyncio.Task[None]] = {}
+        self._shutting_down = False
 
     @staticmethod
     def _resolve_concurrency(value: Optional[int]) -> int:
@@ -1066,6 +1086,8 @@ class StreamManager:
                     status == StreamStatus.TRANSCRIBING
                     and previous_status != StreamStatus.TRANSCRIBING
                 ):
+                    # Reset restart counter on successful start
+                    self._reset_restart_counter(stream.id)
                     trigger_reason = (
                         self._start_triggers.pop(stream.id, None)
                         or SystemEventTrigger.system_activity()
@@ -1131,6 +1153,120 @@ class StreamManager:
             await self._ensure_stream_alignment(
                 stream.id, trigger=SystemEventTrigger.automatic_synchronization()
             )
+
+        # Schedule auto-restart for ERROR state on enabled audio streams
+        if (
+            status == StreamStatus.ERROR
+            and stream.source == StreamSource.AUDIO
+            and stream.enabled
+            and not self._shutting_down
+        ):
+            self._schedule_auto_restart(stream.id)
+
+    def _schedule_auto_restart(self, stream_id: str) -> None:
+        """Schedule an automatic restart attempt for a failed stream."""
+        # Cancel any existing restart task for this stream
+        existing_task = self._restart_tasks.pop(stream_id, None)
+        if existing_task and not existing_task.done():
+            existing_task.cancel()
+
+        # Increment attempt counter
+        attempt = self._restart_attempts.get(stream_id, 0) + 1
+        self._restart_attempts[stream_id] = attempt
+
+        if attempt > AUTO_RESTART_MAX_ATTEMPTS:
+            LOGGER.error(
+                "Stream %s auto-restart disabled after %d failed attempts",
+                stream_id,
+                AUTO_RESTART_MAX_ATTEMPTS,
+            )
+            return
+
+        # Calculate delay with exponential backoff
+        delay = min(
+            AUTO_RESTART_DELAY_SECONDS * (2 ** (attempt - 1)),
+            AUTO_RESTART_MAX_DELAY_SECONDS,
+        )
+
+        LOGGER.info(
+            "Stream %s will auto-restart in %.0fs (attempt %d/%d)",
+            stream_id,
+            delay,
+            attempt,
+            AUTO_RESTART_MAX_ATTEMPTS,
+        )
+
+        # Schedule the restart task
+        task = asyncio.create_task(
+            self._delayed_restart(stream_id, delay, attempt),
+            name=f"auto-restart-{stream_id}",
+        )
+        self._restart_tasks[stream_id] = task
+
+    async def _delayed_restart(
+        self, stream_id: str, delay: float, attempt: int
+    ) -> None:
+        """Wait and then attempt to restart a stream."""
+        try:
+            await asyncio.sleep(delay)
+
+            if self._shutting_down:
+                LOGGER.debug(
+                    "Skipping auto-restart for stream %s (service shutting down)",
+                    stream_id,
+                )
+                return
+
+            async with self._lock:
+                stream = self.streams.get(stream_id)
+                if stream is None:
+                    LOGGER.debug(
+                        "Stream %s no longer exists, skipping auto-restart", stream_id
+                    )
+                    return
+
+                if not stream.enabled:
+                    LOGGER.debug(
+                        "Stream %s disabled, skipping auto-restart", stream_id
+                    )
+                    return
+
+                if stream.status == StreamStatus.TRANSCRIBING:
+                    LOGGER.debug(
+                        "Stream %s already running, skipping auto-restart", stream_id
+                    )
+                    return
+
+            LOGGER.info(
+                "Auto-restarting stream %s (attempt %d/%d)",
+                stream_id,
+                attempt,
+                AUTO_RESTART_MAX_ATTEMPTS,
+            )
+
+            trigger = SystemEventTrigger.automatic_restart_after_error(attempt)
+            await self.start_stream(stream_id, trigger=trigger)
+
+            # Reset attempt counter on successful start
+            # (the counter stays until next successful transcription,
+            # which happens in _handle_status_change when status becomes TRANSCRIBING)
+
+        except asyncio.CancelledError:
+            LOGGER.debug("Auto-restart task for stream %s was cancelled", stream_id)
+        except Exception:
+            LOGGER.exception(
+                "Failed to auto-restart stream %s (attempt %d)", stream_id, attempt
+            )
+        finally:
+            self._restart_tasks.pop(stream_id, None)
+
+    def _reset_restart_counter(self, stream_id: str) -> None:
+        """Reset the restart attempt counter after successful recovery."""
+        if stream_id in self._restart_attempts:
+            LOGGER.debug(
+                "Stream %s recovered, resetting restart counter", stream_id
+            )
+            del self._restart_attempts[stream_id]
 
     async def _handle_upstream_disconnect(
         self,
@@ -1246,6 +1382,16 @@ class StreamManager:
         await self.broadcaster.publish(StreamEvent("streams_update", payload))
 
     async def shutdown(self) -> None:
+        # Prevent new auto-restart tasks from being scheduled
+        self._shutting_down = True
+
+        # Cancel any pending auto-restart tasks
+        for stream_id, task in list(self._restart_tasks.items()):
+            if not task.done():
+                task.cancel()
+        self._restart_tasks.clear()
+        self._restart_attempts.clear()
+
         await self._stop_retention_task()
         audio_streams: List[Stream] = []
         async with self._lock:
@@ -1260,7 +1406,15 @@ class StreamManager:
             self.workers.clear()
         for stream_id, worker in workers:
             try:
-                await worker.stop()
+                await asyncio.wait_for(
+                    worker.stop(), timeout=WORKER_STOP_TIMEOUT_SECONDS
+                )
+            except asyncio.TimeoutError:
+                LOGGER.warning(
+                    "Worker %s did not stop within %.0fs, continuing shutdown",
+                    stream_id,
+                    WORKER_STOP_TIMEOUT_SECONDS,
+                )
             except Exception:  # pragma: no cover - defensive cleanup
                 LOGGER.exception("Failed to stop worker %s during shutdown", stream_id)
         for stream in audio_streams:
