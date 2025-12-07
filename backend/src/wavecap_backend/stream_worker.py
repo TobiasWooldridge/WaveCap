@@ -5,12 +5,12 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
+import random
 import re
 import struct
 import time
 import uuid
 from collections import deque
-import time
 from dataclasses import dataclass
 from pathlib import Path
 from functools import lru_cache
@@ -56,7 +56,11 @@ from .llm_corrector import AbstractLLMCorrector, NoOpCorrector
 BLANK_AUDIO_TOKEN = "[BLANK_AUDIO]"
 UNABLE_TO_TRANSCRIBE_TOKEN = "[unable to transcribe]"
 
-RECONNECT_BACKOFF_SECONDS = 600.0
+# Reconnection backoff configuration
+RECONNECT_INITIAL_DELAY_SECONDS = 5.0  # Initial delay on first retry
+RECONNECT_MAX_DELAY_SECONDS = 600.0    # Maximum backoff (10 minutes)
+RECONNECT_BACKOFF_MULTIPLIER = 2.0     # Exponential multiplier
+RECONNECT_JITTER_FACTOR = 0.25         # Random jitter up to 25% of delay
 
 # Number of consecutive transcription failures before stopping the stream.
 # Individual failures are logged and the chunk is skipped; only persistent
@@ -396,6 +400,9 @@ class StreamWorker:
         self._hallucination_phrases = self._prepare_hallucination_phrases(
             config.silenceHallucinationPhrases,
             self._initial_prompt or config.initialPrompt,
+        )
+        self._advertisement_phrases = self._prepare_advertisement_phrases(
+            config.advertisementFilterPhrases
         )
 
         deemphasis_seconds = (
@@ -969,9 +976,28 @@ class StreamWorker:
             raise worker_failure
 
     def _reconnect_delay_seconds(self, attempt: int) -> float:
+        """Calculate reconnection delay with exponential backoff and jitter.
+
+        Backoff sequence (approximate, before jitter):
+          Attempt 1: 0s (immediate)
+          Attempt 2: 5s
+          Attempt 3: 10s
+          Attempt 4: 20s
+          Attempt 5: 40s
+          Attempt 6: 80s
+          Attempt 7+: 600s (capped)
+        """
         if attempt <= 1:
             return 0.0
-        return RECONNECT_BACKOFF_SECONDS
+        # Exponential backoff: initial * multiplier^(attempt-2)
+        base_delay = RECONNECT_INITIAL_DELAY_SECONDS * (
+            RECONNECT_BACKOFF_MULTIPLIER ** (attempt - 2)
+        )
+        # Cap at maximum
+        capped_delay = min(base_delay, RECONNECT_MAX_DELAY_SECONDS)
+        # Add jitter to prevent thundering herd
+        jitter = capped_delay * RECONNECT_JITTER_FACTOR * random.random()
+        return capped_delay + jitter
 
     def _check_audio_inactivity(self, has_audio: bool) -> bool:
         threshold = self._no_audio_reconnect_seconds
@@ -1307,6 +1333,16 @@ class StreamWorker:
             segments = []
             hallucination_discarded = True
 
+        # Discard advertisements from streams like Broadcastify
+        if text and self._is_advertisement(text):
+            LOGGER.info(
+                "Stream %s discarding advertisement: %s",
+                self.stream.id,
+                text,
+            )
+            text = ""
+            segments = []
+
         if text and self._is_low_energy(effective_samples):
             LOGGER.debug(
                 "Stream %s dropping low-energy transcription output: %s",
@@ -1502,6 +1538,30 @@ class StreamWorker:
         return prepared
 
     @staticmethod
+    def _prepare_advertisement_phrases(phrases: Iterable[str]) -> Set[str]:
+        """Prepare advertisement filter phrases for matching."""
+        prepared: Set[str] = set()
+        for phrase in phrases:
+            if not phrase:
+                continue
+            normalized = StreamWorker._normalize_hallucination_phrase(phrase)
+            if normalized:
+                prepared.add(normalized)
+        return prepared
+
+    def _is_advertisement(self, text: str) -> bool:
+        """Check if transcription text matches an advertisement phrase."""
+        if not self._advertisement_phrases:
+            return False
+        normalized = self._normalize_hallucination_phrase(text)
+        if not normalized:
+            return False
+        for phrase in self._advertisement_phrases:
+            if phrase in normalized:
+                return True
+        return False
+
+    @staticmethod
     def _normalize_hallucination_phrase(text: str) -> str:
         lowered = text.strip().lower()
         if not lowered:
@@ -1637,8 +1697,10 @@ class StreamWorker:
         total_tokens = len(tokens)
         if total_tokens < 10:  # Need at least 10 tokens for 10 single-word repeats
             return False
-        # Check 1, 2, and 3-gram repetitions
-        for ngram_size in range(1, 4):
+        # Check n-gram repetitions up to 8 words to catch longer phrase hallucinations
+        # like "I'm not sure what you're doing" repeated 10+ times
+        max_ngram = min(8, total_tokens // 10)  # Need at least 10 repeats
+        for ngram_size in range(1, max_ngram + 1):
             min_tokens_needed = ngram_size * 10
             if total_tokens < min_tokens_needed:
                 continue

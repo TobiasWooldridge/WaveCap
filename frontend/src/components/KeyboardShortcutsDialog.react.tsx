@@ -1,4 +1,4 @@
-import Dialog from "./primitives/Dialog.react";
+import Modal from "./primitives/Modal.react";
 import "./KeyboardShortcutsDialog.scss";
 
 type Shortcut = {
@@ -85,22 +85,21 @@ const renderKeys = (keys: string[]) => (
 
 const KeyboardShortcutsDialog = ({ open, onClose }: KeyboardShortcutsDialogProps) => {
   return (
-    <Dialog
+    <Modal
       open={open}
       onClose={onClose}
       title="Keyboard shortcuts"
+      subtitle="Navigate WaveCap with familiar Discord-inspired shortcuts."
+      size="lg"
+      backdropOpacity={0.6}
       dialogClassName="keyboard-shortcuts-dialog"
       bodyClassName="keyboard-shortcuts-dialog__body"
       closeAriaLabel="Close keyboard shortcut guide"
     >
-      <p className="text-body-secondary mb-0">
-        Navigate WaveCap with familiar Discord-inspired shortcuts. Use these combinations to move through streams and manage
-        activity without taking your hands off the keyboard.
-      </p>
       <div className="keyboard-shortcuts-dialog__sections">
         {SECTIONS.map((section) => (
           <section key={section.title} className="keyboard-shortcuts-dialog__section">
-            <h3 className="h6 text-body mb-2">{section.title}</h3>
+            <h3 className="keyboard-shortcuts-dialog__section-title">{section.title}</h3>
             <ul className="keyboard-shortcuts-dialog__list">
               {section.shortcuts.map((shortcut) => (
                 <li key={`${section.title}-${shortcut.description}`} className="keyboard-shortcuts-dialog__item">
@@ -112,7 +111,7 @@ const KeyboardShortcutsDialog = ({ open, onClose }: KeyboardShortcutsDialogProps
           </section>
         ))}
       </div>
-    </Dialog>
+    </Modal>
   );
 };
 

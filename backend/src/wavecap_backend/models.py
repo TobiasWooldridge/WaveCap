@@ -411,6 +411,9 @@ class WhisperConfig(APIModel):
     silenceHallucinationPhrases: List[str] = Field(
         default_factory=list, alias="silenceHallucinationPhrases"
     )
+    advertisementFilterPhrases: List[str] = Field(
+        default_factory=list, alias="advertisementFilterPhrases"
+    )
     noAudioReconnectSeconds: Optional[float] = Field(
         default=None, alias="noAudioReconnectSeconds"
     )

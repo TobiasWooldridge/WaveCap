@@ -12544,6 +12544,18 @@ const BarChart3 = createLucideIcon("BarChart3", [
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
  */
+const BellOff = createLucideIcon("BellOff", [
+  ["path", { d: "M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5", key: "o7mx20" }],
+  ["path", { d: "M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7", key: "16f1lm" }],
+  ["path", { d: "M10.3 21a1.94 1.94 0 0 0 3.4 0", key: "qgo35s" }],
+  ["path", { d: "m2 2 20 20", key: "1ooewy" }]
+]);
+/**
+ * @license lucide-react v0.294.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
 const Bell = createLucideIcon("Bell", [
   ["path", { d: "M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9", key: "1qo2s2" }],
   ["path", { d: "M10.3 21a1.94 1.94 0 0 0 3.4 0", key: "qgo35s" }]
@@ -12775,6 +12787,18 @@ const Radio = createLucideIcon("Radio", [
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
  */
+const RefreshCw = createLucideIcon("RefreshCw", [
+  ["path", { d: "M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8", key: "v9h5vc" }],
+  ["path", { d: "M21 3v5h-5", key: "1q7to0" }],
+  ["path", { d: "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16", key: "3uifl3" }],
+  ["path", { d: "M8 16H3v5", key: "1cv678" }]
+]);
+/**
+ * @license lucide-react v0.294.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
 const RotateCcw = createLucideIcon("RotateCcw", [
   ["path", { d: "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8", key: "1357e3" }],
   ["path", { d: "M3 3v5h5", key: "1xhq8a" }]
@@ -12839,6 +12863,16 @@ const Star = createLucideIcon("Star", [
       key: "8f66p6"
     }
   ]
+]);
+/**
+ * @license lucide-react v0.294.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+const Terminal = createLucideIcon("Terminal", [
+  ["polyline", { points: "4 17 10 11 4 5", key: "akl6gq" }],
+  ["line", { x1: "12", x2: "20", y1: "19", y2: "19", key: "q2wloq" }]
 ]);
 /**
  * @license lucide-react v0.294.0 - ISC
@@ -14678,6 +14712,29 @@ const useTranscriptionAudioPlayback = () => {
     isSegmentCurrentlyPlaying
   };
 };
+const HoveredSegmentContext = reactExports.createContext(void 0);
+const HoveredSegmentProvider = ({
+  children
+}) => {
+  const [hoveredSegmentId, setHoveredSegmentIdState] = reactExports.useState(
+    null
+  );
+  const setHoveredSegmentId = reactExports.useCallback((id2) => {
+    setHoveredSegmentIdState(id2);
+  }, []);
+  const contextValue = reactExports.useMemo(
+    () => ({
+      hoveredSegmentId,
+      setHoveredSegmentId
+    }),
+    [hoveredSegmentId, setHoveredSegmentId]
+  );
+  return /* @__PURE__ */ jsxRuntimeExports.jsx(HoveredSegmentContext.Provider, { value: contextValue, children });
+};
+const useHoveredSegmentOptional = () => {
+  return reactExports.useContext(HoveredSegmentContext) ?? null;
+};
+const buildHoveredSegmentId = (transcriptionId, segmentId) => `${transcriptionId}-${segmentId}`;
 const THEME_STORAGE_KEY = "wavecap-theme-mode";
 const COLOR_CODING_STORAGE_KEY = "wavecap-color-coding-enabled";
 const TRANSCRIPT_CORRECTION_STORAGE_KEY = "wavecap-transcript-correction-enabled";
@@ -16254,13 +16311,15 @@ const TranscriptSegmentPlaybackButton = ({
   disabled,
   tooltip,
   confidenceClass,
+  isWaveformHovered,
   children
 }) => {
   const segmentClassName = clsx(
     "transcript-segment",
     confidenceClass,
     isPlaying && "transcript-segment--playing",
-    disabled && "transcript-segment--static"
+    disabled && "transcript-segment--static",
+    isWaveformHovered && "transcript-segment--waveform-hovered"
   );
   const core = disabled ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: segmentClassName, "aria-disabled": "true", title: tooltip, children }) : /* @__PURE__ */ jsxRuntimeExports.jsx(
     Button,
@@ -16316,6 +16375,7 @@ const TranscriptSegmentListItem = ({
   originalText
 }) => {
   const { colorCodingEnabled } = useUISettings();
+  const hoveredContext = useHoveredSegmentOptional();
   const segmentConfidence = reactExports.useMemo(
     () => calculateSegmentConfidence(segment),
     [segment]
@@ -16324,6 +16384,12 @@ const TranscriptSegmentListItem = ({
     () => getConfidenceStyles(segmentConfidence, colorCodingEnabled),
     [segmentConfidence, colorCodingEnabled]
   );
+  const isWaveformHovered = reactExports.useMemo(() => {
+    if (!(hoveredContext == null ? void 0 : hoveredContext.hoveredSegmentId) || segment.id < 0)
+      return false;
+    const thisSegmentId = buildHoveredSegmentId(transcriptionId, segment.id);
+    return hoveredContext.hoveredSegmentId === thisSegmentId;
+  }, [hoveredContext == null ? void 0 : hoveredContext.hoveredSegmentId, transcriptionId, segment.id]);
   const segmentStart = Math.max(
     0,
     typeof displayOffsetSeconds === "number" && Number.isFinite(displayOffsetSeconds) ? displayOffsetSeconds : segment.start
@@ -16361,6 +16427,7 @@ const TranscriptSegmentListItem = ({
       tooltip: tooltipParts.join(" • ") || void 0,
       confidenceClass,
       isPlaying,
+      isWaveformHovered,
       children: /* @__PURE__ */ jsxRuntimeExports.jsx(
         TranscriptSegmentContent,
         {
@@ -19492,6 +19559,90 @@ const StreamSection = ({
     }
   );
 };
+const WaveformSegmentOverlay$1 = "";
+const MIN_LABEL_WIDTH_PX = 60;
+const REFERENCE_WIDTH_PX = 400;
+const WaveformSegmentOverlay = ({
+  segments,
+  transcriptionId,
+  duration,
+  onSegmentClick,
+  height = 40
+}) => {
+  const hoveredContext = useHoveredSegmentOptional();
+  const segmentPositions = reactExports.useMemo(() => {
+    if (duration <= 0 || segments.length === 0) {
+      return [];
+    }
+    return segments.map((segment, index2) => {
+      const leftPercent = Math.max(0, segment.start / duration * 100);
+      const rightPercent = Math.min(100, segment.end / duration * 100);
+      const widthPercent = Math.max(0.5, rightPercent - leftPercent);
+      const estimatedWidthPx = widthPercent / 100 * REFERENCE_WIDTH_PX;
+      const showLabel = estimatedWidthPx >= MIN_LABEL_WIDTH_PX;
+      return {
+        segment,
+        index: index2,
+        leftPercent,
+        widthPercent,
+        showLabel,
+        segmentId: buildHoveredSegmentId(transcriptionId, segment.id)
+      };
+    });
+  }, [segments, duration, transcriptionId]);
+  if (segmentPositions.length === 0) {
+    return null;
+  }
+  const handleMouseEnter = (segmentId) => {
+    hoveredContext == null ? void 0 : hoveredContext.setHoveredSegmentId(segmentId);
+  };
+  const handleMouseLeave = () => {
+    hoveredContext == null ? void 0 : hoveredContext.setHoveredSegmentId(null);
+  };
+  const handleClick = (segment, e) => {
+    if (onSegmentClick) {
+      e.stopPropagation();
+      onSegmentClick(segment);
+    }
+  };
+  return /* @__PURE__ */ jsxRuntimeExports.jsx(
+    "div",
+    {
+      className: "waveform-segment-overlay",
+      style: { height },
+      children: segmentPositions.map(
+        ({ segment, index: index2, leftPercent, widthPercent, showLabel, segmentId }) => {
+          const isHovered = (hoveredContext == null ? void 0 : hoveredContext.hoveredSegmentId) === segmentId;
+          const colorClass = index2 % 2 === 0 ? "even" : "odd";
+          return /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "div",
+            {
+              className: `waveform-segment waveform-segment--${colorClass}${isHovered ? " waveform-segment--hovered" : ""}`,
+              style: {
+                left: `${leftPercent}%`,
+                width: `${widthPercent}%`
+              },
+              onMouseEnter: () => handleMouseEnter(segmentId),
+              onMouseLeave: handleMouseLeave,
+              onClick: (e) => handleClick(segment, e),
+              role: "button",
+              tabIndex: 0,
+              onKeyDown: (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSegmentClick == null ? void 0 : onSegmentClick(segment);
+                }
+              },
+              "aria-label": `Segment ${index2 + 1}: ${segment.text.slice(0, 50)}${segment.text.length > 50 ? "..." : ""}`,
+              children: showLabel && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "waveform-segment__label", children: segment.text })
+            },
+            segmentId
+          );
+        }
+      )
+    }
+  );
+};
 const WaveformDisplay$1 = "";
 const WaveformDisplay = ({
   waveform,
@@ -19503,7 +19654,10 @@ const WaveformDisplay = ({
   onSeek,
   height = 32,
   className,
-  overlay = false
+  overlay = false,
+  segments,
+  transcriptionId,
+  onSegmentClick
 }) => {
   const numBars = waveform.length;
   const { progressBar, speechStartBar, speechEndBar } = reactExports.useMemo(() => {
@@ -19551,6 +19705,16 @@ const WaveformDisplay = ({
             i
           );
         }) }),
+        segments && segments.length > 0 && transcriptionId && /* @__PURE__ */ jsxRuntimeExports.jsx(
+          WaveformSegmentOverlay,
+          {
+            segments,
+            transcriptionId,
+            duration,
+            onSegmentClick,
+            height
+          }
+        ),
         progressBar > 0 && progressBar < numBars && /* @__PURE__ */ jsxRuntimeExports.jsx(
           "div",
           {
@@ -19600,7 +19764,33 @@ const PlaybackBar = ({
   const speechStartOffset = transcription == null ? void 0 : transcription.speechStartOffset;
   const speechEndOffset = transcription == null ? void 0 : transcription.speechEndOffset;
   const timestamp = transcription == null ? void 0 : transcription.timestamp;
+  const segments = transcription == null ? void 0 : transcription.segments;
+  const transcriptionId = transcription == null ? void 0 : transcription.id;
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `playback-bar${isPlaying ? " playback-bar--active" : ""}`, children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "playback-bar__controls", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        Button,
+        {
+          use: "unstyled",
+          onClick: onTogglePlayback,
+          className: "playback-bar__button playback-bar__button--play",
+          "aria-label": isPlaying ? "Pause" : "Play",
+          disabled: !isPlaying,
+          children: isPlaying ? /* @__PURE__ */ jsxRuntimeExports.jsx(Pause, { size: 18 }) : /* @__PURE__ */ jsxRuntimeExports.jsx(Play, { size: 18 })
+        }
+      ),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        Button,
+        {
+          use: "unstyled",
+          onClick: onStop,
+          className: "playback-bar__button playback-bar__button--stop",
+          "aria-label": "Stop",
+          disabled: !isPlaying,
+          children: /* @__PURE__ */ jsxRuntimeExports.jsx(Square, { size: 16 })
+        }
+      )
+    ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "playback-bar__info", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx(Radio, { size: 16, className: "playback-bar__icon" }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "playback-bar__meta", children: [
@@ -19626,57 +19816,35 @@ const PlaybackBar = ({
         speechEnd: speechEndOffset,
         isPlaying,
         onSeek: handleSeek,
-        height: 40
+        height: 40,
+        segments,
+        transcriptionId
       }
     ) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "playback-bar__empty", children: "Click play on any transcription to listen" }) }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "playback-bar__controls", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "playback-bar__volume", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx(
         Button,
         {
           use: "unstyled",
-          onClick: onTogglePlayback,
-          className: "playback-bar__button playback-bar__button--play",
-          "aria-label": isPlaying ? "Pause" : "Play",
-          disabled: !isPlaying,
-          children: isPlaying ? /* @__PURE__ */ jsxRuntimeExports.jsx(Pause, { size: 18 }) : /* @__PURE__ */ jsxRuntimeExports.jsx(Play, { size: 18 })
+          onClick: handleToggleMute,
+          className: "playback-bar__volume-button",
+          "aria-label": isMuted ? "Unmute" : "Mute",
+          children: isMuted ? /* @__PURE__ */ jsxRuntimeExports.jsx(VolumeX, { size: 16 }) : /* @__PURE__ */ jsxRuntimeExports.jsx(Volume2, { size: 16 })
         }
       ),
       /* @__PURE__ */ jsxRuntimeExports.jsx(
-        Button,
+        "input",
         {
-          use: "unstyled",
-          onClick: onStop,
-          className: "playback-bar__button playback-bar__button--stop",
-          "aria-label": "Stop",
-          disabled: !isPlaying,
-          children: /* @__PURE__ */ jsxRuntimeExports.jsx(Square, { size: 16 })
+          type: "range",
+          min: "0",
+          max: "1",
+          step: "0.01",
+          value: volume,
+          onChange: handleVolumeChange,
+          className: "playback-bar__volume-slider",
+          "aria-label": "Volume"
         }
-      ),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "playback-bar__volume", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx(
-          Button,
-          {
-            use: "unstyled",
-            onClick: handleToggleMute,
-            className: "playback-bar__volume-button",
-            "aria-label": isMuted ? "Unmute" : "Mute",
-            children: isMuted ? /* @__PURE__ */ jsxRuntimeExports.jsx(VolumeX, { size: 16 }) : /* @__PURE__ */ jsxRuntimeExports.jsx(Volume2, { size: 16 })
-          }
-        ),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "input",
-          {
-            type: "range",
-            min: "0",
-            max: "1",
-            step: "0.01",
-            value: volume,
-            onChange: handleVolumeChange,
-            className: "playback-bar__volume-slider",
-            "aria-label": "Volume"
-          }
-        )
-      ] })
+      )
     ] })
   ] });
 };
@@ -19762,7 +19930,7 @@ const StreamTranscriptionPanel = ({
       stopCurrentRecording();
     }
   };
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "transcript-view transcript-view--stacked transcript-view--frameless", children: [
+  return /* @__PURE__ */ jsxRuntimeExports.jsx(HoveredSegmentProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "transcript-view transcript-view--stacked transcript-view--frameless", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "transcript-view__scroller transcript-view__scroller--stacked", children: visibleStreams.map((stream) => /* @__PURE__ */ jsxRuntimeExports.jsx(
       StreamSection,
       {
@@ -19799,7 +19967,7 @@ const StreamTranscriptionPanel = ({
         onVolumeChange: setVolume
       }
     )
-  ] });
+  ] }) });
 };
 const TranscriptMessageRow = ({
   streamId,
@@ -20404,6 +20572,134 @@ const useToast = () => {
   }
   return context;
 };
+const STORAGE_KEY = "wavecap:alert-subscriptions";
+const DEFAULT_PREFERENCES = {
+  enabled: true,
+  subscriptions: {}
+};
+function loadPreferences() {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) {
+      return DEFAULT_PREFERENCES;
+    }
+    const parsed = JSON.parse(stored);
+    return {
+      enabled: typeof parsed.enabled === "boolean" ? parsed.enabled : true,
+      subscriptions: parsed.subscriptions ?? {}
+    };
+  } catch {
+    return DEFAULT_PREFERENCES;
+  }
+}
+function savePreferences(prefs) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+  } catch (error) {
+    console.error("Failed to save alert preferences:", error);
+  }
+}
+function subscriptionFromRule(rule) {
+  return {
+    ruleId: rule.id,
+    playSound: rule.playSound !== false,
+    showBanner: rule.notify !== false
+  };
+}
+function useAlertSubscriptions(serverConfig) {
+  const [preferences, setPreferences] = reactExports.useState(
+    loadPreferences
+  );
+  reactExports.useEffect(() => {
+    savePreferences(preferences);
+  }, [preferences]);
+  const serverRulesMap = reactExports.useMemo(() => {
+    const map = /* @__PURE__ */ new Map();
+    if (serverConfig == null ? void 0 : serverConfig.rules) {
+      for (const rule of serverConfig.rules) {
+        if (rule.enabled !== false) {
+          map.set(rule.id, rule);
+        }
+      }
+    }
+    return map;
+  }, [serverConfig]);
+  const getSubscription = reactExports.useCallback(
+    (ruleId) => {
+      const serverRule = serverRulesMap.get(ruleId);
+      if (!serverRule) {
+        return null;
+      }
+      const localOverride = preferences.subscriptions[ruleId];
+      if (localOverride) {
+        return localOverride;
+      }
+      return subscriptionFromRule(serverRule);
+    },
+    [serverRulesMap, preferences.subscriptions]
+  );
+  const subscriptions = reactExports.useMemo(() => {
+    const result = [];
+    for (const rule of serverRulesMap.values()) {
+      const sub = getSubscription(rule.id);
+      if (sub) {
+        result.push(sub);
+      }
+    }
+    return result;
+  }, [serverRulesMap, getSubscription]);
+  const setEnabled = reactExports.useCallback((enabled) => {
+    setPreferences((prev) => ({ ...prev, enabled }));
+  }, []);
+  const updateSubscription = reactExports.useCallback(
+    (ruleId, updates) => {
+      const serverRule = serverRulesMap.get(ruleId);
+      if (!serverRule) {
+        return;
+      }
+      setPreferences((prev) => {
+        const existing = prev.subscriptions[ruleId] ?? subscriptionFromRule(serverRule);
+        return {
+          ...prev,
+          subscriptions: {
+            ...prev.subscriptions,
+            [ruleId]: {
+              ...existing,
+              ...updates,
+              ruleId
+            }
+          }
+        };
+      });
+    },
+    [serverRulesMap]
+  );
+  const resetSubscription = reactExports.useCallback((ruleId) => {
+    setPreferences((prev) => {
+      const { [ruleId]: _, ...rest } = prev.subscriptions;
+      return {
+        ...prev,
+        subscriptions: rest
+      };
+    });
+  }, []);
+  const resetAll = reactExports.useCallback(() => {
+    setPreferences(DEFAULT_PREFERENCES);
+  }, []);
+  const hasLocalOverrides = reactExports.useMemo(() => {
+    return !preferences.enabled || Object.keys(preferences.subscriptions).length > 0;
+  }, [preferences]);
+  return {
+    enabled: preferences.enabled,
+    setEnabled,
+    getSubscription,
+    subscriptions,
+    updateSubscription,
+    resetSubscription,
+    resetAll,
+    hasLocalOverrides
+  };
+}
 const SettingsModal$1 = "";
 const RULE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 const generateUid = () => {
@@ -20448,6 +20744,7 @@ const parsePhrases = (value) => {
 const KeywordAlertsSettingsSection = (_props) => {
   const [loading, setLoading] = reactExports.useState(true);
   const [loadError, setLoadError] = reactExports.useState(null);
+  const [serverConfig, setServerConfig] = reactExports.useState(null);
   const [enabled, setEnabled] = reactExports.useState(true);
   const [rules, setRules] = reactExports.useState([]);
   const [initialEnabled, setInitialEnabled] = reactExports.useState(true);
@@ -20458,9 +20755,11 @@ const KeywordAlertsSettingsSection = (_props) => {
   const [saveError, setSaveError] = reactExports.useState(null);
   const { showToast } = useToast();
   const { authFetch, role, requestLogin } = useAuth();
+  const subscriptions = useAlertSubscriptions(serverConfig);
   const isEditor = role === "editor";
   const canEdit = isEditor && !saving;
   const applyConfig = reactExports.useCallback((config) => {
+    setServerConfig(config ?? null);
     const sanitizedEnabled = (config == null ? void 0 : config.enabled) === false ? false : true;
     const editableRules = buildEditableRules(config);
     setEnabled(sanitizedEnabled);
@@ -20695,303 +20994,513 @@ const KeywordAlertsSettingsSection = (_props) => {
     showToast,
     validateRules
   ]);
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "app-header-info__section keyword-alerts-settings", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__header", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "app-header-info__section-title text-uppercase small fw-semibold text-body-secondary", children: "Keyword alerts" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-body-secondary small", children: "Configure watch phrases and choose whether the console plays a chime or shows a banner when they appear." })
-    ] }),
-    loading ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-body-secondary small", children: "Loading keyword alerts…" }) : loadError ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "alert alert-warning", role: "alert", children: loadError }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__content", children: [
-      saveError && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "alert alert-danger", role: "alert", children: saveError }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "keyword-alerts-settings__switch", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "form-check form-switch m-0 ps-0 d-flex align-items-center gap-2", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "input",
-          {
-            id: "keyword-alerts-enabled",
-            type: "checkbox",
-            className: "form-check-input",
-            role: "switch",
-            checked: enabled,
-            onChange: handleToggleEnabled,
-            disabled: !canEdit
-          }
-        ),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "label",
-          {
-            htmlFor: "keyword-alerts-enabled",
-            className: "form-check-label fw-semibold",
-            children: "Enable keyword alerts"
-          }
-        )
-      ] }) }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "keyword-alerts-settings__rules", children: hasRules ? rules.map((rule) => {
-        const errorsForRule = ruleErrors[rule.uid] ?? {};
-        const idInputId = `keyword-alert-id-${rule.uid}`;
-        const labelInputId = `keyword-alert-label-${rule.uid}`;
-        const phrasesInputId = `keyword-alert-phrases-${rule.uid}`;
-        return /* @__PURE__ */ jsxRuntimeExports.jsxs(
-          "article",
-          {
-            className: "keyword-alerts-settings__rule",
-            children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__rule-header", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__field", children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    "label",
-                    {
-                      htmlFor: labelInputId,
-                      className: "keyword-alerts-settings__label",
-                      children: "Display label"
-                    }
-                  ),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    "input",
-                    {
-                      id: labelInputId,
-                      type: "text",
-                      className: "form-control",
-                      value: rule.label,
-                      onChange: (event) => handleRuleFieldChange(
-                        rule.uid,
-                        "label",
-                        event.target.value
-                      ),
-                      disabled: !canEdit,
-                      placeholder: "e.g. Distress: MAYDAY"
-                    }
-                  )
-                ] }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "keyword-alerts-settings__rule-toggle", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "form-check form-switch", children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    "input",
-                    {
-                      id: `keyword-alert-enabled-${rule.uid}`,
-                      type: "checkbox",
-                      className: "form-check-input",
-                      role: "switch",
-                      checked: rule.enabled,
-                      onChange: (event) => handleRuleFieldChange(
-                        rule.uid,
-                        "enabled",
-                        event.target.checked
-                      ),
-                      disabled: !canEdit
-                    }
-                  ),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    "label",
-                    {
-                      htmlFor: `keyword-alert-enabled-${rule.uid}`,
-                      className: "form-check-label small fw-semibold",
-                      children: "Rule enabled"
-                    }
-                  )
-                ] }) })
-              ] }),
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__grid", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__field keyword-alerts-settings__field--grow", children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    "label",
-                    {
-                      htmlFor: idInputId,
-                      className: "keyword-alerts-settings__label",
-                      children: "Rule ID"
-                    }
-                  ),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    "input",
-                    {
-                      id: idInputId,
-                      type: "text",
-                      className: `form-control${errorsForRule.id ? " is-invalid" : ""}`,
-                      value: rule.id,
-                      onChange: (event) => handleRuleFieldChange(
-                        rule.uid,
-                        "id",
-                        event.target.value
-                      ),
-                      disabled: !canEdit,
-                      placeholder: "e.g. distress-mayday"
-                    }
-                  ),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "form-text", children: "Used internally and must be unique." }),
-                  errorsForRule.id && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "invalid-feedback", children: errorsForRule.id })
-                ] }),
-                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__field keyword-alerts-settings__field--wide", children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    "label",
-                    {
-                      htmlFor: phrasesInputId,
-                      className: "keyword-alerts-settings__label",
-                      children: "Watch phrases"
-                    }
-                  ),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    "textarea",
-                    {
-                      id: phrasesInputId,
-                      className: `form-control${errorsForRule.phrases ? " is-invalid" : ""}`,
-                      rows: 3,
-                      value: rule.phrasesText,
-                      onChange: (event) => handleRuleFieldChange(
-                        rule.uid,
-                        "phrasesText",
-                        event.target.value
-                      ),
-                      disabled: !canEdit,
-                      placeholder: "Enter one phrase per line"
-                    }
-                  ),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "form-text", children: "The app matches these phrases exactly. Separate each phrase with a new line or comma." }),
-                  errorsForRule.phrases && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "invalid-feedback", children: errorsForRule.phrases })
-                ] })
-              ] }),
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__rule-actions", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__switches", children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "form-check form-switch", children: [
-                    /* @__PURE__ */ jsxRuntimeExports.jsx(
-                      "input",
-                      {
-                        id: `keyword-alert-sound-${rule.uid}`,
-                        type: "checkbox",
-                        className: "form-check-input",
-                        role: "switch",
-                        checked: rule.playSound,
-                        onChange: (event) => handleRuleFieldChange(
-                          rule.uid,
-                          "playSound",
-                          event.target.checked
-                        ),
-                        disabled: !canEdit
-                      }
-                    ),
-                    /* @__PURE__ */ jsxRuntimeExports.jsx(
-                      "label",
-                      {
-                        htmlFor: `keyword-alert-sound-${rule.uid}`,
-                        className: "form-check-label",
-                        children: "Play chime"
-                      }
-                    )
-                  ] }),
-                  /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "form-check form-switch", children: [
-                    /* @__PURE__ */ jsxRuntimeExports.jsx(
-                      "input",
-                      {
-                        id: `keyword-alert-notify-${rule.uid}`,
-                        type: "checkbox",
-                        className: "form-check-input",
-                        role: "switch",
-                        checked: rule.notify,
-                        onChange: (event) => handleRuleFieldChange(
-                          rule.uid,
-                          "notify",
-                          event.target.checked
-                        ),
-                        disabled: !canEdit
-                      }
-                    ),
-                    /* @__PURE__ */ jsxRuntimeExports.jsx(
-                      "label",
-                      {
-                        htmlFor: `keyword-alert-notify-${rule.uid}`,
-                        className: "form-check-label",
-                        children: "Show banner"
-                      }
-                    )
-                  ] }),
-                  /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "form-check form-switch", children: [
-                    /* @__PURE__ */ jsxRuntimeExports.jsx(
-                      "input",
-                      {
-                        id: `keyword-alert-case-${rule.uid}`,
-                        type: "checkbox",
-                        className: "form-check-input",
-                        role: "switch",
-                        checked: rule.caseSensitive,
-                        onChange: (event) => handleRuleFieldChange(
-                          rule.uid,
-                          "caseSensitive",
-                          event.target.checked
-                        ),
-                        disabled: !canEdit
-                      }
-                    ),
-                    /* @__PURE__ */ jsxRuntimeExports.jsx(
-                      "label",
-                      {
-                        htmlFor: `keyword-alert-case-${rule.uid}`,
-                        className: "form-check-label",
-                        children: "Match case"
-                      }
-                    )
-                  ] })
-                ] }),
-                isEditor ? /* @__PURE__ */ jsxRuntimeExports.jsx(
-                  Button,
-                  {
-                    size: "sm",
-                    use: "destroy",
-                    onClick: () => handleRemoveRule(rule.uid),
-                    disabled: !canEdit,
-                    children: "Remove"
-                  }
-                ) : null
-              ] })
-            ]
-          },
-          rule.uid
-        );
-      }) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-body-secondary small", children: isEditor ? "No keyword alerts configured. Add a rule to monitor specific phrases." : "No keyword alerts configured. Sign in to add keyword alerts." }) }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "keyword-alerts-settings__footer", children: isEditor ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx(
-          Button,
-          {
-            size: "sm",
-            use: "primary",
-            onClick: handleAddRule,
-            disabled: saving,
-            children: "Add rule"
-          }
-        ),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__footer-actions", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
+  const enabledRules = reactExports.useMemo(() => {
+    return rules.filter((rule) => rule.enabled);
+  }, [rules]);
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "settings-section keyword-alerts-settings", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "settings-section__header", children: /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "settings-section__title", children: "Keyword Alerts" }) }),
+    loading ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-body-secondary small", children: "Loading keyword alerts…" }) : loadError ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "alert alert-warning mb-0", role: "alert", children: loadError }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__content", children: [
+      saveError && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "alert alert-danger mb-0", role: "alert", children: saveError }),
+      enabledRules.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__subscriptions", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__subscriptions-header", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "keyword-alerts-settings__subscriptions-title", children: "Your notification preferences" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "keyword-alerts-settings__subscriptions-description", children: "Customize how you receive alerts. These settings are stored locally in your browser." })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__switch", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "form-check form-switch m-0 d-flex align-items-center gap-2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                id: "keyword-alerts-local-enabled",
+                type: "checkbox",
+                className: "form-check-input",
+                role: "switch",
+                checked: subscriptions.enabled,
+                onChange: (e) => subscriptions.setEnabled(e.target.checked)
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "label",
+              {
+                htmlFor: "keyword-alerts-local-enabled",
+                className: "form-check-label fw-semibold",
+                children: "Enable alerts on this device"
+              }
+            )
+          ] }),
+          subscriptions.hasLocalOverrides && /* @__PURE__ */ jsxRuntimeExports.jsx(
             Button,
             {
               size: "sm",
               use: "secondary",
-              onClick: resetChanges,
-              disabled: !dirty || saving,
-              children: "Reset changes"
+              appearance: "outline",
+              onClick: subscriptions.resetAll,
+              startContent: /* @__PURE__ */ jsxRuntimeExports.jsx(RotateCcw, { size: 14 }),
+              children: "Reset to defaults"
+            }
+          )
+        ] }),
+        subscriptions.enabled && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "keyword-alerts-settings__subscription-list", children: enabledRules.map((rule) => {
+          const sub = subscriptions.getSubscription(rule.id);
+          if (!sub)
+            return null;
+          return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            "div",
+            {
+              className: "keyword-alerts-settings__subscription-item",
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__subscription-label", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "keyword-alerts-settings__subscription-name", children: rule.label || rule.id }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "keyword-alerts-settings__subscription-phrases", children: [
+                    parsePhrases(rule.phrasesText).slice(0, 3).join(", "),
+                    parsePhrases(rule.phrasesText).length > 3 && "…"
+                  ] })
+                ] }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__subscription-toggles", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "button",
+                    {
+                      type: "button",
+                      className: `keyword-alerts-settings__toggle-btn ${sub.playSound ? "keyword-alerts-settings__toggle-btn--active" : ""}`,
+                      onClick: () => subscriptions.updateSubscription(rule.id, {
+                        playSound: !sub.playSound
+                      }),
+                      title: sub.playSound ? "Sound enabled" : "Sound disabled",
+                      children: sub.playSound ? /* @__PURE__ */ jsxRuntimeExports.jsx(Volume2, { size: 16 }) : /* @__PURE__ */ jsxRuntimeExports.jsx(VolumeX, { size: 16 })
+                    }
+                  ),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "button",
+                    {
+                      type: "button",
+                      className: `keyword-alerts-settings__toggle-btn ${sub.showBanner ? "keyword-alerts-settings__toggle-btn--active" : ""}`,
+                      onClick: () => subscriptions.updateSubscription(rule.id, {
+                        showBanner: !sub.showBanner
+                      }),
+                      title: sub.showBanner ? "Banner enabled" : "Banner disabled",
+                      children: sub.showBanner ? /* @__PURE__ */ jsxRuntimeExports.jsx(Bell, { size: 16 }) : /* @__PURE__ */ jsxRuntimeExports.jsx(BellOff, { size: 16 })
+                    }
+                  )
+                ] })
+              ]
+            },
+            rule.uid
+          );
+        }) })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__server-rules", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__header", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "keyword-alerts-settings__subscriptions-title", children: [
+            "Alert rules ",
+            !isEditor && "(view only)"
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-body-secondary small mb-0", children: isEditor ? "Configure watch phrases that trigger alerts for all users." : "These rules are configured by administrators. Contact an editor to add or modify rules." })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "keyword-alerts-settings__switch", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "form-check form-switch m-0 d-flex align-items-center gap-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "input",
+            {
+              id: "keyword-alerts-enabled",
+              type: "checkbox",
+              className: "form-check-input",
+              role: "switch",
+              checked: enabled,
+              onChange: handleToggleEnabled,
+              disabled: !canEdit
             }
           ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "label",
+            {
+              htmlFor: "keyword-alerts-enabled",
+              className: "form-check-label fw-semibold",
+              children: "Enable keyword alerts globally"
+            }
+          )
+        ] }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "keyword-alerts-settings__rules", children: hasRules ? rules.map((rule) => {
+          const errorsForRule = ruleErrors[rule.uid] ?? {};
+          const idInputId = `keyword-alert-id-${rule.uid}`;
+          const labelInputId = `keyword-alert-label-${rule.uid}`;
+          const phrasesInputId = `keyword-alert-phrases-${rule.uid}`;
+          return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            "article",
+            {
+              className: "keyword-alerts-settings__rule",
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__rule-header", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__field keyword-alerts-settings__field--grow", children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx(
+                      "label",
+                      {
+                        htmlFor: labelInputId,
+                        className: "keyword-alerts-settings__label",
+                        children: "Display label"
+                      }
+                    ),
+                    /* @__PURE__ */ jsxRuntimeExports.jsx(
+                      "input",
+                      {
+                        id: labelInputId,
+                        type: "text",
+                        className: "form-control form-control-sm",
+                        value: rule.label,
+                        onChange: (event) => handleRuleFieldChange(
+                          rule.uid,
+                          "label",
+                          event.target.value
+                        ),
+                        disabled: !canEdit,
+                        placeholder: "e.g. Distress: MAYDAY"
+                      }
+                    )
+                  ] }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "keyword-alerts-settings__rule-toggle", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "form-check form-switch", children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx(
+                      "input",
+                      {
+                        id: `keyword-alert-enabled-${rule.uid}`,
+                        type: "checkbox",
+                        className: "form-check-input",
+                        role: "switch",
+                        checked: rule.enabled,
+                        onChange: (event) => handleRuleFieldChange(
+                          rule.uid,
+                          "enabled",
+                          event.target.checked
+                        ),
+                        disabled: !canEdit
+                      }
+                    ),
+                    /* @__PURE__ */ jsxRuntimeExports.jsx(
+                      "label",
+                      {
+                        htmlFor: `keyword-alert-enabled-${rule.uid}`,
+                        className: "form-check-label small fw-semibold",
+                        children: "Enabled"
+                      }
+                    )
+                  ] }) })
+                ] }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__grid", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__field", children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx(
+                      "label",
+                      {
+                        htmlFor: idInputId,
+                        className: "keyword-alerts-settings__label",
+                        children: "Rule ID"
+                      }
+                    ),
+                    /* @__PURE__ */ jsxRuntimeExports.jsx(
+                      "input",
+                      {
+                        id: idInputId,
+                        type: "text",
+                        className: `form-control form-control-sm${errorsForRule.id ? " is-invalid" : ""}`,
+                        value: rule.id,
+                        onChange: (event) => handleRuleFieldChange(
+                          rule.uid,
+                          "id",
+                          event.target.value
+                        ),
+                        disabled: !canEdit,
+                        placeholder: "e.g. distress-mayday"
+                      }
+                    ),
+                    errorsForRule.id && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "invalid-feedback", children: errorsForRule.id })
+                  ] }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__field keyword-alerts-settings__field--wide", children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx(
+                      "label",
+                      {
+                        htmlFor: phrasesInputId,
+                        className: "keyword-alerts-settings__label",
+                        children: "Watch phrases"
+                      }
+                    ),
+                    /* @__PURE__ */ jsxRuntimeExports.jsx(
+                      "textarea",
+                      {
+                        id: phrasesInputId,
+                        className: `form-control form-control-sm${errorsForRule.phrases ? " is-invalid" : ""}`,
+                        rows: 2,
+                        value: rule.phrasesText,
+                        onChange: (event) => handleRuleFieldChange(
+                          rule.uid,
+                          "phrasesText",
+                          event.target.value
+                        ),
+                        disabled: !canEdit,
+                        placeholder: "Enter one phrase per line"
+                      }
+                    ),
+                    errorsForRule.phrases && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "invalid-feedback", children: errorsForRule.phrases })
+                  ] })
+                ] }),
+                isEditor && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__rule-actions", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__switches", children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "form-check form-switch", children: [
+                      /* @__PURE__ */ jsxRuntimeExports.jsx(
+                        "input",
+                        {
+                          id: `keyword-alert-sound-${rule.uid}`,
+                          type: "checkbox",
+                          className: "form-check-input",
+                          role: "switch",
+                          checked: rule.playSound,
+                          onChange: (event) => handleRuleFieldChange(
+                            rule.uid,
+                            "playSound",
+                            event.target.checked
+                          ),
+                          disabled: !canEdit
+                        }
+                      ),
+                      /* @__PURE__ */ jsxRuntimeExports.jsx(
+                        "label",
+                        {
+                          htmlFor: `keyword-alert-sound-${rule.uid}`,
+                          className: "form-check-label small",
+                          children: "Play chime (default)"
+                        }
+                      )
+                    ] }),
+                    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "form-check form-switch", children: [
+                      /* @__PURE__ */ jsxRuntimeExports.jsx(
+                        "input",
+                        {
+                          id: `keyword-alert-notify-${rule.uid}`,
+                          type: "checkbox",
+                          className: "form-check-input",
+                          role: "switch",
+                          checked: rule.notify,
+                          onChange: (event) => handleRuleFieldChange(
+                            rule.uid,
+                            "notify",
+                            event.target.checked
+                          ),
+                          disabled: !canEdit
+                        }
+                      ),
+                      /* @__PURE__ */ jsxRuntimeExports.jsx(
+                        "label",
+                        {
+                          htmlFor: `keyword-alert-notify-${rule.uid}`,
+                          className: "form-check-label small",
+                          children: "Show banner (default)"
+                        }
+                      )
+                    ] }),
+                    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "form-check form-switch", children: [
+                      /* @__PURE__ */ jsxRuntimeExports.jsx(
+                        "input",
+                        {
+                          id: `keyword-alert-case-${rule.uid}`,
+                          type: "checkbox",
+                          className: "form-check-input",
+                          role: "switch",
+                          checked: rule.caseSensitive,
+                          onChange: (event) => handleRuleFieldChange(
+                            rule.uid,
+                            "caseSensitive",
+                            event.target.checked
+                          ),
+                          disabled: !canEdit
+                        }
+                      ),
+                      /* @__PURE__ */ jsxRuntimeExports.jsx(
+                        "label",
+                        {
+                          htmlFor: `keyword-alert-case-${rule.uid}`,
+                          className: "form-check-label small",
+                          children: "Match case"
+                        }
+                      )
+                    ] })
+                  ] }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    Button,
+                    {
+                      size: "sm",
+                      use: "destroy",
+                      onClick: () => handleRemoveRule(rule.uid),
+                      disabled: !canEdit,
+                      children: "Remove"
+                    }
+                  )
+                ] })
+              ]
+            },
+            rule.uid
+          );
+        }) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-body-secondary small", children: isEditor ? "No keyword alerts configured. Add a rule to monitor specific phrases." : "No keyword alerts configured." }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "keyword-alerts-settings__footer", children: isEditor ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx(
             Button,
             {
               size: "sm",
               use: "primary",
-              onClick: handleSave,
-              disabled: disableSave,
-              children: saving ? "Saving…" : "Save alerts"
+              onClick: handleAddRule,
+              disabled: saving,
+              children: "Add rule"
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "keyword-alerts-settings__footer-actions", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              Button,
+              {
+                size: "sm",
+                use: "secondary",
+                onClick: resetChanges,
+                disabled: !dirty || saving,
+                children: "Reset changes"
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              Button,
+              {
+                size: "sm",
+                use: "primary",
+                onClick: handleSave,
+                disabled: disableSave,
+                children: saving ? "Saving…" : "Save rules"
+              }
+            )
+          ] })
+        ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-body-secondary small d-flex flex-column gap-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Sign in with editor access to manage alert rules." }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            Button,
+            {
+              size: "sm",
+              use: "primary",
+              className: "align-self-start",
+              onClick: requestLogin,
+              startContent: /* @__PURE__ */ jsxRuntimeExports.jsx(LogIn, { size: 16 }),
+              children: "Sign in"
             }
           )
-        ] })
-      ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-body-secondary small d-flex flex-column gap-2", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Sign in to add, edit, or remove keyword alerts." }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(
-          Button,
-          {
-            size: "sm",
-            use: "primary",
-            className: "align-self-start",
-            onClick: requestLogin,
-            startContent: /* @__PURE__ */ jsxRuntimeExports.jsx(LogIn, { size: 16 }),
-            children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Sign in" })
-          }
-        )
-      ] }) })
+        ] }) })
+      ] })
     ] })
   ] });
+};
+const Modal$1 = "";
+const Modal = ({
+  open,
+  onClose,
+  title,
+  subtitle,
+  id: id2,
+  titleId,
+  size = "md",
+  backdropOpacity = 0.6,
+  overlayClassName,
+  dialogClassName,
+  headerClassName,
+  bodyClassName,
+  closeAriaLabel = "Close",
+  showCloseButton = true,
+  closeOnBackdropClick = true,
+  closeOnEscape = true,
+  closeButtonRef,
+  children
+}) => {
+  const autoId = reactExports.useId();
+  const resolvedTitleId = titleId ?? `${id2 ?? autoId}-title`;
+  const handleKeyDown = reactExports.useCallback(
+    (event) => {
+      if (closeOnEscape && event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+    },
+    [closeOnEscape, onClose]
+  );
+  reactExports.useEffect(() => {
+    if (!open)
+      return;
+    document.addEventListener("keydown", handleKeyDown);
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [open, handleKeyDown]);
+  if (!open)
+    return null;
+  const handleBackdropClick = (event) => {
+    if (closeOnBackdropClick && event.target === event.currentTarget) {
+      onClose();
+    }
+  };
+  const backdropStyle = {
+    "--modal-backdrop-opacity": backdropOpacity
+  };
+  return /* @__PURE__ */ jsxRuntimeExports.jsx(
+    "div",
+    {
+      className: [
+        "modal-overlay",
+        `modal-overlay--${size}`,
+        overlayClassName ?? ""
+      ].filter(Boolean).join(" "),
+      role: "presentation",
+      onClick: handleBackdropClick,
+      style: backdropStyle,
+      children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        "div",
+        {
+          className: [
+            "modal-dialog",
+            `modal-dialog--${size}`,
+            dialogClassName ?? ""
+          ].filter(Boolean).join(" "),
+          role: "dialog",
+          "aria-modal": "true",
+          "aria-labelledby": title ? resolvedTitleId : void 0,
+          id: id2,
+          onClick: (event) => event.stopPropagation(),
+          children: [
+            (title || showCloseButton) && /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              "header",
+              {
+                className: ["modal-header", headerClassName ?? ""].filter(Boolean).join(" "),
+                children: [
+                  title && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "modal-header__text", children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "modal-title", id: resolvedTitleId, children: title }),
+                    subtitle && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "modal-subtitle", children: subtitle })
+                  ] }),
+                  showCloseButton && /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    Button,
+                    {
+                      size: "sm",
+                      use: "secondary",
+                      appearance: "outline",
+                      className: "modal-close",
+                      onClick: onClose,
+                      ref: closeButtonRef,
+                      "aria-label": closeAriaLabel,
+                      children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 18 })
+                    }
+                  )
+                ]
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "div",
+              {
+                className: ["modal-body", bodyClassName ?? ""].filter(Boolean).join(" "),
+                children
+              }
+            )
+          ]
+        }
+      )
+    }
+  );
 };
 const BREAKPOINTS = ["sm", "md", "lg", "xl", "xxl"];
 const toArray = (value) => {
@@ -21132,25 +21641,341 @@ const SettingsModal = ({
   pagerExportError,
   onExportPagerFeed,
   isReadOnly,
-  onRequestLogin
+  onRequestLogin,
+  onOpenBackendLogs
 }) => {
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+    Modal,
+    {
+      open,
+      onClose,
+      title: "Settings",
+      subtitle: "Manage workspace status, appearance, and keyword alerts.",
+      size: "xl",
+      backdropOpacity: 0.65,
+      closeButtonRef,
+      closeAriaLabel: "Close settings",
+      id: "app-settings-dialog",
+      dialogClassName: "settings-modal",
+      bodyClassName: "settings-modal__body",
+      children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "settings-section", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "settings-section__header", children: /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "settings-section__title", children: "Status" }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "settings-section__content", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "settings-stats", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "settings-stat", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "settings-stat__value", children: (streams == null ? void 0 : streams.length) || 0 }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "settings-stat__label", children: "Streams" })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "settings-stat", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "settings-stat__value", children: activeStreams }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "settings-stat__label", children: "Active" })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "settings-stat", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "settings-stat__value", children: totalTranscriptions }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "settings-stat__label", children: "Transcriptions" })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `settings-stat settings-stat--connection ${wsConnected ? "settings-stat--connected" : "settings-stat--disconnected"}`, children: wsConnected ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(Wifi, { size: 20 }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "settings-stat__label", children: "Connected" })
+            ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(WifiOff, { size: 20 }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "settings-stat__label", children: "Disconnected" })
+            ] }) })
+          ] }) })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "settings-section", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "settings-section__header", children: /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "settings-section__title", children: "Appearance" }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "settings-section__content", children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            Flex,
+            {
+              direction: { base: "column", sm: "row" },
+              gap: 3,
+              align: { base: "stretch", sm: "center" },
+              className: "settings-controls",
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "settings-control", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("label", { htmlFor: "theme-mode", className: "settings-control__label", children: "Theme" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                    "select",
+                    {
+                      id: "theme-mode",
+                      value: themeMode,
+                      onChange: onThemeModeChange,
+                      className: "form-select form-select-sm settings-select",
+                      children: [
+                        /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "light", children: "Light" }),
+                        /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "dark", children: "Dark" }),
+                        /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "system", children: "System" })
+                      ]
+                    }
+                  )
+                ] }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "settings-control settings-control--switch", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "form-check form-switch m-0", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "input",
+                    {
+                      id: "color-coding",
+                      type: "checkbox",
+                      className: "form-check-input",
+                      role: "switch",
+                      checked: colorCodingEnabled,
+                      onChange: onColorCodingToggle
+                    }
+                  ),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "label",
+                    {
+                      htmlFor: "color-coding",
+                      className: "form-check-label settings-control__label",
+                      children: "Color-code transcripts"
+                    }
+                  )
+                ] }) })
+              ]
+            }
+          ) })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(KeywordAlertsSettingsSection, {}),
+        transcriptCorrectionEnabled && /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "settings-section", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "settings-section__header", children: /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "settings-section__title", children: "Reviewed Transcript Export" }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "settings-section__content", children: isReadOnly ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "settings-auth-prompt", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { children: "Sign in with editor access to export reviewed transcripts." }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              Button,
+              {
+                size: "sm",
+                use: "primary",
+                onClick: onRequestLogin,
+                startContent: /* @__PURE__ */ jsxRuntimeExports.jsx(LogIn, { size: 16 }),
+                children: "Sign in"
+              }
+            )
+          ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "settings-export", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "settings-export__options", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(Flex, { wrap: "wrap", gap: 2, children: reviewStatusOptions.map((option) => {
+                const isChecked = exportStatuses.includes(option.value);
+                const disableUncheck = isChecked && exportStatuses.length === 1;
+                const inputId = `export-status-${option.value}`;
+                return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                  "div",
+                  {
+                    className: "form-check form-check-inline m-0",
+                    children: [
+                      /* @__PURE__ */ jsxRuntimeExports.jsx(
+                        "input",
+                        {
+                          className: "form-check-input",
+                          type: "checkbox",
+                          id: inputId,
+                          checked: isChecked,
+                          onChange: () => onExportStatusToggle(option.value),
+                          disabled: disableUncheck || exporting
+                        }
+                      ),
+                      /* @__PURE__ */ jsxRuntimeExports.jsx(
+                        "label",
+                        {
+                          className: "form-check-label",
+                          htmlFor: inputId,
+                          children: option.label
+                        }
+                      )
+                    ]
+                  },
+                  option.value
+                );
+              }) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "settings-export__description", children: "Downloads a ZIP archive with JSONL transcripts and audio clips." })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              Button,
+              {
+                onClick: onExportTranscriptions,
+                disabled: exporting,
+                size: "sm",
+                use: "primary",
+                startContent: !exporting ? /* @__PURE__ */ jsxRuntimeExports.jsx(Download, { size: 16 }) : void 0,
+                children: exporting ? "Exporting…" : "Export"
+              }
+            )
+          ] }) })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "settings-section", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "settings-section__header", children: /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "settings-section__title", children: "Pager Feed Export" }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "settings-section__content", children: isReadOnly ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "settings-auth-prompt", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { children: "Sign in with editor access to export pager feeds." }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              Button,
+              {
+                size: "sm",
+                use: "primary",
+                onClick: onRequestLogin,
+                startContent: /* @__PURE__ */ jsxRuntimeExports.jsx(LogIn, { size: 16 }),
+                children: "Sign in"
+              }
+            )
+          ] }) : pagerStreams.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-body-secondary small m-0", children: "No pager feeds available to export." }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "settings-export", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "settings-export__options", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "settings-control", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  "label",
+                  {
+                    htmlFor: "pager-export-stream",
+                    className: "settings-control__label",
+                    children: "Pager feed"
+                  }
+                ),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  "select",
+                  {
+                    id: "pager-export-stream",
+                    className: "form-select form-select-sm settings-select",
+                    value: selectedPagerStreamId ?? "",
+                    onChange: (event) => onSelectPagerStream(event.target.value),
+                    disabled: pagerExporting,
+                    children: pagerStreams.map((stream) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: stream.id, children: stream.name }, stream.id))
+                  }
+                )
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "settings-export__description", children: "Downloads a ZIP archive with JSONL pager messages and incident details." })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "settings-export__action", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                Button,
+                {
+                  onClick: onExportPagerFeed,
+                  disabled: pagerExporting || !selectedPagerStreamId,
+                  size: "sm",
+                  use: "primary",
+                  startContent: !pagerExporting ? /* @__PURE__ */ jsxRuntimeExports.jsx(Download, { size: 16 }) : void 0,
+                  children: pagerExporting ? "Exporting…" : "Export"
+                }
+              ),
+              pagerExportError && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-danger small", children: pagerExportError })
+            ] })
+          ] }) })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "settings-section", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "settings-section__header", children: /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "settings-section__title", children: "System" }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "settings-section__content", children: isReadOnly ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "settings-auth-prompt", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { children: "Sign in with editor access to view backend logs." }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              Button,
+              {
+                size: "sm",
+                use: "primary",
+                onClick: onRequestLogin,
+                startContent: /* @__PURE__ */ jsxRuntimeExports.jsx(LogIn, { size: 16 }),
+                children: "Sign in"
+              }
+            )
+          ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "settings-system", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "settings-system__description", children: "View server errors and application logs for troubleshooting." }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              Button,
+              {
+                onClick: onOpenBackendLogs,
+                size: "sm",
+                use: "secondary",
+                appearance: "outline",
+                startContent: /* @__PURE__ */ jsxRuntimeExports.jsx(Terminal, { size: 16 }),
+                children: "View backend logs"
+              }
+            )
+          ] }) })
+        ] })
+      ]
+    }
+  );
+};
+const BackendLogsPanel$1 = "";
+const SOURCE_OPTIONS = [
+  { value: "all", label: "All Sources" },
+  { value: "stderr", label: "Service Errors (stderr)" },
+  { value: "app", label: "Application Log" }
+];
+const LINE_OPTIONS = [
+  { value: 100, label: "100 lines" },
+  { value: 250, label: "250 lines" },
+  { value: 500, label: "500 lines" },
+  { value: 1e3, label: "1000 lines" }
+];
+const BackendLogsPanel = ({
+  open,
+  onClose,
+  authFetch
+}) => {
+  const [entries, setEntries] = reactExports.useState([]);
+  const [loading, setLoading] = reactExports.useState(false);
+  const [error, setError] = reactExports.useState(null);
+  const [source, setSource] = reactExports.useState("stderr");
+  const [maxLines, setMaxLines] = reactExports.useState(250);
+  const [autoRefresh, setAutoRefresh] = reactExports.useState(false);
+  const [filterText, setFilterText] = reactExports.useState("");
+  const fetchLogs = reactExports.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({
+        source,
+        lines: String(maxLines)
+      });
+      const response = await authFetch(`/api/logs/backend?${params}`);
+      if (!response.ok) {
+        if (response.status === 403) {
+          throw new Error("Editor access required to view logs");
+        }
+        throw new Error(`Failed to fetch logs: ${response.status}`);
+      }
+      const data = await response.json();
+      setEntries(data.entries);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch logs");
+    } finally {
+      setLoading(false);
+    }
+  }, [authFetch, source, maxLines]);
+  reactExports.useEffect(() => {
+    if (open) {
+      fetchLogs();
+    }
+  }, [open, fetchLogs]);
+  reactExports.useEffect(() => {
+    if (!open || !autoRefresh)
+      return;
+    const interval = setInterval(fetchLogs, 5e3);
+    return () => clearInterval(interval);
+  }, [open, autoRefresh, fetchLogs]);
+  const filteredEntries = filterText ? entries.filter(
+    (e) => e.line.toLowerCase().includes(filterText.toLowerCase())
+  ) : entries;
+  const isErrorLine = (line) => {
+    const lower = line.toLowerCase();
+    return lower.includes("error") || lower.includes("exception") || lower.includes("failed") || lower.includes("traceback") || lower.includes("assertion");
+  };
+  const isWarningLine = (line) => {
+    const lower = line.toLowerCase();
+    return lower.includes("warning") || lower.includes("warn");
+  };
   if (!open) {
     return null;
   }
   return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "app-modal", role: "presentation", onClick: onClose, children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
     "div",
     {
-      className: "app-modal__dialog settings-modal",
+      className: "app-modal__dialog backend-logs-panel",
       role: "dialog",
       "aria-modal": "true",
-      "aria-labelledby": "app-settings-title",
-      id: "app-settings-dialog",
-      onClick: (event) => event.stopPropagation(),
+      "aria-labelledby": "backend-logs-title",
+      onClick: (e) => e.stopPropagation(),
       children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "settings-modal__header", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "settings-modal__header-text", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "settings-modal__title", id: "app-settings-title", children: "Settings" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "settings-modal__subtitle text-body-secondary small mb-0", children: "Manage workspace status, appearance, and keyword alerts." })
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "backend-logs-panel__header", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "backend-logs-panel__header-text", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("h2", { className: "backend-logs-panel__title", id: "backend-logs-title", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(Terminal, { size: 20 }),
+              "Backend Logs"
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "backend-logs-panel__subtitle text-body-secondary small mb-0", children: "View server errors and application logs" })
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsx(
             Button,
@@ -21158,249 +21983,98 @@ const SettingsModal = ({
               size: "sm",
               use: "secondary",
               appearance: "outline",
-              className: "settings-modal__close",
               onClick: onClose,
-              ref: closeButtonRef,
-              "aria-label": "Close settings",
+              "aria-label": "Close logs",
               children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { size: 16 })
             }
           )
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "settings-modal__body", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "app-header-info__section", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "app-header-info__section-title text-uppercase small fw-semibold text-body-secondary", children: "Status summary" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("dl", { className: "app-header-info__metrics", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "app-header-info__metric", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("dt", { children: "Streams" }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("dd", { children: (streams == null ? void 0 : streams.length) || 0 })
-              ] }),
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "app-header-info__metric", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("dt", { children: "Active" }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("dd", { children: activeStreams })
-              ] }),
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "app-header-info__metric", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("dt", { children: "Transcriptions" }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("dd", { children: totalTranscriptions })
-              ] })
-            ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "backend-logs-panel__controls", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "backend-logs-panel__filters", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx(
-              Flex,
+              "select",
               {
-                className: "app-header-info__connection",
-                align: "center",
-                gap: 2,
-                children: wsConnected ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(Wifi, { className: "text-success", size: 18 }),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "fw-semibold text-success", children: "Connected" })
-                ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(WifiOff, { className: "text-danger", size: 18 }),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "fw-semibold text-danger", children: "Disconnected" })
-                ] })
+                value: source,
+                onChange: (e) => setSource(e.target.value),
+                className: "backend-logs-panel__select",
+                children: SOURCE_OPTIONS.map((opt) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: opt.value, children: opt.label }, opt.value))
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "select",
+              {
+                value: maxLines,
+                onChange: (e) => setMaxLines(Number(e.target.value)),
+                className: "backend-logs-panel__select",
+                children: LINE_OPTIONS.map((opt) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: opt.value, children: opt.label }, opt.value))
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                type: "text",
+                placeholder: "Filter logs...",
+                value: filterText,
+                onChange: (e) => setFilterText(e.target.value),
+                className: "backend-logs-panel__filter-input"
               }
             )
           ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "app-header-info__section", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "app-header-info__section-title text-uppercase small fw-semibold text-body-secondary", children: "Appearance" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs(
-              Flex,
-              {
-                direction: { base: "column", sm: "row" },
-                gap: 3,
-                align: { base: "stretch", sm: "center" },
-                children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsxs(Flex, { align: "center", gap: 3, children: [
-                    /* @__PURE__ */ jsxRuntimeExports.jsx("label", { htmlFor: "theme-mode", className: "fw-semibold mb-0", children: "Theme" }),
-                    /* @__PURE__ */ jsxRuntimeExports.jsxs(
-                      "select",
-                      {
-                        id: "theme-mode",
-                        value: themeMode,
-                        onChange: onThemeModeChange,
-                        className: "form-select form-select-sm bg-body-secondary text-body app-header__select",
-                        children: [
-                          /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "light", children: "Light" }),
-                          /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "dark", children: "Dark" }),
-                          /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "system", children: "System" })
-                        ]
-                      }
-                    )
-                  ] }),
-                  /* @__PURE__ */ jsxRuntimeExports.jsxs(
-                    Flex,
-                    {
-                      className: "form-check form-switch m-0 ps-0 small",
-                      align: "center",
-                      gap: 2,
-                      children: [
-                        /* @__PURE__ */ jsxRuntimeExports.jsx(
-                          "input",
-                          {
-                            id: "color-coding",
-                            type: "checkbox",
-                            className: "form-check-input m-0",
-                            role: "switch",
-                            checked: colorCodingEnabled,
-                            onChange: onColorCodingToggle
-                          }
-                        ),
-                        /* @__PURE__ */ jsxRuntimeExports.jsx(
-                          "label",
-                          {
-                            htmlFor: "color-coding",
-                            className: "form-check-label fw-semibold",
-                            children: "Color-code transcripts"
-                          }
-                        )
-                      ]
-                    }
-                  )
-                ]
-              }
-            )
-          ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(KeywordAlertsSettingsSection, {}),
-          transcriptCorrectionEnabled && /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "app-header-info__section", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "app-header-info__section-title text-uppercase small fw-semibold text-body-secondary", children: "Reviewed transcript export" }),
-            isReadOnly ? /* @__PURE__ */ jsxRuntimeExports.jsxs(
-              Flex,
-              {
-                className: "alert alert-info",
-                direction: "column",
-                gap: 2,
-                role: "note",
-                children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "small mb-0", children: "Sign in with editor access to export reviewed transcripts." }),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    Button,
-                    {
-                      size: "sm",
-                      use: "primary",
-                      className: "align-self-start",
-                      onClick: onRequestLogin,
-                      startContent: /* @__PURE__ */ jsxRuntimeExports.jsx(LogIn, { size: 16 }),
-                      children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Sign in" })
-                    }
-                  )
-                ]
-              }
-            ) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "app-header-info__export", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsxs(Flex, { direction: "column", gap: 2, children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(Flex, { wrap: "wrap", gap: 2, children: reviewStatusOptions.map((option) => {
-                  const isChecked = exportStatuses.includes(option.value);
-                  const disableUncheck = isChecked && exportStatuses.length === 1;
-                  const inputId = `export-status-${option.value}`;
-                  return /* @__PURE__ */ jsxRuntimeExports.jsxs(
-                    "div",
-                    {
-                      className: "form-check form-check-inline m-0",
-                      children: [
-                        /* @__PURE__ */ jsxRuntimeExports.jsx(
-                          "input",
-                          {
-                            className: "form-check-input",
-                            type: "checkbox",
-                            id: inputId,
-                            checked: isChecked,
-                            onChange: () => onExportStatusToggle(option.value),
-                            disabled: disableUncheck || exporting
-                          }
-                        ),
-                        /* @__PURE__ */ jsxRuntimeExports.jsx(
-                          "label",
-                          {
-                            className: "form-check-label",
-                            htmlFor: inputId,
-                            children: option.label
-                          }
-                        )
-                      ]
-                    },
-                    option.value
-                  );
-                }) }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-body-secondary small", children: "Downloads a ZIP archive with JSONL transcripts and audio clips." })
-              ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "backend-logs-panel__actions", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "backend-logs-panel__auto-refresh", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx(
-                Button,
+                "input",
                 {
-                  onClick: onExportTranscriptions,
-                  disabled: exporting,
-                  className: "fw-semibold align-self-start",
-                  size: "sm",
-                  use: "primary",
-                  startContent: !exporting ? /* @__PURE__ */ jsxRuntimeExports.jsx(Download, { size: 16 }) : void 0,
-                  children: exporting ? "Exporting…" : "Export reviewed transcripts"
+                  type: "checkbox",
+                  checked: autoRefresh,
+                  onChange: (e) => setAutoRefresh(e.target.checked)
                 }
-              )
-            ] })
-          ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "app-header-info__section", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "app-header-info__section-title text-uppercase small fw-semibold text-body-secondary", children: "Pager feed export" }),
-            isReadOnly ? /* @__PURE__ */ jsxRuntimeExports.jsxs(
-              Flex,
+              ),
+              "Auto-refresh"
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              Button,
               {
-                className: "alert alert-info",
-                direction: "column",
-                gap: 2,
-                role: "note",
+                size: "sm",
+                use: "secondary",
+                appearance: "outline",
+                onClick: fetchLogs,
+                disabled: loading,
                 children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "small mb-0", children: "Sign in with editor access to export pager feeds." }),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    Button,
-                    {
-                      size: "sm",
-                      use: "primary",
-                      className: "align-self-start",
-                      onClick: onRequestLogin,
-                      startContent: /* @__PURE__ */ jsxRuntimeExports.jsx(LogIn, { size: 16 }),
-                      children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Sign in" })
-                    }
-                  )
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(RefreshCw, { size: 14, className: loading ? "spinning" : "" }),
+                  "Refresh"
                 ]
               }
-            ) : pagerStreams.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "small text-body-secondary", children: "No pager feeds available to export." }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "app-header-info__export", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsxs(Flex, { direction: "column", gap: 2, className: "w-100", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    "label",
-                    {
-                      htmlFor: "pager-export-stream",
-                      className: "form-label small fw-semibold text-body-secondary text-uppercase",
-                      children: "Pager feed"
-                    }
-                  ),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    "select",
-                    {
-                      id: "pager-export-stream",
-                      className: "form-select form-select-sm",
-                      value: selectedPagerStreamId ?? "",
-                      onChange: (event) => onSelectPagerStream(event.target.value),
-                      disabled: pagerExporting,
-                      children: pagerStreams.map((stream) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: stream.id, children: stream.name }, stream.id))
-                    }
-                  )
-                ] }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-body-secondary small", children: "Downloads a ZIP archive with JSONL pager messages and incident details." })
-              ] }),
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "d-flex flex-column gap-2 align-items-start", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(
-                  Button,
-                  {
-                    onClick: onExportPagerFeed,
-                    disabled: pagerExporting || !selectedPagerStreamId,
-                    className: "fw-semibold",
-                    size: "sm",
-                    use: "primary",
-                    startContent: !pagerExporting ? /* @__PURE__ */ jsxRuntimeExports.jsx(Download, { size: 16 }) : void 0,
-                    children: pagerExporting ? "Exporting…" : "Export pager messages"
-                  }
-                ),
-                pagerExportError ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-danger small", role: "alert", children: pagerExportError }) : null
-              ] })
-            ] })
+            )
           ] })
-        ] })
+        ] }),
+        error && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "backend-logs-panel__error", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(AlertTriangle, { size: 16 }),
+          error
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "backend-logs-panel__content", children: filteredEntries.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "backend-logs-panel__empty", children: loading ? "Loading..." : "No log entries found" }) : /* @__PURE__ */ jsxRuntimeExports.jsx("pre", { className: "backend-logs-panel__log", children: filteredEntries.map((entry, idx) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "div",
+          {
+            className: `backend-logs-panel__line ${isErrorLine(entry.line) ? "backend-logs-panel__line--error" : isWarningLine(entry.line) ? "backend-logs-panel__line--warning" : ""}`,
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "backend-logs-panel__source", children: [
+                "[",
+                entry.source,
+                "]"
+              ] }),
+              entry.line
+            ]
+          },
+          idx
+        )) }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("footer", { className: "backend-logs-panel__footer", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-body-secondary small", children: [
+          "Showing ",
+          filteredEntries.length,
+          " of ",
+          entries.length,
+          " entries",
+          filterText && " (filtered)"
+        ] }) })
       ]
     }
   ) });
@@ -21714,25 +22388,25 @@ const SECTIONS = [
 ];
 const renderKeys = (keys) => /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "keyboard-shortcuts-dialog__keys", children: keys.map((key, index2) => /* @__PURE__ */ jsxRuntimeExports.jsx("kbd", { children: key }, `${key}-${index2}`)) });
 const KeyboardShortcutsDialog = ({ open, onClose }) => {
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs(
-    Dialog,
+  return /* @__PURE__ */ jsxRuntimeExports.jsx(
+    Modal,
     {
       open,
       onClose,
       title: "Keyboard shortcuts",
+      subtitle: "Navigate WaveCap with familiar Discord-inspired shortcuts.",
+      size: "lg",
+      backdropOpacity: 0.6,
       dialogClassName: "keyboard-shortcuts-dialog",
       bodyClassName: "keyboard-shortcuts-dialog__body",
       closeAriaLabel: "Close keyboard shortcut guide",
-      children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-body-secondary mb-0", children: "Navigate WaveCap with familiar Discord-inspired shortcuts. Use these combinations to move through streams and manage activity without taking your hands off the keyboard." }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "keyboard-shortcuts-dialog__sections", children: SECTIONS.map((section) => /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "keyboard-shortcuts-dialog__section", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "h6 text-body mb-2", children: section.title }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("ul", { className: "keyboard-shortcuts-dialog__list", children: section.shortcuts.map((shortcut) => /* @__PURE__ */ jsxRuntimeExports.jsxs("li", { className: "keyboard-shortcuts-dialog__item", children: [
-            renderKeys(shortcut.keys),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "keyboard-shortcuts-dialog__description", children: shortcut.description })
-          ] }, `${section.title}-${shortcut.description}`)) })
-        ] }, section.title)) })
-      ]
+      children: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "keyboard-shortcuts-dialog__sections", children: SECTIONS.map((section) => /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "keyboard-shortcuts-dialog__section", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "keyboard-shortcuts-dialog__section-title", children: section.title }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("ul", { className: "keyboard-shortcuts-dialog__list", children: section.shortcuts.map((shortcut) => /* @__PURE__ */ jsxRuntimeExports.jsxs("li", { className: "keyboard-shortcuts-dialog__item", children: [
+          renderKeys(shortcut.keys),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "keyboard-shortcuts-dialog__description", children: shortcut.description })
+        ] }, `${section.title}-${shortcut.description}`)) })
+      ] }, section.title)) })
     }
   );
 };
@@ -21821,7 +22495,7 @@ const SidebarItemRow = reactExports.memo(function SidebarItemRow2({
                         }
                         const url = String(((_b2 = item.stream) == null ? void 0 : _b2.url) || "");
                         const isWeb = /^https?:\/\//i.test(url);
-                        return /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "badge rounded-pill text-bg-secondary-subtle text-secondary-emphasis", children: isWeb ? "Web" : "Audio" });
+                        return /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "badge rounded-pill text-bg-secondary-subtle text-secondary-emphasis", children: isWeb ? "Transcript" : "Audio" });
                       })()
                     ] }),
                     /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "stream-sidebar__item-preview text-body-secondary", children: item.previewText.trim().toLowerCase() === "no transcription" ? /* @__PURE__ */ jsxRuntimeExports.jsx("em", { children: "No transcription" }) : item.previewText })
@@ -22725,6 +23399,7 @@ function App() {
   } = useUISettings();
   const [showSettings, setShowSettings] = reactExports.useState(false);
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = reactExports.useState(false);
+  const [showBackendLogs, setShowBackendLogs] = reactExports.useState(false);
   const settingsTriggerRef = reactExports.useRef(null);
   const settingsCloseButtonRef = reactExports.useRef(null);
   const {
@@ -23795,7 +24470,8 @@ function App() {
           pagerExportError,
           onExportPagerFeed: exportPagerFeed,
           isReadOnly,
-          onRequestLogin: requestLogin
+          onRequestLogin: requestLogin,
+          onOpenBackendLogs: () => setShowBackendLogs(true)
         }
       ),
       /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -23803,6 +24479,14 @@ function App() {
         {
           open: showKeyboardShortcuts,
           onClose: () => setShowKeyboardShortcuts(false)
+        }
+      ),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        BackendLogsPanel,
+        {
+          open: showBackendLogs,
+          onClose: () => setShowBackendLogs(false),
+          authFetch
         }
       ),
       /* @__PURE__ */ jsxRuntimeExports.jsx("main", { className: "app-main", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "app-layout app-container", children: [
@@ -24362,4 +25046,4 @@ const queryClient = new QueryClient();
 client.createRoot(document.getElementById("root")).render(
   /* @__PURE__ */ jsxRuntimeExports.jsx(React.StrictMode, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(QueryClientProvider, { client: queryClient, children: /* @__PURE__ */ jsxRuntimeExports.jsx(AuthProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(UISettingsProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(ToastProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(BrowserRouter, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(LiveAudioProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(App, {}) }) }) }) }) }) }) })
 );
-//# sourceMappingURL=index-eee50fa2.js.map
+//# sourceMappingURL=index-7a8b9a45.js.map

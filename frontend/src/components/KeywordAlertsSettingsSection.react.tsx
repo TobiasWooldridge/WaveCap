@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { LogIn } from "lucide-react";
+import { Bell, BellOff, LogIn, RotateCcw, Volume2, VolumeX } from "lucide-react";
 import type { AlertsConfig } from "@types";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../hooks/useToast";
+import { useAlertSubscriptions } from "../hooks/useAlertSubscriptions";
 import Button from "./primitives/Button.react";
 import "./SettingsModal.scss";
 
@@ -90,6 +91,7 @@ const KeywordAlertsSettingsSection = (
 ) => {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [serverConfig, setServerConfig] = useState<AlertsConfig | null>(null);
   const [enabled, setEnabled] = useState<boolean>(true);
   const [rules, setRules] = useState<EditableRule[]>([]);
   const [initialEnabled, setInitialEnabled] = useState<boolean>(true);
@@ -101,10 +103,14 @@ const KeywordAlertsSettingsSection = (
   const { showToast } = useToast();
   const { authFetch, role, requestLogin } = useAuth();
 
+  // Local subscription preferences (stored in localStorage)
+  const subscriptions = useAlertSubscriptions(serverConfig);
+
   const isEditor = role === "editor";
   const canEdit = isEditor && !saving;
 
   const applyConfig = useCallback((config: AlertsConfig | null | undefined) => {
+    setServerConfig(config ?? null);
     const sanitizedEnabled = config?.enabled === false ? false : true;
     const editableRules = buildEditableRules(config);
     setEnabled(sanitizedEnabled);
@@ -371,321 +377,423 @@ const KeywordAlertsSettingsSection = (
     validateRules,
   ]);
 
+  // Get enabled rules for displaying local subscription preferences
+  const enabledRules = useMemo(() => {
+    return rules.filter((rule) => rule.enabled);
+  }, [rules]);
+
   return (
-    <section className="app-header-info__section keyword-alerts-settings">
-      <div className="keyword-alerts-settings__header">
-        <h3 className="app-header-info__section-title text-uppercase small fw-semibold text-body-secondary">
-          Keyword alerts
-        </h3>
-        <p className="text-body-secondary small">
-          Configure watch phrases and choose whether the console plays a chime
-          or shows a banner when they appear.
-        </p>
+    <section className="settings-section keyword-alerts-settings">
+      <div className="settings-section__header">
+        <h3 className="settings-section__title">Keyword Alerts</h3>
       </div>
 
       {loading ? (
         <div className="text-body-secondary small">Loading keyword alerts…</div>
       ) : loadError ? (
-        <div className="alert alert-warning" role="alert">
+        <div className="alert alert-warning mb-0" role="alert">
           {loadError}
         </div>
       ) : (
         <div className="keyword-alerts-settings__content">
           {saveError && (
-            <div className="alert alert-danger" role="alert">
+            <div className="alert alert-danger mb-0" role="alert">
               {saveError}
             </div>
           )}
 
-          <div className="keyword-alerts-settings__switch">
-            <div className="form-check form-switch m-0 ps-0 d-flex align-items-center gap-2">
-              <input
-                id="keyword-alerts-enabled"
-                type="checkbox"
-                className="form-check-input"
-                role="switch"
-                checked={enabled}
-                onChange={handleToggleEnabled}
-                disabled={!canEdit}
-              />
-              <label
-                htmlFor="keyword-alerts-enabled"
-                className="form-check-label fw-semibold"
-              >
-                Enable keyword alerts
-              </label>
-            </div>
-          </div>
-
-          <div className="keyword-alerts-settings__rules">
-            {hasRules ? (
-              rules.map((rule) => {
-                const errorsForRule = ruleErrors[rule.uid] ?? {};
-                const idInputId = `keyword-alert-id-${rule.uid}`;
-                const labelInputId = `keyword-alert-label-${rule.uid}`;
-                const phrasesInputId = `keyword-alert-phrases-${rule.uid}`;
-                return (
-                  <article
-                    key={rule.uid}
-                    className="keyword-alerts-settings__rule"
-                  >
-                    <div className="keyword-alerts-settings__rule-header">
-                      <div className="keyword-alerts-settings__field">
-                        <label
-                          htmlFor={labelInputId}
-                          className="keyword-alerts-settings__label"
-                        >
-                          Display label
-                        </label>
-                        <input
-                          id={labelInputId}
-                          type="text"
-                          className="form-control"
-                          value={rule.label}
-                          onChange={(event) =>
-                            handleRuleFieldChange(
-                              rule.uid,
-                              "label",
-                              event.target.value,
-                            )
-                          }
-                          disabled={!canEdit}
-                          placeholder="e.g. Distress: MAYDAY"
-                        />
-                      </div>
-                      <div className="keyword-alerts-settings__rule-toggle">
-                        <div className="form-check form-switch">
-                          <input
-                            id={`keyword-alert-enabled-${rule.uid}`}
-                            type="checkbox"
-                            className="form-check-input"
-                            role="switch"
-                            checked={rule.enabled}
-                            onChange={(event) =>
-                              handleRuleFieldChange(
-                                rule.uid,
-                                "enabled",
-                                event.target.checked,
-                              )
-                            }
-                            disabled={!canEdit}
-                          />
-                          <label
-                            htmlFor={`keyword-alert-enabled-${rule.uid}`}
-                            className="form-check-label small fw-semibold"
-                          >
-                            Rule enabled
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="keyword-alerts-settings__grid">
-                      <div className="keyword-alerts-settings__field keyword-alerts-settings__field--grow">
-                        <label
-                          htmlFor={idInputId}
-                          className="keyword-alerts-settings__label"
-                        >
-                          Rule ID
-                        </label>
-                        <input
-                          id={idInputId}
-                          type="text"
-                          className={`form-control${errorsForRule.id ? " is-invalid" : ""}`}
-                          value={rule.id}
-                          onChange={(event) =>
-                            handleRuleFieldChange(
-                              rule.uid,
-                              "id",
-                              event.target.value,
-                            )
-                          }
-                          disabled={!canEdit}
-                          placeholder="e.g. distress-mayday"
-                        />
-                        <div className="form-text">
-                          Used internally and must be unique.
-                        </div>
-                        {errorsForRule.id && (
-                          <div className="invalid-feedback">
-                            {errorsForRule.id}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="keyword-alerts-settings__field keyword-alerts-settings__field--wide">
-                        <label
-                          htmlFor={phrasesInputId}
-                          className="keyword-alerts-settings__label"
-                        >
-                          Watch phrases
-                        </label>
-                        <textarea
-                          id={phrasesInputId}
-                          className={`form-control${errorsForRule.phrases ? " is-invalid" : ""}`}
-                          rows={3}
-                          value={rule.phrasesText}
-                          onChange={(event) =>
-                            handleRuleFieldChange(
-                              rule.uid,
-                              "phrasesText",
-                              event.target.value,
-                            )
-                          }
-                          disabled={!canEdit}
-                          placeholder="Enter one phrase per line"
-                        />
-                        <div className="form-text">
-                          The app matches these phrases exactly. Separate each
-                          phrase with a new line or comma.
-                        </div>
-                        {errorsForRule.phrases && (
-                          <div className="invalid-feedback">
-                            {errorsForRule.phrases}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="keyword-alerts-settings__rule-actions">
-                      <div className="keyword-alerts-settings__switches">
-                        <div className="form-check form-switch">
-                          <input
-                            id={`keyword-alert-sound-${rule.uid}`}
-                            type="checkbox"
-                            className="form-check-input"
-                            role="switch"
-                            checked={rule.playSound}
-                            onChange={(event) =>
-                              handleRuleFieldChange(
-                                rule.uid,
-                                "playSound",
-                                event.target.checked,
-                              )
-                            }
-                            disabled={!canEdit}
-                          />
-                          <label
-                            htmlFor={`keyword-alert-sound-${rule.uid}`}
-                            className="form-check-label"
-                          >
-                            Play chime
-                          </label>
-                        </div>
-                        <div className="form-check form-switch">
-                          <input
-                            id={`keyword-alert-notify-${rule.uid}`}
-                            type="checkbox"
-                            className="form-check-input"
-                            role="switch"
-                            checked={rule.notify}
-                            onChange={(event) =>
-                              handleRuleFieldChange(
-                                rule.uid,
-                                "notify",
-                                event.target.checked,
-                              )
-                            }
-                            disabled={!canEdit}
-                          />
-                          <label
-                            htmlFor={`keyword-alert-notify-${rule.uid}`}
-                            className="form-check-label"
-                          >
-                            Show banner
-                          </label>
-                        </div>
-                        <div className="form-check form-switch">
-                          <input
-                            id={`keyword-alert-case-${rule.uid}`}
-                            type="checkbox"
-                            className="form-check-input"
-                            role="switch"
-                            checked={rule.caseSensitive}
-                            onChange={(event) =>
-                              handleRuleFieldChange(
-                                rule.uid,
-                                "caseSensitive",
-                                event.target.checked,
-                              )
-                            }
-                            disabled={!canEdit}
-                          />
-                          <label
-                            htmlFor={`keyword-alert-case-${rule.uid}`}
-                            className="form-check-label"
-                          >
-                            Match case
-                          </label>
-                        </div>
-                      </div>
-                      {isEditor ? (
-                        <Button
-                          size="sm"
-                          use="destroy"
-                          onClick={() => handleRemoveRule(rule.uid)}
-                          disabled={!canEdit}
-                        >
-                          Remove
-                        </Button>
-                      ) : null}
-                    </div>
-                  </article>
-                );
-              })
-            ) : (
-              <div className="text-body-secondary small">
-                {isEditor
-                  ? "No keyword alerts configured. Add a rule to monitor specific phrases."
-                  : "No keyword alerts configured. Sign in to add keyword alerts."}
+          {/* Local subscription preferences (available to all users) */}
+          {enabledRules.length > 0 && (
+            <div className="keyword-alerts-settings__subscriptions">
+              <div className="keyword-alerts-settings__subscriptions-header">
+                <span className="keyword-alerts-settings__subscriptions-title">
+                  Your notification preferences
+                </span>
+                <p className="keyword-alerts-settings__subscriptions-description">
+                  Customize how you receive alerts. These settings are stored locally in your browser.
+                </p>
               </div>
-            )}
-          </div>
 
-          <div className="keyword-alerts-settings__footer">
-            {isEditor ? (
-              <>
-                <Button
-                  size="sm"
-                  use="primary"
-                  onClick={handleAddRule}
-                  disabled={saving}
-                >
-                  Add rule
-                </Button>
-                <div className="keyword-alerts-settings__footer-actions">
+              <div className="keyword-alerts-settings__switch">
+                <div className="form-check form-switch m-0 d-flex align-items-center gap-2">
+                  <input
+                    id="keyword-alerts-local-enabled"
+                    type="checkbox"
+                    className="form-check-input"
+                    role="switch"
+                    checked={subscriptions.enabled}
+                    onChange={(e) => subscriptions.setEnabled(e.target.checked)}
+                  />
+                  <label
+                    htmlFor="keyword-alerts-local-enabled"
+                    className="form-check-label fw-semibold"
+                  >
+                    Enable alerts on this device
+                  </label>
+                </div>
+                {subscriptions.hasLocalOverrides && (
                   <Button
                     size="sm"
                     use="secondary"
-                    onClick={resetChanges}
-                    disabled={!dirty || saving}
+                    appearance="outline"
+                    onClick={subscriptions.resetAll}
+                    startContent={<RotateCcw size={14} />}
                   >
-                    Reset changes
+                    Reset to defaults
                   </Button>
+                )}
+              </div>
+
+              {subscriptions.enabled && (
+                <div className="keyword-alerts-settings__subscription-list">
+                  {enabledRules.map((rule) => {
+                    const sub = subscriptions.getSubscription(rule.id);
+                    if (!sub) return null;
+
+                    return (
+                      <div
+                        key={rule.uid}
+                        className="keyword-alerts-settings__subscription-item"
+                      >
+                        <div className="keyword-alerts-settings__subscription-label">
+                          <span className="keyword-alerts-settings__subscription-name">
+                            {rule.label || rule.id}
+                          </span>
+                          <span className="keyword-alerts-settings__subscription-phrases">
+                            {parsePhrases(rule.phrasesText).slice(0, 3).join(", ")}
+                            {parsePhrases(rule.phrasesText).length > 3 && "…"}
+                          </span>
+                        </div>
+                        <div className="keyword-alerts-settings__subscription-toggles">
+                          <button
+                            type="button"
+                            className={`keyword-alerts-settings__toggle-btn ${sub.playSound ? "keyword-alerts-settings__toggle-btn--active" : ""}`}
+                            onClick={() =>
+                              subscriptions.updateSubscription(rule.id, {
+                                playSound: !sub.playSound,
+                              })
+                            }
+                            title={sub.playSound ? "Sound enabled" : "Sound disabled"}
+                          >
+                            {sub.playSound ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                          </button>
+                          <button
+                            type="button"
+                            className={`keyword-alerts-settings__toggle-btn ${sub.showBanner ? "keyword-alerts-settings__toggle-btn--active" : ""}`}
+                            onClick={() =>
+                              subscriptions.updateSubscription(rule.id, {
+                                showBanner: !sub.showBanner,
+                              })
+                            }
+                            title={sub.showBanner ? "Banner enabled" : "Banner disabled"}
+                          >
+                            {sub.showBanner ? <Bell size={16} /> : <BellOff size={16} />}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Server-side rule management (editor only) */}
+          <div className="keyword-alerts-settings__server-rules">
+            <div className="keyword-alerts-settings__header">
+              <span className="keyword-alerts-settings__subscriptions-title">
+                Alert rules {!isEditor && "(view only)"}
+              </span>
+              <p className="text-body-secondary small mb-0">
+                {isEditor
+                  ? "Configure watch phrases that trigger alerts for all users."
+                  : "These rules are configured by administrators. Contact an editor to add or modify rules."}
+              </p>
+            </div>
+
+            <div className="keyword-alerts-settings__switch">
+              <div className="form-check form-switch m-0 d-flex align-items-center gap-2">
+                <input
+                  id="keyword-alerts-enabled"
+                  type="checkbox"
+                  className="form-check-input"
+                  role="switch"
+                  checked={enabled}
+                  onChange={handleToggleEnabled}
+                  disabled={!canEdit}
+                />
+                <label
+                  htmlFor="keyword-alerts-enabled"
+                  className="form-check-label fw-semibold"
+                >
+                  Enable keyword alerts globally
+                </label>
+              </div>
+            </div>
+
+            <div className="keyword-alerts-settings__rules">
+              {hasRules ? (
+                rules.map((rule) => {
+                  const errorsForRule = ruleErrors[rule.uid] ?? {};
+                  const idInputId = `keyword-alert-id-${rule.uid}`;
+                  const labelInputId = `keyword-alert-label-${rule.uid}`;
+                  const phrasesInputId = `keyword-alert-phrases-${rule.uid}`;
+                  return (
+                    <article
+                      key={rule.uid}
+                      className="keyword-alerts-settings__rule"
+                    >
+                      <div className="keyword-alerts-settings__rule-header">
+                        <div className="keyword-alerts-settings__field keyword-alerts-settings__field--grow">
+                          <label
+                            htmlFor={labelInputId}
+                            className="keyword-alerts-settings__label"
+                          >
+                            Display label
+                          </label>
+                          <input
+                            id={labelInputId}
+                            type="text"
+                            className="form-control form-control-sm"
+                            value={rule.label}
+                            onChange={(event) =>
+                              handleRuleFieldChange(
+                                rule.uid,
+                                "label",
+                                event.target.value,
+                              )
+                            }
+                            disabled={!canEdit}
+                            placeholder="e.g. Distress: MAYDAY"
+                          />
+                        </div>
+                        <div className="keyword-alerts-settings__rule-toggle">
+                          <div className="form-check form-switch">
+                            <input
+                              id={`keyword-alert-enabled-${rule.uid}`}
+                              type="checkbox"
+                              className="form-check-input"
+                              role="switch"
+                              checked={rule.enabled}
+                              onChange={(event) =>
+                                handleRuleFieldChange(
+                                  rule.uid,
+                                  "enabled",
+                                  event.target.checked,
+                                )
+                              }
+                              disabled={!canEdit}
+                            />
+                            <label
+                              htmlFor={`keyword-alert-enabled-${rule.uid}`}
+                              className="form-check-label small fw-semibold"
+                            >
+                              Enabled
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="keyword-alerts-settings__grid">
+                        <div className="keyword-alerts-settings__field">
+                          <label
+                            htmlFor={idInputId}
+                            className="keyword-alerts-settings__label"
+                          >
+                            Rule ID
+                          </label>
+                          <input
+                            id={idInputId}
+                            type="text"
+                            className={`form-control form-control-sm${errorsForRule.id ? " is-invalid" : ""}`}
+                            value={rule.id}
+                            onChange={(event) =>
+                              handleRuleFieldChange(
+                                rule.uid,
+                                "id",
+                                event.target.value,
+                              )
+                            }
+                            disabled={!canEdit}
+                            placeholder="e.g. distress-mayday"
+                          />
+                          {errorsForRule.id && (
+                            <div className="invalid-feedback">
+                              {errorsForRule.id}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="keyword-alerts-settings__field keyword-alerts-settings__field--wide">
+                          <label
+                            htmlFor={phrasesInputId}
+                            className="keyword-alerts-settings__label"
+                          >
+                            Watch phrases
+                          </label>
+                          <textarea
+                            id={phrasesInputId}
+                            className={`form-control form-control-sm${errorsForRule.phrases ? " is-invalid" : ""}`}
+                            rows={2}
+                            value={rule.phrasesText}
+                            onChange={(event) =>
+                              handleRuleFieldChange(
+                                rule.uid,
+                                "phrasesText",
+                                event.target.value,
+                              )
+                            }
+                            disabled={!canEdit}
+                            placeholder="Enter one phrase per line"
+                          />
+                          {errorsForRule.phrases && (
+                            <div className="invalid-feedback">
+                              {errorsForRule.phrases}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {isEditor && (
+                        <div className="keyword-alerts-settings__rule-actions">
+                          <div className="keyword-alerts-settings__switches">
+                            <div className="form-check form-switch">
+                              <input
+                                id={`keyword-alert-sound-${rule.uid}`}
+                                type="checkbox"
+                                className="form-check-input"
+                                role="switch"
+                                checked={rule.playSound}
+                                onChange={(event) =>
+                                  handleRuleFieldChange(
+                                    rule.uid,
+                                    "playSound",
+                                    event.target.checked,
+                                  )
+                                }
+                                disabled={!canEdit}
+                              />
+                              <label
+                                htmlFor={`keyword-alert-sound-${rule.uid}`}
+                                className="form-check-label small"
+                              >
+                                Play chime (default)
+                              </label>
+                            </div>
+                            <div className="form-check form-switch">
+                              <input
+                                id={`keyword-alert-notify-${rule.uid}`}
+                                type="checkbox"
+                                className="form-check-input"
+                                role="switch"
+                                checked={rule.notify}
+                                onChange={(event) =>
+                                  handleRuleFieldChange(
+                                    rule.uid,
+                                    "notify",
+                                    event.target.checked,
+                                  )
+                                }
+                                disabled={!canEdit}
+                              />
+                              <label
+                                htmlFor={`keyword-alert-notify-${rule.uid}`}
+                                className="form-check-label small"
+                              >
+                                Show banner (default)
+                              </label>
+                            </div>
+                            <div className="form-check form-switch">
+                              <input
+                                id={`keyword-alert-case-${rule.uid}`}
+                                type="checkbox"
+                                className="form-check-input"
+                                role="switch"
+                                checked={rule.caseSensitive}
+                                onChange={(event) =>
+                                  handleRuleFieldChange(
+                                    rule.uid,
+                                    "caseSensitive",
+                                    event.target.checked,
+                                  )
+                                }
+                                disabled={!canEdit}
+                              />
+                              <label
+                                htmlFor={`keyword-alert-case-${rule.uid}`}
+                                className="form-check-label small"
+                              >
+                                Match case
+                              </label>
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            use="destroy"
+                            onClick={() => handleRemoveRule(rule.uid)}
+                            disabled={!canEdit}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      )}
+                    </article>
+                  );
+                })
+              ) : (
+                <div className="text-body-secondary small">
+                  {isEditor
+                    ? "No keyword alerts configured. Add a rule to monitor specific phrases."
+                    : "No keyword alerts configured."}
+                </div>
+              )}
+            </div>
+
+            <div className="keyword-alerts-settings__footer">
+              {isEditor ? (
+                <>
                   <Button
                     size="sm"
                     use="primary"
-                    onClick={handleSave}
-                    disabled={disableSave}
+                    onClick={handleAddRule}
+                    disabled={saving}
                   >
-                    {saving ? "Saving…" : "Save alerts"}
+                    Add rule
+                  </Button>
+                  <div className="keyword-alerts-settings__footer-actions">
+                    <Button
+                      size="sm"
+                      use="secondary"
+                      onClick={resetChanges}
+                      disabled={!dirty || saving}
+                    >
+                      Reset changes
+                    </Button>
+                    <Button
+                      size="sm"
+                      use="primary"
+                      onClick={handleSave}
+                      disabled={disableSave}
+                    >
+                      {saving ? "Saving…" : "Save rules"}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="text-body-secondary small d-flex flex-column gap-2">
+                  <span>Sign in with editor access to manage alert rules.</span>
+                  <Button
+                    size="sm"
+                    use="primary"
+                    className="align-self-start"
+                    onClick={requestLogin}
+                    startContent={<LogIn size={16} />}
+                  >
+                    Sign in
                   </Button>
                 </div>
-              </>
-            ) : (
-              <div className="text-body-secondary small d-flex flex-column gap-2">
-                <span>Sign in to add, edit, or remove keyword alerts.</span>
-                <Button
-                  size="sm"
-                  use="primary"
-                  className="align-self-start"
-                  onClick={requestLogin}
-                  startContent={<LogIn size={16} />}
-                >
-                  <span>Sign in</span>
-                </Button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -239,4 +239,9 @@ PORT=$(python -c "from wavecap_backend.config import load_config; print(load_con
 echo "Backend listening on ${HOST}:${PORT}"
 
 # Replace the shell with uvicorn so it receives signals directly (Ctrl+C, SIGTERM)
-exec uvicorn wavecap_backend.server:create_app --factory --host "$HOST" --port "$PORT"
+# Use caffeinate -s to prevent system sleep while WaveCap is running (macOS only)
+if command -v caffeinate >/dev/null 2>&1; then
+  exec caffeinate -s uvicorn wavecap_backend.server:create_app --factory --host "$HOST" --port "$PORT"
+else
+  exec uvicorn wavecap_backend.server:create_app --factory --host "$HOST" --port "$PORT"
+fi
