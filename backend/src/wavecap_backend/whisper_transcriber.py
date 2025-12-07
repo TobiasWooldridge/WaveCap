@@ -872,11 +872,25 @@ class SubprocessMLXTranscriber(AbstractTranscriber):
                 last_error = exc
                 error_msg = str(exc).lower()
 
-                # Check if this is a subprocess crash
-                if "subprocess" in error_msg or "crashed" in error_msg or "died" in error_msg:
+                # Check if this is a subprocess crash or communication failure
+                retryable_indicators = (
+                    "subprocess",
+                    "crashed",
+                    "died",
+                    "broken pipe",
+                    "errno 32",
+                    "not running",
+                )
+                is_retryable = any(ind in error_msg for ind in retryable_indicators)
+
+                if is_retryable:
+                    # Force cleanup dead subprocess and reset respawn count
+                    with self._lock:
+                        self._cleanup_subprocess()
+                        self._respawn_count = 0
                     if attempt < max_retries:
                         LOGGER.warning(
-                            "MLX subprocess crashed (attempt %d/%d), retrying...",
+                            "MLX subprocess communication failed (attempt %d/%d), respawning...",
                             attempt + 1,
                             max_retries + 1,
                         )
