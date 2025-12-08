@@ -99,8 +99,8 @@ const Modal: React.FC<ModalProps> = ({
   return (
     <div
       className={[
-        "modal-overlay",
-        `modal-overlay--${size}`,
+        "app-modal-overlay",
+        `app-modal-overlay--${size}`,
         overlayClassName ?? "",
       ]
         .filter(Boolean)
@@ -111,8 +111,8 @@ const Modal: React.FC<ModalProps> = ({
     >
       <div
         className={[
-          "modal-dialog",
-          `modal-dialog--${size}`,
+          "app-modal-dialog",
+          `app-modal-dialog--${size}`,
           dialogClassName ?? "",
         ]
           .filter(Boolean)
@@ -125,17 +125,17 @@ const Modal: React.FC<ModalProps> = ({
       >
         {(title || showCloseButton) && (
           <header
-            className={["modal-header", headerClassName ?? ""]
+            className={["app-modal-header", headerClassName ?? ""]
               .filter(Boolean)
               .join(" ")}
           >
             {title && (
-              <div className="modal-header__text">
-                <h2 className="modal-title" id={resolvedTitleId}>
+              <div className="app-modal-header__text">
+                <h2 className="app-modal-title" id={resolvedTitleId}>
                   {title}
                 </h2>
                 {subtitle && (
-                  <p className="modal-subtitle">{subtitle}</p>
+                  <p className="app-modal-subtitle">{subtitle}</p>
                 )}
               </div>
             )}
@@ -144,7 +144,7 @@ const Modal: React.FC<ModalProps> = ({
                 size="sm"
                 use="secondary"
                 appearance="outline"
-                className="modal-close"
+                className="app-modal-close"
                 onClick={onClose}
                 ref={closeButtonRef}
                 aria-label={closeAriaLabel}
@@ -155,7 +155,7 @@ const Modal: React.FC<ModalProps> = ({
           </header>
         )}
         <div
-          className={["modal-body", bodyClassName ?? ""]
+          className={["app-modal-body", bodyClassName ?? ""]
             .filter(Boolean)
             .join(" ")}
         >

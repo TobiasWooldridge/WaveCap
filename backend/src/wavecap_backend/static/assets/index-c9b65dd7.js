@@ -21443,8 +21443,8 @@ const Modal = ({
     "div",
     {
       className: [
-        "modal-overlay",
-        `modal-overlay--${size}`,
+        "app-modal-overlay",
+        `app-modal-overlay--${size}`,
         overlayClassName ?? ""
       ].filter(Boolean).join(" "),
       role: "presentation",
@@ -21454,8 +21454,8 @@ const Modal = ({
         "div",
         {
           className: [
-            "modal-dialog",
-            `modal-dialog--${size}`,
+            "app-modal-dialog",
+            `app-modal-dialog--${size}`,
             dialogClassName ?? ""
           ].filter(Boolean).join(" "),
           role: "dialog",
@@ -21467,11 +21467,11 @@ const Modal = ({
             (title || showCloseButton) && /* @__PURE__ */ jsxRuntimeExports.jsxs(
               "header",
               {
-                className: ["modal-header", headerClassName ?? ""].filter(Boolean).join(" "),
+                className: ["app-modal-header", headerClassName ?? ""].filter(Boolean).join(" "),
                 children: [
-                  title && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "modal-header__text", children: [
-                    /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "modal-title", id: resolvedTitleId, children: title }),
-                    subtitle && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "modal-subtitle", children: subtitle })
+                  title && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "app-modal-header__text", children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "app-modal-title", id: resolvedTitleId, children: title }),
+                    subtitle && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "app-modal-subtitle", children: subtitle })
                   ] }),
                   showCloseButton && /* @__PURE__ */ jsxRuntimeExports.jsx(
                     Button,
@@ -21479,7 +21479,7 @@ const Modal = ({
                       size: "sm",
                       use: "secondary",
                       appearance: "outline",
-                      className: "modal-close",
+                      className: "app-modal-close",
                       onClick: onClose,
                       ref: closeButtonRef,
                       "aria-label": closeAriaLabel,
@@ -21492,7 +21492,7 @@ const Modal = ({
             /* @__PURE__ */ jsxRuntimeExports.jsx(
               "div",
               {
-                className: ["modal-body", bodyClassName ?? ""].filter(Boolean).join(" "),
+                className: ["app-modal-body", bodyClassName ?? ""].filter(Boolean).join(" "),
                 children
               }
             )
@@ -25046,4 +25046,4 @@ const queryClient = new QueryClient();
 client.createRoot(document.getElementById("root")).render(
   /* @__PURE__ */ jsxRuntimeExports.jsx(React.StrictMode, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(QueryClientProvider, { client: queryClient, children: /* @__PURE__ */ jsxRuntimeExports.jsx(AuthProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(UISettingsProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(ToastProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(BrowserRouter, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(LiveAudioProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(App, {}) }) }) }) }) }) }) })
 );
-//# sourceMappingURL=index-fac902ac.js.map
+//# sourceMappingURL=index-c9b65dd7.js.map
