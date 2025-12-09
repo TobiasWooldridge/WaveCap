@@ -13640,6 +13640,8 @@ const IDLE_DISCONNECT_DELAY_MS = 15 * 60 * 1e3;
 const IDLE_DISCONNECT_CLOSE_CODE = 4e3;
 const STALE_CONNECTION_TIMEOUT_MS = 2 * 60 * 1e3;
 const STALE_CHECK_INTERVAL_MS = 30 * 1e3;
+const MAX_RECONNECT_DELAY_MS = 5 * 60 * 1e3;
+const FAST_RETRY_THRESHOLD = 5;
 const createRequestId = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -13656,7 +13658,6 @@ const useWebSocket = (url, options = {}) => {
   const [error, setError] = reactExports.useState(null);
   const reconnectTimeoutRef = reactExports.useRef();
   const reconnectAttempts = reactExports.useRef(0);
-  const maxReconnectAttempts = 5;
   const pendingRequestsRef = reactExports.useRef(/* @__PURE__ */ new Map());
   const shouldReloadOnReconnectRef = reactExports.useRef(false);
   const isManualCloseRef = reactExports.useRef(false);
@@ -13808,17 +13809,15 @@ const useWebSocket = (url, options = {}) => {
           shouldReloadOnReconnectRef.current = false;
           return;
         }
-        if (reconnectAttempts.current < maxReconnectAttempts) {
-          reconnectAttempts.current++;
-          const delay = Math.min(
-            1e3 * Math.pow(2, reconnectAttempts.current),
-            3e4
-          );
-          console.log(`🔌 WebSocket reconnecting in ${delay}ms (attempt ${reconnectAttempts.current}/${maxReconnectAttempts})...`);
-          reconnectTimeoutRef.current = window.setTimeout(connect, delay);
-        } else {
-          setError("Failed to reconnect after multiple attempts");
+        reconnectAttempts.current++;
+        const attempt = reconnectAttempts.current;
+        const baseDelay = attempt <= FAST_RETRY_THRESHOLD ? 1e3 * Math.pow(2, attempt) : 3e4 * Math.pow(1.5, attempt - FAST_RETRY_THRESHOLD);
+        const delay = Math.min(baseDelay, MAX_RECONNECT_DELAY_MS);
+        if (attempt > FAST_RETRY_THRESHOLD) {
+          setError(`Connection lost. Retrying in ${Math.round(delay / 1e3)}s... (attempt ${attempt})`);
         }
+        console.log(`🔌 WebSocket reconnecting in ${Math.round(delay / 1e3)}s (attempt ${attempt})...`);
+        reconnectTimeoutRef.current = window.setTimeout(connect, delay);
       };
       ws.onerror = (event) => {
         if (connectionIdRef.current !== connectionId) {
@@ -13999,6 +13998,17 @@ const useWebSocket = (url, options = {}) => {
     },
     [isConnected, sendMessage, socket]
   );
+  const reconnect = reactExports.useCallback(() => {
+    clearReconnectTimer();
+    reconnectAttempts.current = 0;
+    setError(null);
+    if (socketRef.current) {
+      isManualCloseRef.current = true;
+      socketRef.current.close();
+      socketRef.current = null;
+    }
+    connect();
+  }, [clearReconnectTimer, connect]);
   const startTranscription = reactExports.useCallback(
     (streamId) => {
       return sendCommand({
@@ -14053,7 +14063,8 @@ const useWebSocket = (url, options = {}) => {
     startTranscription,
     stopTranscription,
     resetStream,
-    updateStream
+    updateStream,
+    reconnect
   };
 };
 const STREAM_TITLE_COLLATOR = new Intl.Collator(void 0, {
@@ -15306,9 +15317,19 @@ const useLiveAudio = (canListen, baseUrl) => {
   }, [syncToLiveEdge]);
   const onError = reactExports.useCallback(() => {
     const audio = elementRef.current;
-    const message = describeMediaError((audio == null ? void 0 : audio.error) ?? null);
-    if (audio == null ? void 0 : audio.error) {
-      console.error("❌ Live audio playback error:", audio.error);
+    const mediaError = (audio == null ? void 0 : audio.error) ?? null;
+    const message = describeMediaError(mediaError);
+    if (mediaError) {
+      console.error("❌ Live audio playback error:", {
+        code: mediaError.code,
+        message: mediaError.message || message,
+        MEDIA_ERR_ABORTED: mediaError.code === 1,
+        MEDIA_ERR_NETWORK: mediaError.code === 2,
+        MEDIA_ERR_DECODE: mediaError.code === 3,
+        MEDIA_ERR_SRC_NOT_SUPPORTED: mediaError.code === 4
+      });
+    } else {
+      console.error("❌ Live audio playback error: unknown error (no MediaError)");
     }
     setError(message);
   }, []);
@@ -23439,8 +23460,10 @@ function App() {
   const {
     isConnected: wsConnected,
     lastMessage,
+    error: wsError,
     resetStream: wsResetStream,
-    updateStream: wsUpdateStream
+    updateStream: wsUpdateStream,
+    reconnect: wsReconnect
   } = useWebSocket("/ws", { token, onUnauthorized: requestLogin });
   const { showToast } = useToast();
   const { keywordAlerts, handleAlertMatches, handleDismissAlert } = useKeywordAlerts(streams);
@@ -24443,6 +24466,20 @@ function App() {
         }
       ) : null,
       /* @__PURE__ */ jsxRuntimeExports.jsx(LiveAudioBanner, {}),
+      wsError && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "connection-status-banner", role: "alert", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "connection-status-banner__content", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(AlertTriangle, { size: 16, className: "connection-status-banner__icon" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "connection-status-banner__message", children: wsError }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          Button,
+          {
+            size: "sm",
+            use: "primary",
+            onClick: wsReconnect,
+            className: "connection-status-banner__action",
+            children: "Reconnect now"
+          }
+        )
+      ] }) }),
       /* @__PURE__ */ jsxRuntimeExports.jsx(
         SettingsModal,
         {
@@ -25046,4 +25083,4 @@ const queryClient = new QueryClient();
 client.createRoot(document.getElementById("root")).render(
   /* @__PURE__ */ jsxRuntimeExports.jsx(React.StrictMode, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(QueryClientProvider, { client: queryClient, children: /* @__PURE__ */ jsxRuntimeExports.jsx(AuthProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(UISettingsProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(ToastProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(BrowserRouter, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(LiveAudioProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(App, {}) }) }) }) }) }) }) })
 );
-//# sourceMappingURL=index-c9b65dd7.js.map
+//# sourceMappingURL=index-24b6d245.js.map

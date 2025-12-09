@@ -24,6 +24,10 @@ const IDLE_DISCONNECT_CLOSE_CODE = 4000;
 const STALE_CONNECTION_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
 // How often to check for stale connections
 const STALE_CHECK_INTERVAL_MS = 30 * 1000; // 30 seconds
+// Maximum backoff delay for reconnection attempts (5 minutes)
+const MAX_RECONNECT_DELAY_MS = 5 * 60 * 1000;
+// After this many fast retries, switch to slower reconnection
+const FAST_RETRY_THRESHOLD = 5;
 
 const createRequestId = (): string => {
   if (
@@ -53,7 +57,6 @@ export const useWebSocket = (
   const [error, setError] = useState<string | null>(null);
   const reconnectTimeoutRef = useRef<number>();
   const reconnectAttempts = useRef(0);
-  const maxReconnectAttempts = 5;
   const pendingRequestsRef = useRef<Map<string, PendingRequest>>(new Map());
   const shouldReloadOnReconnectRef = useRef(false);
   const isManualCloseRef = useRef(false);
@@ -247,19 +250,23 @@ export const useWebSocket = (
           return;
         }
 
-        if (
-          reconnectAttempts.current < maxReconnectAttempts
-        ) {
-          reconnectAttempts.current++;
-          const delay = Math.min(
-            1000 * Math.pow(2, reconnectAttempts.current),
-            30000,
-          );
-          console.log(`🔌 WebSocket reconnecting in ${delay}ms (attempt ${reconnectAttempts.current}/${maxReconnectAttempts})...`);
-          reconnectTimeoutRef.current = window.setTimeout(connect, delay);
-        } else {
-          setError("Failed to reconnect after multiple attempts");
+        // Always attempt to reconnect with exponential backoff
+        reconnectAttempts.current++;
+        const attempt = reconnectAttempts.current;
+
+        // Calculate delay with exponential backoff, capped at MAX_RECONNECT_DELAY_MS
+        const baseDelay = attempt <= FAST_RETRY_THRESHOLD
+          ? 1000 * Math.pow(2, attempt) // 2s, 4s, 8s, 16s, 32s for first 5 attempts
+          : 30000 * Math.pow(1.5, attempt - FAST_RETRY_THRESHOLD); // Then slower growth
+        const delay = Math.min(baseDelay, MAX_RECONNECT_DELAY_MS);
+
+        // Update error message to show we're still trying
+        if (attempt > FAST_RETRY_THRESHOLD) {
+          setError(`Connection lost. Retrying in ${Math.round(delay / 1000)}s... (attempt ${attempt})`);
         }
+
+        console.log(`🔌 WebSocket reconnecting in ${Math.round(delay / 1000)}s (attempt ${attempt})...`);
+        reconnectTimeoutRef.current = window.setTimeout(connect, delay);
       };
 
       ws.onerror = (event) => {
@@ -482,6 +489,22 @@ export const useWebSocket = (
     [isConnected, sendMessage, socket],
   );
 
+  const reconnect = useCallback(() => {
+    // Clear any pending reconnect timer
+    clearReconnectTimer();
+    // Reset attempt counter for manual reconnect
+    reconnectAttempts.current = 0;
+    setError(null);
+    // Close existing socket if any
+    if (socketRef.current) {
+      isManualCloseRef.current = true;
+      socketRef.current.close();
+      socketRef.current = null;
+    }
+    // Connect immediately
+    connect();
+  }, [clearReconnectTimer, connect]);
+
   const startTranscription = useCallback(
     (streamId: string) => {
       return sendCommand({
@@ -550,5 +573,6 @@ export const useWebSocket = (
     stopTranscription,
     resetStream,
     updateStream,
+    reconnect,
   };
 };

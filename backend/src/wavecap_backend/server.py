@@ -27,7 +27,7 @@ from fastapi import (
 )
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .audio_regression import (
@@ -1095,6 +1095,28 @@ def create_app() -> FastAPI:
         )
 
     frontend_dir = get_frontend_dir()
+
+    # Serve favicon.ico from favicon.svg to prevent 404s
+    @app.get("/favicon.ico", include_in_schema=False)
+    async def favicon():
+        favicon_path = frontend_dir / "favicon.svg"
+        if favicon_path.exists():
+            return FileResponse(
+                favicon_path,
+                media_type="image/svg+xml",
+                headers={"Cache-Control": "public, max-age=86400"},
+            )
+        raise HTTPException(status_code=404, detail="Favicon not found")
+
+    # Serve robots.txt to prevent 404s
+    @app.get("/robots.txt", include_in_schema=False)
+    async def robots_txt():
+        return Response(
+            content="User-agent: *\nDisallow: /api/\nDisallow: /ws\n",
+            media_type="text/plain",
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+
     if frontend_dir.exists():
         app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
     else:

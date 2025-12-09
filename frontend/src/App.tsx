@@ -334,8 +334,10 @@ function App() {
   const {
     isConnected: wsConnected,
     lastMessage,
+    error: wsError,
     resetStream: wsResetStream,
     updateStream: wsUpdateStream,
+    reconnect: wsReconnect,
   } = useWebSocket("/ws", { token, onUnauthorized: requestLogin });
   const { showToast } = useToast();
   const { keywordAlerts, handleAlertMatches, handleDismissAlert } =
@@ -1542,6 +1544,23 @@ function App() {
           />
         ) : null}
         <LiveAudioBanner />
+
+        {wsError && (
+          <div className="connection-status-banner" role="alert">
+            <div className="connection-status-banner__content">
+              <AlertTriangle size={16} className="connection-status-banner__icon" />
+              <span className="connection-status-banner__message">{wsError}</span>
+              <Button
+                size="sm"
+                use="primary"
+                onClick={wsReconnect}
+                className="connection-status-banner__action"
+              >
+                Reconnect now
+              </Button>
+            </div>
+          </div>
+        )}
 
         <SettingsModal
           open={showSettings}

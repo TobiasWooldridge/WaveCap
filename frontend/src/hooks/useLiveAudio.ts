@@ -138,9 +138,20 @@ export const useLiveAudio = (
 
   const onError = useCallback(() => {
     const audio = elementRef.current;
-    const message = describeMediaError(audio?.error ?? null);
-    if (audio?.error) {
-      console.error("❌ Live audio playback error:", audio.error);
+    const mediaError = audio?.error ?? null;
+    const message = describeMediaError(mediaError);
+    if (mediaError) {
+      // MediaError doesn't have enumerable properties, so extract them explicitly
+      console.error("❌ Live audio playback error:", {
+        code: mediaError.code,
+        message: mediaError.message || message,
+        MEDIA_ERR_ABORTED: mediaError.code === 1,
+        MEDIA_ERR_NETWORK: mediaError.code === 2,
+        MEDIA_ERR_DECODE: mediaError.code === 3,
+        MEDIA_ERR_SRC_NOT_SUPPORTED: mediaError.code === 4,
+      });
+    } else {
+      console.error("❌ Live audio playback error: unknown error (no MediaError)");
     }
     setError(message);
   }, []);
