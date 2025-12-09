@@ -273,8 +273,9 @@ export const useWebSocket = (
         if (connectionIdRef.current !== connectionId) {
           return;
         }
+        // Only log, don't set error - let onclose handle the retry logic
+        // and only show error to user after multiple failed attempts
         console.error("WebSocket error:", event);
-        setError("WebSocket connection error - server may not be running");
       };
 
       setSocket(ws);

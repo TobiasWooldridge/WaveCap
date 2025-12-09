@@ -13824,7 +13824,6 @@ const useWebSocket = (url, options = {}) => {
           return;
         }
         console.error("WebSocket error:", event);
-        setError("WebSocket connection error - server may not be running");
       };
       setSocket(ws);
       socketRef.current = ws;
@@ -25083,4 +25082,4 @@ const queryClient = new QueryClient();
 client.createRoot(document.getElementById("root")).render(
   /* @__PURE__ */ jsxRuntimeExports.jsx(React.StrictMode, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(QueryClientProvider, { client: queryClient, children: /* @__PURE__ */ jsxRuntimeExports.jsx(AuthProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(UISettingsProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(ToastProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(BrowserRouter, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(LiveAudioProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(App, {}) }) }) }) }) }) }) })
 );
-//# sourceMappingURL=index-24b6d245.js.map
+//# sourceMappingURL=index-895676fb.js.map
