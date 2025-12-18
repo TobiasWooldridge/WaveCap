@@ -27,7 +27,8 @@ from wavecap_backend.stream_worker import (
     BLANK_AUDIO_TOKEN,
     ChunkAccumulator,
     PreparedChunk,
-    RECONNECT_BACKOFF_SECONDS,
+    RECONNECT_INITIAL_DELAY_SECONDS,
+    RECONNECT_MAX_DELAY_SECONDS,
     StreamWorker,
     UNABLE_TO_TRANSCRIBE_TOKEN,
 )
@@ -2143,6 +2144,18 @@ async def test_connectivity_events_emitted_for_reconnect(monkeypatch):
 def test_reconnect_delay_seconds():
     worker = make_reconnect_worker()
 
+    # Attempt 1: no delay
     assert worker._reconnect_delay_seconds(1) == 0.0
-    assert worker._reconnect_delay_seconds(2) == RECONNECT_BACKOFF_SECONDS
-    assert worker._reconnect_delay_seconds(5) == RECONNECT_BACKOFF_SECONDS
+
+    # Attempt 2: base delay with jitter (5.0 + up to 25% jitter)
+    delay_2 = worker._reconnect_delay_seconds(2)
+    assert RECONNECT_INITIAL_DELAY_SECONDS <= delay_2 <= RECONNECT_INITIAL_DELAY_SECONDS * 1.25
+
+    # Attempt 5: exponential backoff (5 * 2^3 = 40) with jitter
+    delay_5 = worker._reconnect_delay_seconds(5)
+    expected_base_5 = RECONNECT_INITIAL_DELAY_SECONDS * (2 ** 3)  # 40
+    assert expected_base_5 <= delay_5 <= expected_base_5 * 1.25
+
+    # Very high attempt should cap at max delay
+    delay_high = worker._reconnect_delay_seconds(20)
+    assert delay_high <= RECONNECT_MAX_DELAY_SECONDS * 1.25

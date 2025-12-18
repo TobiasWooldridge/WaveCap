@@ -206,6 +206,10 @@ async def stream_events(
     await websocket.accept()
     LOGGER.debug("WebSocket connection accepted for %s", client_label)
 
+    # Shared connection health state
+    connection_healthy = True
+    last_pong_time = time.time()
+
     async def ensure_editor(request_id: Optional[str]) -> bool:
         nonlocal current_role
         try:
@@ -240,36 +244,62 @@ async def stream_events(
         period without any frames. Sending a lightweight application-level heartbeat ensures
         there is regular activity so long-lived dashboards stay connected.
         """
-        consecutive_failures = 0
+        nonlocal connection_healthy
+        consecutive_send_failures = 0
         max_consecutive_failures = 3
+        # If no pong received for this many intervals, consider connection dead
+        pong_timeout_intervals = 4  # 4 * 30s = 2 minutes without pong
+        intervals_without_pong = 0
         try:
             while True:
                 await asyncio.sleep(max(interval_seconds, 5.0))
+
+                # Check if we've received a pong recently
+                time_since_pong = time.time() - last_pong_time
+                if time_since_pong > interval_seconds * 1.5:
+                    intervals_without_pong += 1
+                    if intervals_without_pong >= pong_timeout_intervals:
+                        LOGGER.warning(
+                            "No pong received from %s for %.0fs, closing connection",
+                            client_label,
+                            time_since_pong,
+                        )
+                        connection_healthy = False
+                        try:
+                            await websocket.close(code=1011, reason="Client unresponsive")
+                        except Exception:
+                            pass
+                        break
+                else:
+                    intervals_without_pong = 0
+
                 try:
                     payload = {"type": "ping", "timestamp": int(time.time() * 1000)}
                     await websocket.send_text(json.dumps(payload))
-                    consecutive_failures = 0  # Reset on success
+                    consecutive_send_failures = 0  # Reset on success
                 except WebSocketDisconnect:
                     LOGGER.info(
                         "WebSocket disconnected during heartbeat for %s",
                         client_label,
                     )
+                    connection_healthy = False
                     break
                 except Exception as exc:  # pragma: no cover - defensive
-                    consecutive_failures += 1
+                    consecutive_send_failures += 1
                     LOGGER.warning(
                         "Heartbeat send failed for %s (failure %d/%d): %s",
                         client_label,
-                        consecutive_failures,
+                        consecutive_send_failures,
                         max_consecutive_failures,
                         exc,
                     )
-                    if consecutive_failures >= max_consecutive_failures:
+                    if consecutive_send_failures >= max_consecutive_failures:
                         LOGGER.warning(
                             "Closing unhealthy WebSocket connection for %s after %d consecutive heartbeat failures",
                             client_label,
-                            consecutive_failures,
+                            consecutive_send_failures,
                         )
+                        connection_healthy = False
                         try:
                             await websocket.close(code=1011, reason="Heartbeat failed")
                         except Exception:
@@ -366,6 +396,7 @@ async def stream_events(
             await websocket.send_text(json.dumps(ack_payload))
 
     async def receive_commands() -> None:
+        nonlocal last_pong_time
         try:
             while True:
                 raw = await websocket.receive_text()
@@ -387,6 +418,12 @@ async def stream_events(
                     )
                     await send_error("Command must be an object")
                     continue
+                # Handle pong responses from client to track connection health
+                msg_type = message.get("type")
+                if msg_type == "pong":
+                    last_pong_time = time.time()
+                    LOGGER.debug("Received pong from %s", client_label)
+                    continue
                 await handle_command(message)
         except WebSocketDisconnect:
             LOGGER.info("WebSocket disconnected for %s", client_label)
@@ -395,7 +432,25 @@ async def stream_events(
     receiver = asyncio.create_task(receive_commands())
     heartbeat = asyncio.create_task(send_heartbeat())
     try:
-        await asyncio.wait({sender, receiver}, return_when=asyncio.FIRST_COMPLETED)
+        # Include heartbeat in wait so connection closes when heartbeat detects issues
+        done, pending = await asyncio.wait(
+            {sender, receiver, heartbeat},
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        # Log which task completed first for debugging
+        for task in done:
+            task_name = "unknown"
+            if task is sender:
+                task_name = "sender"
+            elif task is receiver:
+                task_name = "receiver"
+            elif task is heartbeat:
+                task_name = "heartbeat"
+            LOGGER.debug(
+                "WebSocket task '%s' completed first for %s",
+                task_name,
+                client_label,
+            )
     finally:
         for task in (sender, receiver, heartbeat):
             task.cancel()

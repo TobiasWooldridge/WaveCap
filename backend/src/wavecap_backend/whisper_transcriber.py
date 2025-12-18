@@ -370,6 +370,7 @@ class MLXWhisperTranscriber(AbstractTranscriber):
         "completed handler provided after commit",
         "failed assertion",
         "metal",
+        "overflow",  # For __next_prime overflow and similar numerical errors
     )
 
     # Fatal Metal errors that indicate unrecoverable GPU state (don't retry excessively)

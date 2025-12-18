@@ -146,7 +146,7 @@ export const LiveAudioProvider = ({ children }: LiveAudioProviderProps) => {
         autoPlay
         playsInline
         preload="none"
-        src={liveAudio.source}
+        src={liveAudio.source || undefined}
         data-live-session={liveAudio.streamNonce ?? undefined}
         data-live-stream-id={activeStream?.id ?? undefined}
         onLoadedMetadata={liveAudio.onReady}

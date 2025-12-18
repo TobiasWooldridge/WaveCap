@@ -154,6 +154,17 @@ export const useWebSocket = (
         lastMessageTimeRef.current = Date.now();
         try {
           const message: ServerToClientMessage = JSON.parse(event.data);
+
+          // Respond to server pings with pong to confirm connection health
+          if (message.type === "ping") {
+            try {
+              ws.send(JSON.stringify({ type: "pong", timestamp: Date.now() }));
+            } catch {
+              // Socket may be closing, ignore send errors for pong
+            }
+            return;
+          }
+
           console.log("📨 WebSocket message received:", message.type, message);
 
           if (message.type === "ack") {
@@ -250,22 +261,52 @@ export const useWebSocket = (
           return;
         }
 
+        // Determine reconnect strategy based on close code
+        // 1000: Normal closure - server is shutting down gracefully
+        // 1001: Going away - server is going away (e.g., restart)
+        // 1006: Abnormal closure - connection lost without close frame
+        // 1011: Server error - internal server error
+        // 1012: Service restart - server is restarting
+        // 1013: Try again later - server is temporarily unavailable
+        const isServerShutdown = event.code === 1000 || event.code === 1001 || event.code === 1012;
+        const isServerOverloaded = event.code === 1013;
+        const isAbnormalClosure = event.code === 1006;
+
         // Always attempt to reconnect with exponential backoff
         reconnectAttempts.current++;
         const attempt = reconnectAttempts.current;
 
         // Calculate delay with exponential backoff, capped at MAX_RECONNECT_DELAY_MS
-        const baseDelay = attempt <= FAST_RETRY_THRESHOLD
-          ? 1000 * Math.pow(2, attempt) // 2s, 4s, 8s, 16s, 32s for first 5 attempts
-          : 30000 * Math.pow(1.5, attempt - FAST_RETRY_THRESHOLD); // Then slower growth
+        let baseDelay: number;
+        if (isServerShutdown) {
+          // Server is restarting, use shorter initial delay but still backoff
+          baseDelay = attempt <= 3
+            ? 2000 * attempt // 2s, 4s, 6s for first 3 attempts
+            : 1000 * Math.pow(2, attempt); // Then normal exponential
+        } else if (isServerOverloaded) {
+          // Server asked us to wait, use longer delays
+          baseDelay = 10000 * Math.pow(1.5, attempt - 1);
+        } else if (attempt <= FAST_RETRY_THRESHOLD) {
+          baseDelay = 1000 * Math.pow(2, attempt); // 2s, 4s, 8s, 16s, 32s for first 5 attempts
+        } else {
+          baseDelay = 30000 * Math.pow(1.5, attempt - FAST_RETRY_THRESHOLD); // Then slower growth
+        }
         const delay = Math.min(baseDelay, MAX_RECONNECT_DELAY_MS);
 
-        // Update error message to show we're still trying
-        if (attempt > FAST_RETRY_THRESHOLD) {
+        // Update error message based on close reason
+        if (isServerShutdown && attempt <= 3) {
+          // Don't show error for first few attempts during server restart
+          setError(null);
+        } else if (isAbnormalClosure && attempt === 1) {
+          // First abnormal closure might be transient, don't alarm user yet
+          setError(null);
+        } else if (attempt > FAST_RETRY_THRESHOLD) {
           setError(`Connection lost. Retrying in ${Math.round(delay / 1000)}s... (attempt ${attempt})`);
+        } else if (attempt > 2) {
+          setError(`Reconnecting... (attempt ${attempt})`);
         }
 
-        console.log(`🔌 WebSocket reconnecting in ${Math.round(delay / 1000)}s (attempt ${attempt})...`);
+        console.log(`🔌 WebSocket reconnecting in ${Math.round(delay / 1000)}s (attempt ${attempt}, code ${event.code})...`);
         reconnectTimeoutRef.current = window.setTimeout(connect, delay);
       };
 
