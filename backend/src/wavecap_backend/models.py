@@ -149,6 +149,25 @@ class PagerIncidentDetails(APIModel):
         return cleaned or None
 
 
+class TrunkedRadioMetadata(APIModel):
+    """Metadata from a trunked radio call (e.g., P25, DMR).
+
+    Populated when transcribing audio from a trunked radio system via
+    WaveCap-SDR's multiplexed voice stream.
+    """
+
+    talkgroupId: str = Field(alias="talkgroupId")
+    talkgroupName: Optional[str] = Field(default=None, alias="talkgroupName")
+    sourceUnitId: Optional[str] = Field(default=None, alias="sourceUnitId")
+    frequencyMhz: Optional[float] = Field(default=None, alias="frequencyMhz")
+    encrypted: bool = False
+    callDurationSeconds: Optional[float] = Field(
+        default=None, alias="callDurationSeconds"
+    )
+    gpsLatitude: Optional[float] = Field(default=None, alias="gpsLatitude")
+    gpsLongitude: Optional[float] = Field(default=None, alias="gpsLongitude")
+
+
 class TranscriptionResult(APIModel):
     id: str
     streamId: str = Field(alias="streamId")
@@ -178,6 +197,10 @@ class TranscriptionResult(APIModel):
     alerts: Optional[List[TranscriptionAlertTrigger]] = None
     pagerIncident: Optional["PagerIncidentDetails"] = Field(
         default=None, alias="pagerIncident"
+    )
+    # Trunked radio call metadata (talk group, source unit, frequency, etc.)
+    radioMetadata: Optional["TrunkedRadioMetadata"] = Field(
+        default=None, alias="radioMetadata"
     )
     # Hidden metadata for debugging/tracing - not exposed to frontend by default
     eventMetadata: Optional[Dict[str, str]] = Field(
@@ -710,8 +733,9 @@ class AppConfig(APIModel):
 
 class RemoteUpstreamConfig(APIModel):
     id: str
-    # "pull" uses WaveCap to connect to the upstream URL.
+    # "pull" uses WaveCap to connect to the upstream URL (HTTP audio stream).
     # "push" allows a remote sender to POST/WS audio into WaveCap.
+    # "trunked" connects to a WaveCap-SDR multiplexed voice WebSocket.
     mode: str = Field(default="pull")
     url: Optional[str] = None
     authToken: Optional[str] = Field(default=None, alias="authToken")
@@ -722,16 +746,23 @@ class RemoteUpstreamConfig(APIModel):
     format: Optional[str] = Field(default="pcm16")
     # Higher priority wins when multiple upstreams are healthy.
     priority: int = 0
+    # Trunked mode: system ID for the trunking system (used in logging/display)
+    systemId: Optional[str] = Field(default=None, alias="systemId")
+    # Trunked mode: optional list of talk group IDs to transcribe (empty = all)
+    talkgroupFilter: Optional[List[int]] = Field(default=None, alias="talkgroupFilter")
 
     @model_validator(mode="after")
     def _validate_remote_upstream(self) -> "RemoteUpstreamConfig":
         mode = (self.mode or "").strip().lower() or "pull"
-        if mode not in {"pull", "push"}:
-            raise ValueError("remoteUpstreams[].mode must be 'pull' or 'push'")
+        if mode not in {"pull", "push", "trunked"}:
+            raise ValueError("remoteUpstreams[].mode must be 'pull', 'push', or 'trunked'")
         self.mode = mode
         if mode == "pull":
             if not (self.url or "").strip():
                 raise ValueError("remoteUpstreams[].url is required for pull mode")
+        if mode == "trunked":
+            if not (self.url or "").strip():
+                raise ValueError("remoteUpstreams[].url is required for trunked mode")
         if self.sampleRate is not None and int(self.sampleRate) <= 0:
             raise ValueError("remoteUpstreams[].sampleRate must be positive")
         fmt = (self.format or "pcm16").strip().lower()

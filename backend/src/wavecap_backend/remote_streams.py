@@ -17,9 +17,12 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from .models import RemoteUpstreamConfig, RemoteUpstreamState
+
+if TYPE_CHECKING:
+    from .trunked_radio import TrunkedCallChunk, TrunkedRadioClient
 
 LOGGER = logging.getLogger(__name__)
 
@@ -161,6 +164,10 @@ class MultiUpstreamSelector:
     - Prefer the highest-priority upstream that is currently producing data.
     - If the active upstream goes quiet, automatically fall back to the next
       available source.
+
+    Trunked mode:
+    - Trunked upstreams connect via WebSocket to WaveCap-SDR and receive
+      complete calls with metadata. Use read_trunked() to get these.
     """
 
     def __init__(
@@ -173,13 +180,16 @@ class MultiUpstreamSelector:
         self._read_size_bytes = max(int(read_size_bytes), 4096)
         self._pulls: Dict[str, _PullProcess] = {}
         self._push_queues: Dict[str, asyncio.Queue[bytes]] = {}
+        self._trunked_clients: Dict[str, "TrunkedRadioClient"] = {}
+        self._trunked_configs: Dict[str, RemoteUpstreamConfig] = {}
         self._states: Dict[str, RemoteUpstreamState] = {}
         self._lock = asyncio.Lock()
         # Build state and processes
         for cfg in sorted(upstreams, key=lambda u: int(getattr(u, "priority", 0)), reverse=True):
+            mode = (cfg.mode or "pull").lower()
             state = RemoteUpstreamState(
                 id=cfg.id,
-                mode=(cfg.mode or "pull").lower(),
+                mode=mode,
                 connected=False,
                 active=False,
                 sampleRate=int(cfg.sampleRate) if cfg.sampleRate else self._target_sample_rate,
@@ -187,18 +197,34 @@ class MultiUpstreamSelector:
                 label=_sanitize_label(cfg.url),
             )
             self._states[cfg.id] = state
-            if state.mode == "pull":
+            if mode == "pull":
                 self._pulls[cfg.id] = _PullProcess(cfg=cfg, sample_rate=self._target_sample_rate, read_size_bytes=self._read_size_bytes)
+            elif mode == "trunked":
+                self._trunked_configs[cfg.id] = cfg
             else:
                 self._push_queues[cfg.id] = asyncio.Queue(maxsize=64)
 
     async def start(self) -> None:
         for proc in self._pulls.values():
             await proc.start()
+        # Start trunked clients (lazy import to avoid circular deps)
+        if self._trunked_configs:
+            from .trunked_radio import TrunkedRadioClient
+
+            for cfg_id, cfg in self._trunked_configs.items():
+                if cfg_id not in self._trunked_clients:
+                    client = TrunkedRadioClient(
+                        cfg=cfg, target_sample_rate=self._target_sample_rate
+                    )
+                    self._trunked_clients[cfg_id] = client
+                await self._trunked_clients[cfg_id].start()
 
     async def stop(self) -> None:
         for proc in self._pulls.values():
             await proc.stop()
+        # Stop trunked clients
+        for client in self._trunked_clients.values():
+            await client.stop()
         # Drain push queues and reset states
         for q in self._push_queues.values():
             while not q.empty():
@@ -210,6 +236,40 @@ class MultiUpstreamSelector:
         for state in self._states.values():
             state.connected = False
             state.active = False
+
+    @property
+    def has_trunked_upstreams(self) -> bool:
+        """Whether this selector has any trunked mode upstreams."""
+        return bool(self._trunked_configs)
+
+    async def read_trunked(
+        self, timeout: float = 0.5
+    ) -> Optional[Tuple[str, "TrunkedCallChunk"]]:
+        """Read the next trunked call chunk from any trunked upstream.
+
+        Returns a tuple of (source_id, chunk) or None on timeout.
+        Trunked calls contain complete audio with metadata (talk group, etc.).
+        """
+        if not self._trunked_clients:
+            await asyncio.sleep(timeout)
+            return None
+
+        # Update connection states
+        for sid, client in self._trunked_clients.items():
+            state = self._states.get(sid)
+            if state is not None:
+                state.connected = client.connected
+
+        # Try to read from any trunked client with pending data
+        for sid, client in self._trunked_clients.items():
+            chunk = await client.read(timeout=timeout / max(len(self._trunked_clients), 1))
+            if chunk is not None:
+                # Mark active
+                for s_id, st in self._states.items():
+                    st.active = (s_id == sid)
+                return sid, chunk
+
+        return None
 
     def states(self) -> List[RemoteUpstreamState]:
         # Return a copy so callers can't mutate internal state

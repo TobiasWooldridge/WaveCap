@@ -40,6 +40,7 @@ from .models import (
     StreamStatus,
     TranscriptionResult,
     TranscriptionSegment,
+    TrunkedRadioMetadata,
     WhisperConfig,
 )
 from .models import StreamSource
@@ -711,13 +712,18 @@ class StreamWorker:
                 self._remote_selector = selector
                 await selector.start()
                 try:
-                    while not self._stop_event.is_set():
-                        picked = await selector.read(timeout=0.5)
-                        if picked is None:
-                            continue
-                        _source_id, chunk = picked
-                        await self._ingest_pcm_bytes(chunk)
-                    await self._flush_pending_chunks()
+                    # Trunked mode: complete calls arrive with metadata
+                    if selector.has_trunked_upstreams:
+                        await self._run_trunked_pipeline(selector)
+                    else:
+                        # Standard remote mode: raw PCM bytes
+                        while not self._stop_event.is_set():
+                            picked = await selector.read(timeout=0.5)
+                            if picked is None:
+                                continue
+                            _source_id, chunk = picked
+                            await self._ingest_pcm_bytes(chunk)
+                        await self._flush_pending_chunks()
                 finally:
                     await selector.stop()
                 return
@@ -974,6 +980,207 @@ class StreamWorker:
             await self._shutdown_transcription_workers(flush=should_flush)
         if worker_failure is not None:
             raise worker_failure
+
+    async def _run_trunked_pipeline(self, selector: MultiUpstreamSelector) -> None:
+        """Process trunked radio calls from WaveCap-SDR.
+
+        Trunked radio calls arrive as complete audio chunks with metadata
+        (talk group ID, source unit, frequency, etc.). Unlike continuous
+        streams, each call is self-contained and doesn't need silence-based
+        chunking.
+        """
+        from .trunked_radio import TrunkedCallChunk
+
+        LOGGER.info(
+            "Stream %s starting trunked radio pipeline",
+            self.stream.id,
+        )
+
+        while not self._stop_event.is_set():
+            if self._worker_failure is not None:
+                break
+
+            result = await selector.read_trunked(timeout=0.5)
+            if result is None:
+                continue
+
+            source_id, chunk = result
+
+            # Skip encrypted calls (no audio to transcribe)
+            if chunk.metadata.encrypted:
+                LOGGER.debug(
+                    "Stream %s skipping encrypted call from TG %s",
+                    self.stream.id,
+                    chunk.metadata.talkgroupId,
+                )
+                continue
+
+            # Skip very short calls that likely won't transcribe well
+            if chunk.audio.size < self.sample_rate * 0.5:  # Less than 0.5 seconds
+                LOGGER.debug(
+                    "Stream %s skipping short call (%.2fs) from TG %s",
+                    self.stream.id,
+                    chunk.audio.size / self.sample_rate,
+                    chunk.metadata.talkgroupId,
+                )
+                continue
+
+            await self._transcribe_trunked_call(chunk)
+
+    async def _transcribe_trunked_call(self, chunk) -> None:
+        """Transcribe a complete trunked radio call with metadata."""
+        from .trunked_radio import TrunkedCallChunk
+
+        if not isinstance(chunk, TrunkedCallChunk):
+            return
+
+        if chunk.audio.size == 0:
+            return
+
+        # Apply audio preprocessing
+        processed_audio = self._prepare_transcription_audio(chunk.audio)
+
+        # Run transcription
+        language = self.stream.language
+        bundle = await self._run_transcription(
+            processed_audio, self.sample_rate, language
+        )
+
+        text = bundle.text.strip()
+        if text:
+            text = self._phrase_canonicalizer.canonicalize(text)
+
+        # Skip low-quality transcriptions
+        if self._is_low_energy(chunk.audio):
+            LOGGER.debug(
+                "Stream %s TG %s dropping low-energy call",
+                self.stream.id,
+                chunk.metadata.talkgroupId,
+            )
+            return
+
+        # Build segments list
+        segments: Optional[List[TranscriptionSegment]] = None
+        if bundle.segments:
+            segments = []
+            for segment in bundle.segments:
+                segments.append(segment.model_copy())
+                if text:
+                    segment.text = self._phrase_canonicalizer.canonicalize(segment.text)
+
+        # Handle hallucination detection
+        effective_samples = chunk.audio
+        confidence: Optional[float] = None
+        if bundle.no_speech_prob is not None:
+            confidence = float(max(0.0, min(1.0, 1.0 - bundle.no_speech_prob)))
+
+        if text and self._should_discard_hallucination(
+            text, effective_samples, confidence, bundle.avg_logprob
+        ):
+            LOGGER.debug(
+                "Stream %s TG %s discarding hallucination: %s",
+                self.stream.id,
+                chunk.metadata.talkgroupId,
+                text,
+            )
+            text = ""
+            segments = None
+
+        if text and self._is_punctuation_only(text):
+            text = ""
+            segments = None
+
+        # Skip empty transcriptions
+        if not text:
+            return
+
+        # Calculate duration
+        duration = chunk.metadata.callDurationSeconds
+        if duration is None:
+            duration = chunk.audio.size / self.sample_rate
+
+        # Save recording
+        recording_file: Optional[Path] = None
+        if chunk.audio.size > 0:
+            recording_file = await self._write_recording(chunk.audio)
+
+        # Calculate speech boundaries from segments
+        speech_start_offset: Optional[float] = None
+        speech_end_offset: Optional[float] = None
+        if segments:
+            valid_starts = [s.start for s in segments if s.start >= 0]
+            valid_ends = [s.end for s in segments if s.end > 0]
+            if valid_starts:
+                speech_start_offset = min(valid_starts)
+            if valid_ends:
+                speech_end_offset = max(valid_ends)
+
+        # Generate waveform for UI
+        waveform_data: Optional[List[float]] = None
+        if recording_file is not None and chunk.audio.size > 0:
+            waveform_data = await asyncio.to_thread(
+                compute_waveform, chunk.audio, duration=duration
+            )
+
+        # Apply LLM correction if enabled
+        corrected_text: Optional[str] = None
+        if text and text not in (BLANK_AUDIO_TOKEN, UNABLE_TO_TRANSCRIBE_TOKEN):
+            try:
+                correction_result = await self._llm_corrector.correct(text)
+                if correction_result.discard:
+                    LOGGER.debug(
+                        "Stream %s TG %s LLM flagged as nonsense, skipping",
+                        self.stream.id,
+                        chunk.metadata.talkgroupId,
+                    )
+                    return
+                if correction_result.changed:
+                    corrected_text = correction_result.corrected_text
+            except Exception as exc:
+                LOGGER.warning(
+                    "Stream %s TG %s LLM correction failed: %s",
+                    self.stream.id,
+                    chunk.metadata.talkgroupId,
+                    exc,
+                )
+
+        # Create transcription with radio metadata
+        transcription = TranscriptionResult(
+            id=str(uuid.uuid4()),
+            streamId=self.stream.id,
+            text=text,
+            correctedText=corrected_text,
+            timestamp=utcnow(),
+            confidence=confidence,
+            duration=duration,
+            segments=segments,
+            recordingUrl=(
+                f"/recordings/{recording_file.name}"
+                if recording_file is not None
+                else None
+            ),
+            speechStartOffset=speech_start_offset,
+            speechEndOffset=speech_end_offset,
+            waveform=waveform_data,
+            radioMetadata=chunk.metadata,
+        )
+
+        # Evaluate alerts
+        if text != BLANK_AUDIO_TOKEN:
+            alerts = self.alert_evaluator.evaluate(text)
+            if alerts:
+                transcription.alerts = alerts
+
+        await self.database.append_transcription(transcription)
+        await self.on_transcription(transcription)
+
+        LOGGER.debug(
+            "Stream %s transcribed TG %s (%s): %s",
+            self.stream.id,
+            chunk.metadata.talkgroupId,
+            chunk.metadata.talkgroupName or "unnamed",
+            text[:50] + "..." if len(text) > 50 else text,
+        )
 
     def _reconnect_delay_seconds(self, attempt: int) -> float:
         """Calculate reconnection delay with exponential backoff and jitter.

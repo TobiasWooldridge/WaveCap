@@ -9,6 +9,7 @@ import { Timestamp } from "./primitives/Timestamp.react";
 import { TimeInterval } from "./primitives/TimeInterval.react";
 import { TranscriptionSegmentChips } from "./TranscriptionSegmentChips.react";
 import { AlertChips } from "./chips/AlertChips.react";
+import { TalkgroupChip } from "./chips/TalkgroupChip.react";
 import StreamStatusIndicator from "./StreamStatusIndicator.react";
 import { SystemEventChip } from "./chips/SystemEventChip.react";
 
@@ -80,6 +81,17 @@ export const TranscriptMessageRow: React.FC<TranscriptMessageRowProps> = ({
 
   const renderMetadata = () => {
     const parts: React.ReactNode[] = [];
+
+    // Show talk group chip for trunked radio transcriptions
+    if (transcription.radioMetadata?.talkgroupId) {
+      parts.push(
+        <TalkgroupChip
+          key="talkgroup"
+          metadata={transcription.radioMetadata}
+          compact={compact}
+        />,
+      );
+    }
 
     if (alertTriggers.length > 0) {
       parts.push(

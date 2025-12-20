@@ -52,6 +52,29 @@ export interface PagerIncidentDetails {
   rawMessage?: string | null;
 }
 
+/**
+ * Metadata from a trunked radio call (e.g., P25, DMR).
+ * Populated when transcribing audio from a trunked radio system.
+ */
+export interface TrunkedRadioMetadata {
+  /** Talk group ID (numeric identifier as string) */
+  talkgroupId: string;
+  /** Human-readable talk group name */
+  talkgroupName?: string | null;
+  /** Source radio unit ID */
+  sourceUnitId?: string | null;
+  /** Transmission frequency in MHz */
+  frequencyMhz?: number | null;
+  /** Whether the transmission was encrypted (no audio available) */
+  encrypted?: boolean;
+  /** Call duration in seconds */
+  callDurationSeconds?: number | null;
+  /** GPS latitude of the source unit */
+  gpsLatitude?: number | null;
+  /** GPS longitude of the source unit */
+  gpsLongitude?: number | null;
+}
+
 export interface TranscriptionResult {
   id: string;
   streamId: string;
@@ -75,6 +98,8 @@ export interface TranscriptionResult {
   reviewedBy?: string | null;
   alerts?: TranscriptionAlertTrigger[];
   pagerIncident?: PagerIncidentDetails | null;
+  /** Trunked radio call metadata (talk group, source unit, frequency, etc.) */
+  radioMetadata?: TrunkedRadioMetadata | null;
 }
 
 export interface TranscriptionQueryResponse {

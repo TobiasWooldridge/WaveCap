@@ -144,6 +144,29 @@ streams:
         format: pcm16
         priority: 5
 
+  # Example trunked radio stream powered by WaveCap‑SDR. Connects via WebSocket
+  # to receive multiplexed audio from all talk groups on a P25/DMR trunked
+  # system. Each call arrives as a complete audio chunk with metadata (talk
+  # group ID, name, source unit, frequency, etc.). All talk groups appear in
+  # the same stream view with color-coded chips distinguishing them.
+  #
+  # - id: seattle-pd-trunked
+  #   name: Seattle PD Trunked
+  #   source: remote
+  #   enabled: false
+  #   recordingRetentionSeconds: 604800
+  #   remoteUpstreams:
+  #     - id: wavecap-sdr-primary
+  #       mode: trunked
+  #       url: ws://192.168.1.100:8087/stream/seattle_p25/voice
+  #       systemId: seattle_p25
+  #       # authToken: <optional bearer token for WaveCap‑SDR>
+  #       sampleRate: 16000
+  #       format: pcm16
+  #       priority: 10
+  #       # Optional: only transcribe specific talk groups (empty = all)
+  #       # talkgroupFilter: [1616, 1617, 1620]
+
 ingest:
   # When set, remote senders must provide X-Ingest-Password with this value.
   # This password is rotated automatically in state/config.yaml when missing.
