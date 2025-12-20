@@ -173,6 +173,9 @@ class AppState:
     async def shutdown(self) -> None:
         await self.stream_manager.shutdown()
         await self.database.close()
+        # Close the transcriber to clean up subprocess resources (prevents semaphore leaks)
+        if hasattr(self.transcriber, "close"):
+            self.transcriber.close()
 
     async def load_fixtures(self) -> None:
         if not self.fixture_set:

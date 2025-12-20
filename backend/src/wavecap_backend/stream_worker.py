@@ -1843,12 +1843,24 @@ class StreamWorker:
         if not phrase_tokens or not text_tokens:
             return False
         phrase_length = len(phrase_tokens)
-        if len(text_tokens) <= phrase_length or len(text_tokens) % phrase_length != 0:
+        # Need at least 2 full repetitions to count as repeated
+        if len(text_tokens) < phrase_length * 2:
             return False
-        for index, token in enumerate(text_tokens):
-            if token != phrase_tokens[index % phrase_length]:
+        # Count how many complete repetitions match
+        full_reps = len(text_tokens) // phrase_length
+        remainder = len(text_tokens) % phrase_length
+        # Check all complete repetitions
+        for rep in range(full_reps):
+            start = rep * phrase_length
+            for i, expected in enumerate(phrase_tokens):
+                if text_tokens[start + i] != expected:
+                    return False
+        # Check partial repetition at the end (if any) - allow truncated final phrase
+        for i in range(remainder):
+            if text_tokens[full_reps * phrase_length + i] != phrase_tokens[i]:
                 return False
-        return True
+        # Must have at least 3 repetitions (or 2 full + partial) to be a hallucination
+        return full_reps >= 3 or (full_reps >= 2 and remainder > 0)
 
     @staticmethod
     def _has_excessive_repetition(normalized_text: str) -> bool:

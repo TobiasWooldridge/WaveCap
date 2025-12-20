@@ -802,12 +802,19 @@ class SubprocessMLXTranscriber(AbstractTranscriber):
                     self._process.kill()
             self._process = None
 
-        # Clear queues
+        # Clear and close queues to prevent semaphore leaks
         for queue in (self._request_queue, self._response_queue):
             if queue is not None:
                 try:
+                    # Drain any pending items
                     while not queue.empty():
                         queue.get_nowait()
+                except Exception:
+                    pass
+                try:
+                    # Close the queue to release semaphores
+                    queue.close()
+                    queue.join_thread()
                 except Exception:
                     pass
 
