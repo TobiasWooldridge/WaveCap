@@ -541,6 +541,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+
     app.state.state = state
 
     def get_state() -> AppState:
@@ -1173,6 +1174,7 @@ def create_app() -> FastAPI:
         )
 
     if frontend_dir.exists():
+        # Use StaticFiles for reliability - cache headers should be set in nginx/Cloudflare
         app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
     else:
         LOGGER.warning(

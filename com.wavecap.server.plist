@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.wavecap.server</string>
+
+    <key>UserName</key>
+    <string>thw</string>
+
+    <key>GroupName</key>
+    <string>staff</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/caffeinate</string>
+        <string>-s</string>
+        <string>/Users/thw/Projects/WaveCap/backend/.venv/bin/python</string>
+        <string>-m</string>
+        <string>wavecap_backend</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/thw/Projects/WaveCap/backend</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+
+    <key>ExitTimeOut</key>
+    <integer>15</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/thw/Library/Logs/wavecap-server.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/thw/Library/Logs/wavecap-server-error.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/thw/Projects/WaveCap/backend/.venv/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>/Users/thw</string>
+    </dict>
+
+    <key>ProcessType</key>
+    <string>Interactive</string>
+</dict>
+</plist>
