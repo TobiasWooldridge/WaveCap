@@ -165,6 +165,16 @@ const StreamSidebar = ({
   settingsTriggerRef,
   showSettings,
 }: StreamSidebarProps) => {
+  const handleSelectStream = useCallback(
+    (streamId: string) => {
+      onSelectStream(streamId);
+      if (isMobileViewport) {
+        onCloseMobileSidebar();
+      }
+    },
+    [onSelectStream, isMobileViewport, onCloseMobileSidebar],
+  );
+
   const renderEmptyState = () => {
     if (loading) {
       return null;
@@ -264,7 +274,7 @@ const StreamSidebar = ({
             <SidebarItemRow
               key={item.id}
               item={item}
-              onSelectStream={onSelectStream}
+              onSelectStream={handleSelectStream}
             />
           ))}
         </div>
