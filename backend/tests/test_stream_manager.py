@@ -434,3 +434,206 @@ async def test_broadcaster_logs_warning_on_queue_overflow(caplog):
     assert any("Dropping oldest websocket event" in r.message for r in warning_logs)
 
     await broadcaster.unregister(queue)
+
+
+# --- Tests for pure utility functions ---
+
+
+def test_extract_stream_id_from_recording():
+    """_extract_stream_id_from_recording parses stream ID from filename."""
+    assert StreamManager._extract_stream_id_from_recording(
+        Path("stream-dispatch-1234567890.wav")
+    ) == "dispatch"
+    assert StreamManager._extract_stream_id_from_recording(
+        Path("stream-my-stream-123-9999999999.wav")
+    ) == "my-stream-123"
+    assert StreamManager._extract_stream_id_from_recording(
+        Path("/path/to/stream-abc-1234.wav")
+    ) == "abc"
+
+
+def test_extract_stream_id_from_recording_invalid():
+    """_extract_stream_id_from_recording returns None for invalid filenames."""
+    # Not starting with stream-
+    assert StreamManager._extract_stream_id_from_recording(
+        Path("audio-dispatch-1234.wav")
+    ) is None
+    # Not ending with .wav
+    assert StreamManager._extract_stream_id_from_recording(
+        Path("stream-dispatch-1234.mp3")
+    ) is None
+    # No timestamp
+    assert StreamManager._extract_stream_id_from_recording(
+        Path("stream-dispatch.wav")
+    ) is None
+    # Non-numeric timestamp
+    assert StreamManager._extract_stream_id_from_recording(
+        Path("stream-dispatch-abcd.wav")
+    ) is None
+
+
+def test_system_event_trigger_user_request():
+    """SystemEventTrigger.user_request() produces expected description."""
+    trigger = SystemEventTrigger.user_request()
+    assert trigger.describe() == "user request"
+
+
+def test_system_event_trigger_service_shutdown():
+    """SystemEventTrigger.service_shutdown() produces expected description."""
+    trigger = SystemEventTrigger.service_shutdown()
+    assert trigger.describe() == "service shutdown"
+
+
+def test_system_event_trigger_stream_error_with_detail():
+    """SystemEventTrigger.stream_error() includes error detail."""
+    trigger = SystemEventTrigger.stream_error("Connection refused")
+    assert "Connection refused" in trigger.describe()
+
+
+def test_system_event_trigger_automatic_restart():
+    """SystemEventTrigger.automatic_restart_after_error() includes attempt."""
+    trigger = SystemEventTrigger.automatic_restart_after_error(3)
+    assert "attempt 3" in trigger.detail
+
+
+def test_system_event_trigger_normalizes_whitespace():
+    """SystemEventTrigger normalizes excessive whitespace in detail."""
+    trigger = SystemEventTrigger.system_activity("  multiple   spaces  here  ")
+    assert trigger.detail == "multiple spaces here"
+
+
+def test_system_event_trigger_empty_detail_becomes_none():
+    """SystemEventTrigger converts empty/whitespace-only detail to None."""
+    trigger = SystemEventTrigger.system_activity("   ")
+    assert trigger.detail is None
+
+
+@pytest.mark.asyncio
+async def test_shutdown_cancels_pending_restart_tasks(minimal_config, tmp_path):
+    """Shutdown cancels any pending auto-restart tasks."""
+    config = minimal_config.model_copy(deep=True)
+    config.streams = [_audio_stream(enabled=True)]
+    manager = _build_manager(config, tmp_path)
+    await _start_manager(manager)
+
+    # Manually schedule a restart task
+    stream = manager.get_streams()[0]
+    manager._restart_tasks[stream.id] = asyncio.create_task(asyncio.sleep(100))
+
+    await _shutdown_manager(manager)
+
+    # Verify restart tasks were cleaned up
+    assert len(manager._restart_tasks) == 0
+    assert len(manager._restart_attempts) == 0
+
+
+@pytest.mark.asyncio
+async def test_ingest_pager_message_rejects_non_pager_stream(minimal_config, tmp_path):
+    """ingest_pager_message raises for non-pager streams."""
+    config = minimal_config.model_copy(deep=True)
+    config.streams = [_audio_stream()]
+    manager = _build_manager(config, tmp_path)
+    await _start_manager(manager)
+    try:
+        stream = manager.get_streams()[0]
+        request = PagerWebhookRequest(message="Test")
+
+        with pytest.raises(ValueError, match="does not accept pager"):
+            await manager.ingest_pager_message(stream.id, request)
+    finally:
+        await _shutdown_manager(manager)
+
+
+@pytest.mark.asyncio
+async def test_start_stream_pager_raises(minimal_config, tmp_path):
+    """start_stream raises for pager streams (they auto-start)."""
+    config = minimal_config.model_copy(deep=True)
+    config.streams = [_pager_stream()]
+    manager = _build_manager(config, tmp_path)
+    await _start_manager(manager)
+    try:
+        stream = manager.get_streams()[0]
+
+        with pytest.raises(ValueError, match="Pager streams"):
+            await manager.start_stream(stream.id)
+    finally:
+        await _shutdown_manager(manager)
+
+
+@pytest.mark.asyncio
+async def test_stop_stream_pager_raises(minimal_config, tmp_path):
+    """stop_stream raises for pager streams (they auto-stop)."""
+    config = minimal_config.model_copy(deep=True)
+    config.streams = [_pager_stream()]
+    manager = _build_manager(config, tmp_path)
+    await _start_manager(manager)
+    try:
+        stream = manager.get_streams()[0]
+
+        with pytest.raises(ValueError, match="Pager streams"):
+            await manager.stop_stream(stream.id)
+    finally:
+        await _shutdown_manager(manager)
+
+
+@pytest.mark.asyncio
+async def test_update_stream_language_on_pager_raises(minimal_config, tmp_path):
+    """update_stream rejects language setting for pager streams."""
+    config = minimal_config.model_copy(deep=True)
+    config.streams = [_pager_stream()]
+    manager = _build_manager(config, tmp_path)
+    await _start_manager(manager)
+    try:
+        stream = manager.get_streams()[0]
+
+        with pytest.raises(ValueError, match="Language cannot be set"):
+            await manager.update_stream(
+                stream.id, UpdateStreamRequest(language="en")
+            )
+    finally:
+        await _shutdown_manager(manager)
+
+
+@pytest.mark.asyncio
+async def test_broadcaster_subscriber_count(minimal_config, tmp_path):
+    """Broadcaster tracks subscriber count correctly."""
+    broadcaster = StreamEventBroadcaster()
+
+    assert broadcaster.subscriber_count == 0
+
+    queue1 = await broadcaster.register()
+    assert broadcaster.subscriber_count == 1
+
+    queue2 = await broadcaster.register()
+    assert broadcaster.subscriber_count == 2
+
+    await broadcaster.unregister(queue1)
+    assert broadcaster.subscriber_count == 1
+
+    await broadcaster.unregister(queue2)
+    assert broadcaster.subscriber_count == 0
+
+
+@pytest.mark.asyncio
+async def test_query_transcriptions_integration(minimal_config, tmp_path):
+    """query_transcriptions returns paginated results."""
+    config = minimal_config.model_copy(deep=True)
+    config.streams = [_pager_stream()]
+    manager = _build_manager(config, tmp_path)
+    await _start_manager(manager)
+    try:
+        stream = manager.get_streams()[0]
+
+        # Ingest some messages
+        for i in range(5):
+            await manager.ingest_pager_message(
+                stream.id, PagerWebhookRequest(message=f"Message {i}")
+            )
+
+        # Query with limit
+        response = await manager.query_transcriptions(stream.id, limit=3)
+        assert len(response.transcriptions) == 3
+        assert response.hasMoreBefore is True
+        assert response.hasMoreAfter is False
+    finally:
+        await _shutdown_manager(manager)

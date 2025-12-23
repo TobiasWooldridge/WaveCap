@@ -2159,3 +2159,209 @@ def test_reconnect_delay_seconds():
     # Very high attempt should cap at max delay
     delay_high = worker._reconnect_delay_seconds(20)
     assert delay_high <= RECONNECT_MAX_DELAY_SECONDS * 1.25
+
+
+# --- Additional ChunkAccumulator Tests ---
+
+
+def test_chunk_accumulator_respects_max_chunk_size():
+    """Chunks are emitted when max_chunk_seconds is reached."""
+    chunker = ChunkAccumulator(
+        sample_rate=16000,
+        max_chunk_seconds=2.0,
+        min_chunk_seconds=0.5,
+        context_seconds=0.0,
+        silence_threshold=0.01,
+        silence_lookback_seconds=0.25,
+        silence_hold_seconds=0.25,
+        active_ratio_threshold=0.1,
+    )
+
+    # Add 3 seconds of loud audio (more than max_chunk_seconds)
+    loud_audio = np.full(16000 * 3, 0.5, dtype=np.float32)
+    chunks = chunker.add_samples(loud_audio)
+
+    # Should emit at least one chunk at max size
+    assert len(chunks) >= 1
+    # First chunk should be max size (2 seconds * 16000 samples)
+    assert chunks[0].samples.size == 16000 * 2
+
+
+def test_chunk_accumulator_respects_min_chunk_size():
+    """Chunks are not emitted before min_chunk_seconds even on silence."""
+    chunker = ChunkAccumulator(
+        sample_rate=16000,
+        max_chunk_seconds=10.0,
+        min_chunk_seconds=2.0,
+        context_seconds=0.0,
+        silence_threshold=0.01,
+        silence_lookback_seconds=0.25,
+        silence_hold_seconds=0.0,  # Immediate silence detection
+        active_ratio_threshold=0.1,
+    )
+
+    # Add 1 second of tone, then 1 second of silence
+    # Total is 2 seconds, which is at the boundary
+    tone = np.full(16000, 0.5, dtype=np.float32)
+    silence = np.zeros(16000, dtype=np.float32)
+
+    chunks = chunker.add_samples(tone)
+    assert len(chunks) == 0  # Not enough audio yet
+
+    chunks = chunker.add_samples(silence)
+    # Now we have 2 seconds and silence, should flush
+    assert len(chunks) == 1
+
+
+def test_chunk_accumulator_includes_context_prefix():
+    """Context samples from previous chunk are included as prefix."""
+    context_seconds = 0.5
+    chunker = ChunkAccumulator(
+        sample_rate=16000,
+        max_chunk_seconds=2.0,
+        min_chunk_seconds=1.0,
+        context_seconds=context_seconds,
+        silence_threshold=0.01,
+        silence_lookback_seconds=0.25,
+        silence_hold_seconds=0.25,
+        active_ratio_threshold=0.1,
+    )
+
+    # First chunk: 2 seconds of audio to trigger emission
+    first_audio = np.full(16000 * 2, 0.3, dtype=np.float32)
+    chunks = chunker.add_samples(first_audio)
+
+    assert len(chunks) == 1
+    assert chunks[0].prefix_samples == 0  # First chunk has no prefix
+
+    # Second chunk: more audio
+    second_audio = np.full(16000 * 2, 0.4, dtype=np.float32)
+    chunks = chunker.add_samples(second_audio)
+
+    assert len(chunks) == 1
+    # Second chunk should have context prefix from first chunk
+    expected_prefix = int(context_seconds * 16000)
+    assert chunks[0].prefix_samples == expected_prefix
+
+
+def test_chunk_accumulator_flush_returns_remaining():
+    """flush() returns any accumulated but not-yet-emitted samples."""
+    chunker = ChunkAccumulator(
+        sample_rate=16000,
+        max_chunk_seconds=10.0,
+        min_chunk_seconds=1.0,
+        context_seconds=0.0,
+        silence_threshold=0.01,
+        silence_lookback_seconds=0.25,
+        silence_hold_seconds=0.25,
+        active_ratio_threshold=0.1,
+    )
+
+    # Add 1.5 seconds of audio (not enough to trigger emission)
+    audio = np.full(int(16000 * 1.5), 0.5, dtype=np.float32)
+    chunks = chunker.add_samples(audio)
+    assert len(chunks) == 0
+
+    # Flush should return the accumulated audio
+    flushed = chunker.flush()
+    assert len(flushed) == 1
+    assert flushed[0].samples.size == int(16000 * 1.5)
+
+
+def test_chunk_accumulator_flush_empty_returns_nothing():
+    """flush() on empty accumulator returns no chunks."""
+    chunker = ChunkAccumulator(
+        sample_rate=16000,
+        max_chunk_seconds=10.0,
+        min_chunk_seconds=1.0,
+        context_seconds=0.0,
+        silence_threshold=0.01,
+        silence_lookback_seconds=0.25,
+        silence_hold_seconds=0.25,
+        active_ratio_threshold=0.1,
+    )
+
+    flushed = chunker.flush()
+    assert len(flushed) == 0
+
+
+def test_chunk_accumulator_handles_empty_samples():
+    """Adding empty samples doesn't break the accumulator."""
+    chunker = ChunkAccumulator(
+        sample_rate=16000,
+        max_chunk_seconds=10.0,
+        min_chunk_seconds=1.0,
+        context_seconds=0.0,
+        silence_threshold=0.01,
+        silence_lookback_seconds=0.25,
+        silence_hold_seconds=0.25,
+        active_ratio_threshold=0.1,
+    )
+
+    empty = np.array([], dtype=np.float32)
+    chunks = chunker.add_samples(empty)
+    assert len(chunks) == 0
+
+    # Should still work after empty input
+    audio = np.full(16000 * 2, 0.5, dtype=np.float32)
+    chunks = chunker.add_samples(audio)
+    # No chunks yet (2 seconds is at min, no silence trigger)
+
+
+def test_chunk_accumulator_silence_hold_delays_flush():
+    """Silence hold prevents immediate flush on brief silence."""
+    chunker = ChunkAccumulator(
+        sample_rate=16000,
+        max_chunk_seconds=10.0,
+        min_chunk_seconds=1.0,
+        context_seconds=0.0,
+        silence_threshold=0.01,
+        silence_lookback_seconds=0.25,
+        silence_hold_seconds=1.0,  # 1 second hold
+        active_ratio_threshold=0.1,
+    )
+
+    # 2 seconds of audio
+    audio = np.full(16000 * 2, 0.5, dtype=np.float32)
+    chunks = chunker.add_samples(audio)
+    assert len(chunks) == 0
+
+    # Brief silence (0.5 seconds) - less than hold time
+    brief_silence = np.zeros(int(16000 * 0.5), dtype=np.float32)
+    chunks = chunker.add_samples(brief_silence)
+    assert len(chunks) == 0  # Should NOT flush yet
+
+    # More silence to exceed hold time
+    more_silence = np.zeros(int(16000 * 0.6), dtype=np.float32)
+    chunks = chunker.add_samples(more_silence)
+    assert len(chunks) == 1  # NOW should flush
+
+
+def test_chunk_accumulator_active_ratio_threshold():
+    """active_ratio_threshold determines what counts as silence."""
+    # High threshold: requires more active samples to NOT be silence
+    chunker = ChunkAccumulator(
+        sample_rate=16000,
+        max_chunk_seconds=10.0,
+        min_chunk_seconds=1.0,
+        context_seconds=0.0,
+        silence_threshold=0.01,
+        silence_lookback_seconds=0.25,
+        silence_hold_seconds=0.0,
+        active_ratio_threshold=0.9,  # 90% must be above threshold
+    )
+
+    # 2 seconds of audio
+    audio = np.full(16000 * 2, 0.5, dtype=np.float32)
+    chunks = chunker.add_samples(audio)
+    assert len(chunks) == 0
+
+    # Mix of quiet and loud (50% each) - should count as silence
+    # because only 50% is active, but threshold is 90%
+    mixed = np.concatenate([
+        np.zeros(int(16000 * 0.125), dtype=np.float32),  # quiet
+        np.full(int(16000 * 0.125), 0.5, dtype=np.float32),  # loud
+    ])
+    chunks = chunker.add_samples(mixed)
+    # With 90% threshold, this should be considered silence and trigger flush
+    assert len(chunks) == 1

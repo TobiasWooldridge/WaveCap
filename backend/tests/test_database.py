@@ -304,3 +304,197 @@ async def test_commit_with_retry_succeeds_immediately(tmp_path):
 
     assert len(commit_attempts) == 1
     await db.close()
+
+
+@pytest.mark.asyncio
+async def test_initialize_is_idempotent(tmp_path):
+    """Calling initialize() multiple times should not raise."""
+    db = StreamDatabase(tmp_path / "runtime.sqlite")
+    await db.initialize()
+    await db.initialize()  # Should not raise
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_append_transcription_with_segments(tmp_path):
+    """Transcription segments are persisted and loaded correctly."""
+    from wavecap_backend.models import TranscriptionSegment
+
+    db = StreamDatabase(tmp_path / "runtime.sqlite")
+    stream = _make_stream()
+    await db.save_stream(stream)
+
+    tx = _make_transcription(stream.id, utcnow())
+    tx.segments = [
+        TranscriptionSegment(
+            id=0, text="Hello", start=0.0, end=0.5, seek=0,
+            no_speech_prob=0.1, temperature=0.0, avg_logprob=-0.5, compression_ratio=1.2,
+        ),
+        TranscriptionSegment(
+            id=1, text="world", start=0.5, end=1.0, seek=0,
+            no_speech_prob=0.1, temperature=0.0, avg_logprob=-0.5, compression_ratio=1.2,
+        ),
+    ]
+    await db.append_transcription(tx)
+
+    transcriptions = await db.load_recent_transcriptions(stream.id, limit=10)
+    assert transcriptions[0].segments is not None
+    assert len(transcriptions[0].segments) == 2
+    assert transcriptions[0].segments[0].text == "Hello"
+    assert transcriptions[0].segments[1].text == "world"
+
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_append_transcription_with_waveform(tmp_path):
+    """Waveform data is persisted and loaded correctly."""
+    db = StreamDatabase(tmp_path / "runtime.sqlite")
+    stream = _make_stream()
+    await db.save_stream(stream)
+
+    tx = _make_transcription(stream.id, utcnow())
+    tx.waveform = [0.1, 0.5, 0.8, 0.3, 0.2]
+    await db.append_transcription(tx)
+
+    transcriptions = await db.load_recent_transcriptions(stream.id, limit=10)
+    assert transcriptions[0].waveform == [0.1, 0.5, 0.8, 0.3, 0.2]
+
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_append_transcription_with_pager_incident(tmp_path):
+    """Pager incident details are persisted and loaded correctly."""
+    from wavecap_backend.models import PagerIncidentDetails
+
+    db = StreamDatabase(tmp_path / "runtime.sqlite")
+    stream = _make_stream(source=StreamSource.PAGER)
+    await db.save_stream(stream)
+
+    tx = _make_transcription(stream.id, utcnow())
+    tx.pagerIncident = PagerIncidentDetails(
+        incidentId="INC001",
+        callType="FIRE",
+        address="123 Main St",
+    )
+    await db.append_transcription(tx)
+
+    transcriptions = await db.load_recent_transcriptions(stream.id, limit=10)
+    assert transcriptions[0].pagerIncident is not None
+    assert transcriptions[0].pagerIncident.incidentId == "INC001"
+    assert transcriptions[0].pagerIncident.callType == "FIRE"
+
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_load_last_system_event(tmp_path):
+    """load_last_system_event returns the most recent non-transcription event."""
+    from wavecap_backend.models import TranscriptionEventType
+
+    db = StreamDatabase(tmp_path / "runtime.sqlite")
+    stream = _make_stream()
+    await db.save_stream(stream)
+
+    base_time = utcnow()
+
+    tx1 = _make_transcription(stream.id, base_time, "-normal")
+    tx1.eventType = TranscriptionEventType.TRANSCRIPTION
+
+    tx2 = _make_transcription(stream.id, base_time + timedelta(seconds=1), "-started")
+    tx2.eventType = TranscriptionEventType.RECORDING_STARTED
+
+    tx3 = _make_transcription(stream.id, base_time + timedelta(seconds=2), "-another")
+    tx3.eventType = TranscriptionEventType.TRANSCRIPTION
+
+    for tx in (tx1, tx2, tx3):
+        await db.append_transcription(tx)
+
+    result = await db.load_last_system_event(stream.id)
+
+    assert result is not None
+    assert result.eventType == TranscriptionEventType.RECORDING_STARTED
+
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_load_last_system_event_returns_none_when_no_events(tmp_path):
+    """load_last_system_event returns None when only transcription events exist."""
+    from wavecap_backend.models import TranscriptionEventType
+
+    db = StreamDatabase(tmp_path / "runtime.sqlite")
+    stream = _make_stream()
+    await db.save_stream(stream)
+
+    tx = _make_transcription(stream.id, utcnow())
+    tx.eventType = TranscriptionEventType.TRANSCRIPTION
+    await db.append_transcription(tx)
+
+    result = await db.load_last_system_event(stream.id)
+
+    assert result is None
+
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_clear_all_removes_streams_and_transcriptions(tmp_path):
+    """clear_all removes all persisted data."""
+    db = StreamDatabase(tmp_path / "runtime.sqlite")
+    stream = _make_stream()
+    await db.save_stream(stream)
+
+    tx = _make_transcription(stream.id, utcnow())
+    await db.append_transcription(tx)
+
+    await db.clear_all()
+
+    streams = await db.load_streams()
+    assert len(streams) == 0
+
+    transcriptions = await db.load_recent_transcriptions(stream.id, limit=10)
+    assert len(transcriptions) == 0
+
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_delete_stream_removes_stream_and_transcriptions(tmp_path):
+    """delete_stream removes both the stream and its transcriptions."""
+    db = StreamDatabase(tmp_path / "runtime.sqlite")
+    stream = _make_stream()
+    await db.save_stream(stream)
+
+    tx = _make_transcription(stream.id, utcnow())
+    await db.append_transcription(tx)
+
+    await db.delete_stream(stream.id)
+
+    streams = await db.load_streams()
+    assert len(streams) == 0
+
+    transcriptions = await db.load_recent_transcriptions(stream.id, limit=10)
+    assert len(transcriptions) == 0
+
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_speech_boundary_offsets_persisted(tmp_path):
+    """Speech start/end offsets are stored and retrieved."""
+    db = StreamDatabase(tmp_path / "runtime.sqlite")
+    stream = _make_stream()
+    await db.save_stream(stream)
+
+    tx = _make_transcription(stream.id, utcnow())
+    tx.speechStartOffset = 0.5
+    tx.speechEndOffset = 2.3
+    await db.append_transcription(tx)
+
+    transcriptions = await db.load_recent_transcriptions(stream.id, limit=10)
+    assert transcriptions[0].speechStartOffset == 0.5
+    assert transcriptions[0].speechEndOffset == 2.3
+
+    await db.close()
