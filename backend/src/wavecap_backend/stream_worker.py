@@ -880,6 +880,9 @@ class StreamWorker:
                             self._ignore_initial_samples = max(
                                 int(round(ignore_seconds * self.sample_rate)), 0
                             )
+                            # Reset audio filter state to avoid transients from
+                            # stale values accumulated in the previous session.
+                            self._audio_frontend.reset()
                         had_audio = await self._ingest_pcm_bytes(chunk)
                         # Check inactivity window (no audio seen)
                         if self._check_audio_inactivity(had_audio):

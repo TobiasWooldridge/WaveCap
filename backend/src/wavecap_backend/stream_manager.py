@@ -238,6 +238,11 @@ class StreamEventBroadcaster:
             if queue in self._subscribers:
                 self._subscribers.remove(queue)
 
+    @property
+    def subscriber_count(self) -> int:
+        """Return the current number of WebSocket subscribers."""
+        return len(self._subscribers)
+
 
 class StreamManager:
     """Coordinates all stream lifecycle operations."""

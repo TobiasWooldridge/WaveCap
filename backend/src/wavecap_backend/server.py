@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import fcntl
 import hmac
 import io
 import json
 import logging
 import os
+import sys
 from contextlib import asynccontextmanager, suppress
 import time
 from functools import lru_cache
@@ -61,7 +63,7 @@ from .models import (
     UpdateStreamRequest,
 )
 from .pager_formats import parse_pager_webhook_payload
-from .state_paths import LOG_DIR, PROJECT_ROOT, RECORDINGS_DIR, resolve_state_path
+from .state_paths import LOG_DIR, PROJECT_ROOT, RECORDINGS_DIR, STATE_DIR, resolve_state_path
 from .request_utils import describe_remote_client
 from .stream_manager import StreamManager
 from .whisper_transcriber import (
@@ -80,6 +82,74 @@ class DependencyError(Exception):
     """Raised when a required dependency is missing or misconfigured."""
 
     pass
+
+
+SINGLETON_LOCK_DISABLED_ENV = "WAVECAP_DISABLE_SINGLETON_LOCK"
+
+
+class SingletonLock:
+    """File-based lock to ensure only one instance of the server runs at a time.
+
+    Uses fcntl.flock() for advisory locking. The lock is automatically released
+    when the process exits or the file is closed.
+
+    Set WAVECAP_DISABLE_SINGLETON_LOCK=1 environment variable to disable locking
+    (useful for tests or development environments running multiple instances).
+    """
+
+    LOCK_FILE = STATE_DIR / "wavecap.lock"
+
+    def __init__(self) -> None:
+        self._lock_file: Optional[io.TextIOWrapper] = None
+        self._disabled = os.getenv(SINGLETON_LOCK_DISABLED_ENV, "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+
+    def acquire(self) -> None:
+        """Acquire the singleton lock. Raises SystemExit if another instance is running."""
+        if self._disabled:
+            LOGGER.debug("Singleton lock disabled via %s", SINGLETON_LOCK_DISABLED_ENV)
+            return
+
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+
+        # Read existing PID before attempting lock (open "w" truncates the file)
+        existing_pid = "unknown"
+        try:
+            if self.LOCK_FILE.exists():
+                existing_pid = self.LOCK_FILE.read_text().strip() or "unknown"
+        except Exception:
+            pass
+
+        try:
+            self._lock_file = open(self.LOCK_FILE, "w")
+            fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            # Write PID to lock file for debugging
+            self._lock_file.write(str(os.getpid()))
+            self._lock_file.flush()
+        except BlockingIOError:
+            # Another instance holds the lock
+            LOGGER.error(
+                "Another WaveCap instance is already running (PID: %s). "
+                "Only one instance can run at a time.",
+                existing_pid,
+            )
+            sys.exit(1)
+
+    def release(self) -> None:
+        """Release the singleton lock."""
+        if self._lock_file is not None:
+            try:
+                fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_UN)
+                self._lock_file.close()
+            except Exception:
+                pass
+            self._lock_file = None
+            # Clean up lock file
+            with suppress(FileNotFoundError):
+                self.LOCK_FILE.unlink()
 
 
 def check_dependencies() -> None:
@@ -161,8 +231,14 @@ def _create_transcriber(config: AppConfig) -> AbstractTranscriber:
 
 
 class AppState:
-    def __init__(self, config: AppConfig, fixture_set: Optional[str] = None):
+    def __init__(
+        self,
+        config: AppConfig,
+        singleton_lock: SingletonLock,
+        fixture_set: Optional[str] = None,
+    ):
         self.config = config
+        self.singleton_lock = singleton_lock
         self.auth_manager = AuthManager(config.access)
         self.database = StreamDatabase(resolve_state_path("runtime.sqlite"))
         self.transcriber = _create_transcriber(config)
@@ -176,6 +252,8 @@ class AppState:
         # Close the transcriber to clean up subprocess resources (prevents semaphore leaks)
         if hasattr(self.transcriber, "close"):
             self.transcriber.close()
+        # Release the singleton lock
+        self.singleton_lock.release()
 
     async def load_fixtures(self) -> None:
         if not self.fixture_set:
@@ -205,10 +283,8 @@ async def stream_events(
         client_label,
         current_role.value,
     )
-    queue = await manager.broadcaster.register()
-    await websocket.accept()
-    LOGGER.debug("WebSocket connection accepted for %s", client_label)
-
+    # Declare queue before try to allow cleanup in finally even if registration fails
+    queue: Optional[asyncio.Queue] = None
     # Shared connection health state
     connection_healthy = True
     last_pong_time = time.time()
@@ -277,6 +353,10 @@ async def stream_events(
                     intervals_without_pong = 0
 
                 try:
+                    # NOTE: Protocol-level WebSocket pings are handled by uvicorn/ASGI
+                    # server automatically. Starlette doesn't expose ping() directly.
+                    # We send application-level ping for client-side health tracking
+                    # which the frontend responds to with pong.
                     payload = {"type": "ping", "timestamp": int(time.time() * 1000)}
                     await websocket.send_text(json.dumps(payload))
                     consecutive_send_failures = 0  # Reset on success
@@ -431,36 +511,44 @@ async def stream_events(
         except WebSocketDisconnect:
             LOGGER.info("WebSocket disconnected for %s", client_label)
 
-    sender = asyncio.create_task(send_events())
-    receiver = asyncio.create_task(receive_commands())
-    heartbeat = asyncio.create_task(send_heartbeat())
     try:
-        # Include heartbeat in wait so connection closes when heartbeat detects issues
-        done, pending = await asyncio.wait(
-            {sender, receiver, heartbeat},
-            return_when=asyncio.FIRST_COMPLETED,
-        )
-        # Log which task completed first for debugging
-        for task in done:
-            task_name = "unknown"
-            if task is sender:
-                task_name = "sender"
-            elif task is receiver:
-                task_name = "receiver"
-            elif task is heartbeat:
-                task_name = "heartbeat"
-            LOGGER.debug(
-                "WebSocket task '%s' completed first for %s",
-                task_name,
-                client_label,
+        # Register queue inside try to ensure cleanup on any exception
+        queue = await manager.broadcaster.register()
+        await websocket.accept()
+        LOGGER.debug("WebSocket connection accepted for %s", client_label)
+
+        sender = asyncio.create_task(send_events())
+        receiver = asyncio.create_task(receive_commands())
+        heartbeat = asyncio.create_task(send_heartbeat())
+        try:
+            # Include heartbeat in wait so connection closes when heartbeat detects issues
+            done, pending = await asyncio.wait(
+                {sender, receiver, heartbeat},
+                return_when=asyncio.FIRST_COMPLETED,
             )
+            # Log which task completed first for debugging
+            for task in done:
+                task_name = "unknown"
+                if task is sender:
+                    task_name = "sender"
+                elif task is receiver:
+                    task_name = "receiver"
+                elif task is heartbeat:
+                    task_name = "heartbeat"
+                LOGGER.debug(
+                    "WebSocket task '%s' completed first for %s",
+                    task_name,
+                    client_label,
+                )
+        finally:
+            for task in (sender, receiver, heartbeat):
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
     finally:
-        for task in (sender, receiver, heartbeat):
-            task.cancel()
-            with suppress(asyncio.CancelledError):
-                await task
-        await manager.broadcaster.unregister(queue)
-        LOGGER.debug("Unregistered WebSocket queue for %s", client_label)
+        if queue is not None:
+            await manager.broadcaster.unregister(queue)
+            LOGGER.debug("Unregistered WebSocket queue for %s", client_label)
 
 
 FIXTURE_ENV_VAR = "WAVECAP_FIXTURES"
@@ -496,6 +584,10 @@ def create_app() -> FastAPI:
     # Check dependencies before anything else
     check_dependencies()
 
+    # Acquire singleton lock to prevent multiple instances
+    singleton_lock = SingletonLock()
+    singleton_lock.acquire()
+
     config = load_config()
     ensure_logging_directories(config)
     configure_logging(config.logging)
@@ -512,7 +604,7 @@ def create_app() -> FastAPI:
             )
         fixture_request = normalized
 
-    state = AppState(config, fixture_set=fixture_request)
+    state = AppState(config, singleton_lock, fixture_set=fixture_request)
     RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
 
     @asynccontextmanager
@@ -1062,6 +1154,18 @@ def create_app() -> FastAPI:
     async def websocket_endpoint(
         websocket: WebSocket, state: AppState = Depends(get_state)
     ) -> None:
+        # Enforce max WebSocket client limit to prevent resource exhaustion
+        max_clients = state.config.server.maxWebSocketClients
+        current_clients = state.stream_manager.broadcaster.subscriber_count
+        if max_clients > 0 and current_clients >= max_clients:
+            LOGGER.warning(
+                "Rejecting WebSocket connection: max clients reached (%d/%d)",
+                current_clients,
+                max_clients,
+            )
+            await websocket.close(code=1013, reason="Server at capacity")
+            return
+
         token = websocket.query_params.get("token")
         try:
             role = state.auth_manager.resolve_role(token)

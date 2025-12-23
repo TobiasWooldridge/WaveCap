@@ -56,6 +56,17 @@ class AudioFrontEndProcessor:
         self._de_prev_output = 0.0
         self._lp_prev_output = 0.0
 
+    def reset(self) -> None:
+        """Reset filter state to initial values.
+
+        Call this when reconnecting a stream to avoid filter transients
+        from stale state.
+        """
+        self._hp_prev_input = 0.0
+        self._hp_prev_output = 0.0
+        self._de_prev_output = 0.0
+        self._lp_prev_output = 0.0
+
     def process(
         self, samples: np.ndarray, *, target_rms: Optional[float] = None
     ) -> np.ndarray:

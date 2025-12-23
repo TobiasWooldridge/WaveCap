@@ -379,6 +379,7 @@ class ServerConfig(APIModel):
     host: str = Field(default="0.0.0.0")
     port: int = Field(default=8000)
     corsOrigin: str = Field(default="*", alias="corsOrigin")
+    maxWebSocketClients: int = Field(default=100, alias="maxWebSocketClients")
 
     @field_validator("host")
     @classmethod

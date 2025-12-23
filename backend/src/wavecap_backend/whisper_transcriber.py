@@ -7,10 +7,20 @@ import inspect
 import logging
 import platform
 import threading
+import warnings
 from typing import Any, List, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     import multiprocessing
+
+# Suppress harmless multiprocessing resource_tracker warnings about leaked semaphores.
+# These occur because multiprocessing.Queue uses internal semaphores that aren't always
+# cleanly unlinked on shutdown, but the OS cleans them up automatically.
+warnings.filterwarnings(
+    "ignore",
+    message="resource_tracker:.*semaphore",
+    category=UserWarning,
+)
 
 import numpy as np
 from faster_whisper import WhisperModel
@@ -756,6 +766,10 @@ class SubprocessMLXTranscriber(AbstractTranscriber):
             LOGGER.info("Spawning MLX subprocess...")
             self._request_queue = self._mp_context.Queue()
             self._response_queue = self._mp_context.Queue()
+            # Prevent resource tracker warnings by telling Python not to wait
+            # for the queue's background feeder thread on shutdown
+            self._request_queue.cancel_join_thread()
+            self._response_queue.cancel_join_thread()
 
             self._process = self._mp_context.Process(
                 target=_mlx_worker_process,
@@ -812,9 +826,15 @@ class SubprocessMLXTranscriber(AbstractTranscriber):
                 except Exception:
                     pass
                 try:
+                    # Cancel the join thread to prevent resource tracker warnings.
+                    # This must be called before close() to avoid blocking on a
+                    # feeder thread that may be stuck due to subprocess termination.
+                    queue.cancel_join_thread()
+                except Exception:
+                    pass
+                try:
                     # Close the queue to release semaphores
                     queue.close()
-                    queue.join_thread()
                 except Exception:
                     pass
 
