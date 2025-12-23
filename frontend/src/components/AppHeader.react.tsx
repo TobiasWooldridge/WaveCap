@@ -1,5 +1,5 @@
 import { ChangeEvent, MutableRefObject } from "react";
-import { Activity, LogIn, LogOut, Menu, Settings } from "lucide-react";
+import { Activity, LogIn, LogOut, Menu, Settings, Wifi, WifiOff } from "lucide-react";
 import Button from "./primitives/Button.react";
 import Flex from "./primitives/Flex.react";
 import Spinner from "./primitives/Spinner.react";
@@ -18,6 +18,8 @@ interface AppHeaderProps {
   streamsLoading: boolean;
   onRequestLogin: () => void;
   onLogout: () => Promise<void> | void;
+  wsConnected?: boolean;
+  wsError?: string | null;
 }
 
 const AppHeader = ({
@@ -33,7 +35,16 @@ const AppHeader = ({
   streamsLoading,
   onRequestLogin,
   onLogout,
+  wsConnected = true,
+  wsError = null,
 }: AppHeaderProps) => {
+  const connectionStatus = wsConnected ? "connected" : wsError ? "error" : "disconnected";
+  const connectionLabel = wsConnected
+    ? "Connected to server"
+    : wsError
+      ? `Connection error: ${wsError}`
+      : "Disconnected from server";
+
   return (
     <div className="app-header app-header--floating">
       <Flex
@@ -46,6 +57,19 @@ const AppHeader = ({
         <div className="app-header__branding">
           <Activity className="text-warning" size={16} />
           <span className="app-header__title">WaveCap</span>
+        </div>
+
+        <div
+          className={`app-header__connection app-header__connection--${connectionStatus}`}
+          title={connectionLabel}
+          aria-label={connectionLabel}
+          role="status"
+        >
+          {wsConnected ? (
+            <Wifi size={14} aria-hidden="true" />
+          ) : (
+            <WifiOff size={14} aria-hidden="true" />
+          )}
         </div>
 
         {!isReadOnly && !isMobileViewport ? (

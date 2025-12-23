@@ -1541,6 +1541,8 @@ function App() {
             streamsLoading={showAuthLoading}
             onRequestLogin={requestLogin}
             onLogout={logout}
+            wsConnected={wsConnected}
+            wsError={wsError}
           />
         ) : null}
         <LiveAudioBanner />
