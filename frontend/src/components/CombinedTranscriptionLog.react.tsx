@@ -69,6 +69,7 @@ export const CombinedTranscriptionLog: React.FC<CombinedTranscriptionLogProps> =
     currentPlayTime,
     volume,
     isMuted,
+    isLoadingAudio,
     setVolume,
     toggleMute,
     playRecording,
@@ -444,6 +445,7 @@ export const CombinedTranscriptionLog: React.FC<CombinedTranscriptionLogProps> =
         playingRecordingId={playingRecording}
         volume={volume}
         isMuted={isMuted}
+        isLoadingAudio={isLoadingAudio}
         onTogglePlayback={stopCurrentRecording}
         onStop={stopCurrentRecording}
         onVolumeChange={setVolume}

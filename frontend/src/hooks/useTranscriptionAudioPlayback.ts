@@ -75,6 +75,7 @@ export interface UseTranscriptionAudioPlayback {
   playbackQueue: PlaybackQueueState | null;
   volume: number;
   isMuted: boolean;
+  isLoadingAudio: boolean;
   setVolume: (volume: number) => void;
   toggleMute: () => void;
   playRecording: (
@@ -105,6 +106,7 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
   const [currentPlayTime, setCurrentPlayTime] = useState<number>(0);
   const [playbackQueue, _setPlaybackQueue] = useState<PlaybackQueueState | null>(null);
   const [volume, _setVolume] = useState<number>(getStoredVolume);
+  const [isLoadingAudio, setIsLoadingAudio] = useState<boolean>(false);
   const volumeRef = useRef<number>(volume);
 
   const playbackQueueRef = useRef<PlaybackQueueState | null>(null);
@@ -190,6 +192,7 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
       setPlayingRecording(null);
       setPlayingTranscriptionId(null);
       setPlayingSegment(null);
+      setIsLoadingAudio(false);
       if (!options?.keepPlayTime) {
         setCurrentPlayTime(0);
       }
@@ -340,9 +343,11 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
       if (audio.readyState >= 2) {
         startPlayback();
       } else {
+        setIsLoadingAudio(true);
         const onReady = () => {
           audio.removeEventListener("loadeddata", onReady);
           audio.removeEventListener("canplay", onReady);
+          setIsLoadingAudio(false);
           startPlayback();
         };
         audio.addEventListener("loadeddata", onReady, { once: true });
@@ -450,9 +455,11 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
       if (audio.readyState >= 2) {
         startPlayback();
       } else {
+        setIsLoadingAudio(true);
         const onReady = () => {
           audio.removeEventListener("loadeddata", onReady);
           audio.removeEventListener("canplay", onReady);
+          setIsLoadingAudio(false);
           startPlayback();
         };
         audio.addEventListener("loadeddata", onReady, { once: true });
@@ -472,6 +479,7 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
     playbackQueue,
     volume,
     isMuted,
+    isLoadingAudio,
     setVolume,
     toggleMute,
     playRecording,

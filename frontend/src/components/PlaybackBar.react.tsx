@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo } from "react";
-import { Pause, Play, Square, Radio, Volume2, VolumeX } from "lucide-react";
+import { Pause, Play, Square, Radio, Volume2, VolumeX, Loader2 } from "lucide-react";
 import type { TranscriptionResult } from "@types";
 import Button from "./primitives/Button.react";
 import { Timestamp } from "./primitives/Timestamp.react";
@@ -21,6 +21,8 @@ export interface PlaybackBarProps {
   volume: number;
   /** Whether audio is currently muted */
   isMuted: boolean;
+  /** Whether audio is currently loading/buffering */
+  isLoadingAudio?: boolean;
   /** Called when user clicks play/pause */
   onTogglePlayback: () => void;
   /** Called when user clicks stop */
@@ -43,6 +45,7 @@ export const PlaybackBar: React.FC<PlaybackBarProps> = ({
   playingRecordingId,
   volume,
   isMuted,
+  isLoadingAudio = false,
   onTogglePlayback,
   onStop,
   onVolumeChange,
@@ -82,10 +85,16 @@ export const PlaybackBar: React.FC<PlaybackBarProps> = ({
           use="unstyled"
           onClick={onTogglePlayback}
           className="playback-bar__button playback-bar__button--play"
-          aria-label={isPlaying ? "Pause" : "Play"}
-          disabled={!isPlaying}
+          aria-label={isLoadingAudio ? "Loading audio" : isPlaying ? "Pause" : "Play"}
+          disabled={!isPlaying || isLoadingAudio}
         >
-          {isPlaying ? <Pause size={18} /> : <Play size={18} />}
+          {isLoadingAudio ? (
+            <Loader2 size={18} className="playback-bar__spinner" />
+          ) : isPlaying ? (
+            <Pause size={18} />
+          ) : (
+            <Play size={18} />
+          )}
         </Button>
         <Button
           use="unstyled"

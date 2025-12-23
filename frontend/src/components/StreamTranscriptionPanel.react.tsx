@@ -48,6 +48,7 @@ export const StreamTranscriptionPanel = ({
     currentPlayTime,
     volume,
     isMuted,
+    isLoadingAudio,
     setVolume,
     toggleMute,
     playRecording,
@@ -166,6 +167,7 @@ export const StreamTranscriptionPanel = ({
           playingRecordingId={playingRecording}
           volume={volume}
           isMuted={isMuted}
+          isLoadingAudio={isLoadingAudio}
           onTogglePlayback={handleTogglePlayback}
           onStop={stopCurrentRecording}
           onVolumeChange={setVolume}

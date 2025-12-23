@@ -143,6 +143,19 @@
   }
 }
 
+.playback-bar__spinner {
+  animation: playback-bar-spin 1s linear infinite;
+}
+
+@keyframes playback-bar-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .playback-bar__button--stop {
   background-color: rgba(var(--app-danger-rgb), 0.15);
   color: rgb(var(--app-danger-rgb));
