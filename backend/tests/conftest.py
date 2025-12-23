@@ -54,6 +54,9 @@ def pytest_pyfunc_call(pyfuncitem: pytest.Function) -> bool | None:
 
 @pytest.fixture(autouse=True)
 def isolate_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
+    # Disable singleton lock so tests can run while production service is running
+    monkeypatch.setenv("WAVECAP_DISABLE_SINGLETON_LOCK", "1")
+
     from wavecap_backend import state_paths
     from wavecap_backend import stream_manager as stream_manager_module
     from wavecap_backend import stream_worker as stream_worker_module
