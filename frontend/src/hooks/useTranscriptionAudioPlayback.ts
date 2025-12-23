@@ -9,6 +9,7 @@ import { setAudioElementSource } from "../utils/audio";
 import { computePlaybackRange } from "../utils/playback";
 
 const VOLUME_STORAGE_KEY = "wavecap-playback-volume";
+const PRE_MUTE_VOLUME_KEY = "wavecap-pre-mute-volume";
 const DEFAULT_VOLUME = 1.0;
 
 function getStoredVolume(): number {
@@ -34,6 +35,33 @@ function storeVolume(volume: number): void {
   }
 }
 
+function getStoredPreMuteVolume(): number | null {
+  try {
+    const stored = localStorage.getItem(PRE_MUTE_VOLUME_KEY);
+    if (stored !== null) {
+      const parsed = parseFloat(stored);
+      if (!isNaN(parsed) && parsed > 0 && parsed <= 1) {
+        return parsed;
+      }
+    }
+  } catch {
+    // localStorage may be unavailable
+  }
+  return null;
+}
+
+function storePreMuteVolume(volume: number | null): void {
+  try {
+    if (volume === null) {
+      localStorage.removeItem(PRE_MUTE_VOLUME_KEY);
+    } else {
+      localStorage.setItem(PRE_MUTE_VOLUME_KEY, volume.toString());
+    }
+  } catch {
+    // localStorage may be unavailable
+  }
+}
+
 export interface SegmentPlayOptions {
   recordingStartOffset?: number;
 }
@@ -46,7 +74,9 @@ export interface UseTranscriptionAudioPlayback {
   currentPlayTime: number;
   playbackQueue: PlaybackQueueState | null;
   volume: number;
+  isMuted: boolean;
   setVolume: (volume: number) => void;
+  toggleMute: () => void;
   playRecording: (
     transcription: TranscriptionResult,
     options?: { queue?: PlaybackQueueState },
@@ -109,6 +139,10 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
     volumeRef.current = clampedVolume;
     _setVolume(clampedVolume);
     storeVolume(clampedVolume);
+    // Clear pre-mute volume when user explicitly sets volume to non-zero
+    if (clampedVolume > 0) {
+      storePreMuteVolume(null);
+    }
     // Apply to all audio elements
     Object.values(recordingAudioRefs.current).forEach((audio) => {
       if (audio) {
@@ -116,6 +150,30 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
       }
     });
   }, []);
+
+  const isMuted = volume === 0;
+
+  const toggleMute = useCallback(() => {
+    if (isMuted) {
+      // Unmute: restore previous volume or default to 1.0
+      const preMuteVolume = getStoredPreMuteVolume() ?? DEFAULT_VOLUME;
+      storePreMuteVolume(null);
+      setVolume(preMuteVolume);
+    } else {
+      // Mute: save current volume and set to 0
+      storePreMuteVolume(volume);
+      const clampedVolume = 0;
+      volumeRef.current = clampedVolume;
+      _setVolume(clampedVolume);
+      storeVolume(clampedVolume);
+      // Apply to all audio elements
+      Object.values(recordingAudioRefs.current).forEach((audio) => {
+        if (audio) {
+          audio.volume = clampedVolume;
+        }
+      });
+    }
+  }, [isMuted, volume, setVolume]);
 
   useEffect(() => {
     playbackQueueRef.current = playbackQueue;
@@ -413,7 +471,9 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
     currentPlayTime,
     playbackQueue,
     volume,
+    isMuted,
     setVolume,
+    toggleMute,
     playRecording,
     playSegment,
     stopCurrentRecording,

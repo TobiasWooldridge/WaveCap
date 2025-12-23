@@ -19,12 +19,16 @@ export interface PlaybackBarProps {
   playingRecordingId: string | null;
   /** Current volume level (0-1) */
   volume: number;
+  /** Whether audio is currently muted */
+  isMuted: boolean;
   /** Called when user clicks play/pause */
   onTogglePlayback: () => void;
   /** Called when user clicks stop */
   onStop: () => void;
   /** Called when user changes volume */
   onVolumeChange: (volume: number) => void;
+  /** Called when user toggles mute */
+  onToggleMute: () => void;
 }
 
 /**
@@ -38,12 +42,13 @@ export const PlaybackBar: React.FC<PlaybackBarProps> = ({
   recordingAudioRefs,
   playingRecordingId,
   volume,
+  isMuted,
   onTogglePlayback,
   onStop,
   onVolumeChange,
+  onToggleMute,
 }) => {
   const isPlaying = transcription !== null;
-  const isMuted = volume === 0;
 
   const handleSeek = useMemo(() => {
     if (!playingRecordingId) return undefined;
@@ -61,10 +66,6 @@ export const PlaybackBar: React.FC<PlaybackBarProps> = ({
     },
     [onVolumeChange],
   );
-
-  const handleToggleMute = useCallback(() => {
-    onVolumeChange(isMuted ? 1 : 0);
-  }, [isMuted, onVolumeChange]);
 
   const waveform = transcription?.waveform;
   const duration = transcription?.duration;
@@ -142,7 +143,7 @@ export const PlaybackBar: React.FC<PlaybackBarProps> = ({
       <div className="playback-bar__volume">
         <Button
           use="unstyled"
-          onClick={handleToggleMute}
+          onClick={onToggleMute}
           className="playback-bar__volume-button"
           aria-label={isMuted ? "Unmute" : "Mute"}
         >

@@ -47,7 +47,9 @@ export const StreamTranscriptionPanel = ({
     playingSegment,
     currentPlayTime,
     volume,
+    isMuted,
     setVolume,
+    toggleMute,
     playRecording,
     playSegment,
     stopCurrentRecording,
@@ -163,9 +165,11 @@ export const StreamTranscriptionPanel = ({
           recordingAudioRefs={recordingAudioRefs}
           playingRecordingId={playingRecording}
           volume={volume}
+          isMuted={isMuted}
           onTogglePlayback={handleTogglePlayback}
           onStop={stopCurrentRecording}
           onVolumeChange={setVolume}
+          onToggleMute={toggleMute}
         />
       </section>
     </HoveredSegmentProvider>
