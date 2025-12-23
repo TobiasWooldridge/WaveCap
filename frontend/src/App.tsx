@@ -85,7 +85,7 @@ const REVIEW_STATUS_OPTIONS: Array<{
   { value: "pending", label: "Pending" },
 ];
 const REVIEW_STATUS_ORDER = REVIEW_STATUS_OPTIONS.map((option) => option.value);
-const GENERIC_SERVER_ERROR_MESSAGE = "An unexpected server error occurred.";
+const GENERIC_SERVER_ERROR_MESSAGE = "An unexpected server error occurred. Please refresh the page or check your connection.";
 
 const DEFAULT_ACK_MESSAGES: Record<ClientCommandType, string> = {
   start_transcription: "Transcription started.",
@@ -95,10 +95,10 @@ const DEFAULT_ACK_MESSAGES: Record<ClientCommandType, string> = {
 };
 
 const DEFAULT_ERROR_MESSAGES: Record<ClientCommandType, string> = {
-  start_transcription: "Unable to start transcription. Please try again.",
-  stop_transcription: "Unable to stop transcription. Please try again.",
-  reset_stream: "Unable to reset stream. Please try again.",
-  update_stream: "Unable to update stream. Please try again.",
+  start_transcription: "Could not start transcription. The stream may be offline or the audio source unavailable.",
+  stop_transcription: "Could not stop transcription. The stream may have already stopped.",
+  reset_stream: "Could not reset the stream. Check your connection and try again.",
+  update_stream: "Could not save stream settings. Check your connection and try again.",
 };
 
 const DEFAULT_DOCUMENT_TITLE = "WaveCap";
@@ -521,7 +521,18 @@ function App() {
       ) {
         requestLogin();
       }
-      showToast({ variant: "error", title: "Action failed", message });
+      // Provide more specific error titles based on error content
+      let title = "Server error";
+      if (normalized.includes("not found")) {
+        title = "Not found";
+      } else if (normalized.includes("permission") || normalized.includes("access")) {
+        title = "Permission denied";
+      } else if (normalized.includes("timeout") || normalized.includes("timed out")) {
+        title = "Request timed out";
+      } else if (normalized.includes("connection") || normalized.includes("network")) {
+        title = "Connection error";
+      }
+      showToast({ variant: "error", title, message });
     }
   }, [lastMessage, requestLogin, showToast]);
 
