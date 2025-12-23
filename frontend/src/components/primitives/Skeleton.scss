@@ -1,0 +1,71 @@
+.skeleton {
+  display: inline-block;
+  background: linear-gradient(
+    90deg,
+    rgba(var(--app-surface-muted-rgb, 128, 128, 128), 0.3) 25%,
+    rgba(var(--app-surface-muted-rgb, 128, 128, 128), 0.5) 50%,
+    rgba(var(--app-surface-muted-rgb, 128, 128, 128), 0.3) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+.skeleton--text {
+  height: 1em;
+  width: 100%;
+}
+
+.skeleton--circular {
+  border-radius: 50%;
+}
+
+.skeleton--rectangular {
+  border-radius: 4px;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.transcript-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.transcript-skeleton__item {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.transcript-skeleton__avatar {
+  flex-shrink: 0;
+}
+
+.transcript-skeleton__content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.transcript-skeleton__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.transcript-skeleton__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}

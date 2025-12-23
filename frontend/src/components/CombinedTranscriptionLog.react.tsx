@@ -16,6 +16,7 @@ import AudioElement from "./primitives/AudioElement.react";
 import { AlertChips } from "./chips/AlertChips.react";
 import { useAuth } from "../contexts/AuthContext";
 import { StreamTranscriptList } from "./StreamTranscriptList.react";
+import { TranscriptSkeleton } from "./primitives/Skeleton.react";
 import StreamStatusIndicator from "./StreamStatusIndicator.react";
 import { Timestamp } from "./primitives/Timestamp.react";
 import { TimeInterval } from "./primitives/TimeInterval.react";
@@ -272,14 +273,12 @@ export const CombinedTranscriptionLog: React.FC<CombinedTranscriptionLogProps> =
             <p className="fw-semibold mb-1">No streams available</p>
             <p className="mb-0">Add a stream to start collecting transcripts.</p>
           </div>
+        ) : combinedItems.length === 0 && loading ? (
+          <TranscriptSkeleton />
         ) : combinedItems.length === 0 ? (
           <div className="transcript-view__empty">
-            {loading ? <p className="mb-0">Listening for activity…</p> : (
-              <>
-                <p className="fw-semibold mb-1">No transcriptions captured yet.</p>
-                <p className="mb-0">When streams receive audio, transcripts will appear here.</p>
-              </>
-            )}
+            <p className="fw-semibold mb-1">No transcriptions captured yet.</p>
+            <p className="mb-0">When streams receive audio, transcripts will appear here.</p>
           </div>
         ) : (
           <div className="transcript-message-list">
