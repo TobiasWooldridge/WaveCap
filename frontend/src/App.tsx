@@ -1536,6 +1536,9 @@ function App() {
 
   return (
     <>
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
       {loginOverlay}
       <div className="app-shell bg-body-secondary">
         {isMobileViewport ? (
@@ -1615,7 +1618,7 @@ function App() {
           authFetch={authFetch}
         />
 
-        <main className="app-main">
+        <main id="main-content" className="app-main" tabIndex={-1}>
           <div className="app-layout app-container">
             <StreamSidebar
               isReadOnly={isReadOnly}
