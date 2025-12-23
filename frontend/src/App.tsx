@@ -677,6 +677,19 @@ function App() {
   const handleLoginPasswordChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
       setLoginPassword(event.target.value);
+      // Clear error when user starts typing
+      if (loginError) {
+        setLoginError(null);
+      }
+    },
+    [loginError],
+  );
+
+  const handleLoginPasswordBlur = useCallback(
+    (event: React.FocusEvent<HTMLInputElement>) => {
+      if (event.target.value.trim().length === 0) {
+        setLoginError("Password is required.");
+      }
     },
     [],
   );
@@ -1474,16 +1487,19 @@ function App() {
               <input
                 id="auth-password"
                 type="password"
-                className="form-control"
+                className={`form-control${loginError ? " is-invalid" : ""}`}
                 value={loginPassword}
                 onChange={handleLoginPasswordChange}
+                onBlur={handleLoginPasswordBlur}
                 disabled={loggingIn}
                 required
                 autoFocus
+                aria-describedby={loginError ? "auth-password-error" : undefined}
               />
             </div>
             {loginError && (
               <div
+                id="auth-password-error"
                 className="alert alert-danger py-2 px-3 small mb-0"
                 role="alert"
               >
