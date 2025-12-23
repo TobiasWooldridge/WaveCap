@@ -99,3 +99,14 @@
   color: rgb(var(--app-insight-strong-rgb));
 }
 
+.app-toast__actions {
+  margin-top: 0.5rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.app-toast__action {
+  font-size: 0.8rem;
+  padding: 0.35rem 0.75rem;
+}
+

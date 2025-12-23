@@ -4,11 +4,17 @@ import "./ToastViewport.scss";
 
 export type ToastVariant = "success" | "error" | "info";
 
+export type ToastAction = {
+  label: string;
+  onClick: () => void;
+};
+
 export type ToastDescriptor = {
   id: string;
   title?: string;
   message: string;
   variant: ToastVariant;
+  action?: ToastAction;
 };
 
 type ToastViewportProps = {
@@ -74,6 +80,21 @@ export const ToastViewport = ({ toasts, onDismiss }: ToastViewportProps) => {
                 </Button>
               </div>
               <div className="app-toast__message">{toast.message}</div>
+              {toast.action && (
+                <div className="app-toast__actions">
+                  <Button
+                    size="sm"
+                    use="primary"
+                    onClick={() => {
+                      toast.action?.onClick();
+                      onDismiss(toast.id);
+                    }}
+                    className="app-toast__action"
+                  >
+                    {toast.action.label}
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         );

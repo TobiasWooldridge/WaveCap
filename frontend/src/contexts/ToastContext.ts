@@ -1,5 +1,5 @@
 import { createContext } from "react";
-import type { ToastVariant } from "../components/primitives/ToastViewport.react";
+import type { ToastVariant, ToastAction } from "../components/primitives/ToastViewport.react";
 
 export type ShowToastOptions = {
   message: string;
@@ -7,6 +7,7 @@ export type ShowToastOptions = {
   variant?: ToastVariant;
   duration?: number;
   id?: string;
+  action?: ToastAction;
 };
 
 export type ToastContextValue = {

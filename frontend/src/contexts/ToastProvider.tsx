@@ -55,12 +55,13 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
       variant = "info",
       duration = DEFAULT_TOAST_DURATION,
       id,
+      action,
     }: ShowToastOptions) => {
       const toastId = id ?? createToastId();
 
       setToasts((current) => {
         const withoutExisting = current.filter((toast) => toast.id !== toastId);
-        return [...withoutExisting, { id: toastId, message, title, variant }];
+        return [...withoutExisting, { id: toastId, message, title, variant, action }];
       });
 
       if (duration > 0) {
