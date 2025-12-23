@@ -232,12 +232,17 @@ const StreamSidebar = ({
           </div>
           <Flex align="center" gap={2} wrap="wrap">
             <div className="stream-sidebar__sort-control">
+              <label
+                htmlFor="stream-sidebar-sort"
+                className="stream-sidebar__sort-label text-body-secondary small"
+              >
+                Sort:
+              </label>
               <select
                 id="stream-sidebar-sort"
                 className="form-select form-select-sm stream-sidebar__sort-select"
                 value={sortMode}
                 onChange={handleSortChange}
-                aria-label="Sort streams"
               >
                 <option value="activity">Latest activity</option>
                 <option value="name">Name (A–Z)</option>

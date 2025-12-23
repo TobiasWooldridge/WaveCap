@@ -178,14 +178,16 @@
 
 .stream-sidebar__sort-control {
   display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
+  flex-direction: row;
+  gap: 0.35rem;
   min-width: 0;
-  align-items: flex-end;
+  align-items: center;
 }
 
 .stream-sidebar__sort-label {
   margin: 0;
+  white-space: nowrap;
+  font-weight: 500;
 }
 
 .stream-sidebar__sort-select {
