@@ -156,9 +156,12 @@ export const useAutoScroll = () => {
       scheduleScroll();
     });
 
+    // Only observe direct children (new transcript rows), not the entire subtree.
+    // Using subtree: true would fire on every text node mutation during audio
+    // playback segment highlighting, causing excessive CPU usage.
     observer.observe(container, {
       childList: true,
-      subtree: true,
+      subtree: false,
     });
 
     return () => {
