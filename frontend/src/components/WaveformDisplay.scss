@@ -23,28 +23,10 @@
   }
 }
 
-.waveform-display__bars {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
+.waveform-display__canvas {
+  display: block;
   width: 100%;
   height: 100%;
-  padding: 2px 4px;
-  gap: 1px;
-  box-sizing: border-box;
-}
-
-.waveform-display__bar {
-  flex: 1;
-  min-width: 1px;
-  max-width: 4px;
-  background-color: rgba(var(--app-accent-rgb), 0.6);
-  border-radius: 1px;
-
-  // Bars within speech region are brighter
-  &--speech {
-    background-color: rgba(var(--app-accent-rgb), 0.9);
-  }
 }
 
 .waveform-display__playhead {
