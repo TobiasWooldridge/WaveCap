@@ -11,6 +11,9 @@ import { computePlaybackRange } from "../utils/playback";
 const VOLUME_STORAGE_KEY = "wavecap-playback-volume";
 const PRE_MUTE_VOLUME_KEY = "wavecap-pre-mute-volume";
 const DEFAULT_VOLUME = 1.0;
+// Minimum time change (in seconds) before updating currentPlayTime state.
+// This throttles re-renders during audio playback. 100ms = ~10 updates/sec max.
+const PLAY_TIME_UPDATE_THRESHOLD = 0.1;
 
 function getStoredVolume(): number {
   try {
@@ -113,6 +116,8 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
   const playingRecordingRef = useRef<string | null>(null);
   const playingTranscriptionIdRef = useRef<string | null>(null);
   const playingSegmentRef = useRef<string | null>(null);
+  // Track the last reported play time to throttle state updates
+  const lastReportedPlayTimeRef = useRef<number>(0);
   // Ref to hold the latest playRecording function for use in handleEnded callback
   const playRecordingRef = useRef<((transcription: TranscriptionResult, options?: { queue?: PlaybackQueueState; isQueueTransition?: boolean }) => void) | null>(null);
 
@@ -324,12 +329,20 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
         resetAudioPlaybackState(audio);
       };
 
-      const updateTime = () => setCurrentPlayTime(audio.currentTime);
+      const updateTime = () => {
+        const time = audio.currentTime;
+        // Throttle state updates to reduce re-renders
+        if (Math.abs(time - lastReportedPlayTimeRef.current) >= PLAY_TIME_UPDATE_THRESHOLD) {
+          lastReportedPlayTimeRef.current = time;
+          setCurrentPlayTime(time);
+        }
+      };
 
       const startPlayback = () => {
         audio.loop = false;
         audio.volume = volumeRef.current;
         audio.currentTime = startOffset;
+        lastReportedPlayTimeRef.current = startOffset;
         setCurrentPlayTime(startOffset);
         audio.ontimeupdate = updateTime;
         audio.onended = handleEnded;
@@ -429,10 +442,15 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
 
       const handleSegmentTimeUpdate = () => {
         const nextTime = audio.currentTime;
-        setCurrentPlayTime(nextTime);
+        // Check segment completion regardless of throttle
         const completionThreshold = Math.max(playbackStart, playbackEnd - 0.05);
         if (nextTime >= completionThreshold && playingSegmentRef.current === segmentKey) {
           setPlayingSegment(null);
+        }
+        // Throttle state updates to reduce re-renders
+        if (Math.abs(nextTime - lastReportedPlayTimeRef.current) >= PLAY_TIME_UPDATE_THRESHOLD) {
+          lastReportedPlayTimeRef.current = nextTime;
+          setCurrentPlayTime(nextTime);
         }
       };
 
@@ -441,8 +459,10 @@ export const useTranscriptionAudioPlayback = (): UseTranscriptionAudioPlayback =
       const startPlayback = () => {
         audio.loop = false;
         audio.volume = volumeRef.current;
-        audio.currentTime = Math.max(0, playbackStart);
-        setCurrentPlayTime(Math.max(0, playbackStart));
+        const initialTime = Math.max(0, playbackStart);
+        audio.currentTime = initialTime;
+        lastReportedPlayTimeRef.current = initialTime;
+        setCurrentPlayTime(initialTime);
         audio.ontimeupdate = handleSegmentTimeUpdate;
         audio.onended = handleEnded;
         audio.onerror = handleError;
