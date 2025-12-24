@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo } from "react";
+import { useClock } from "../../contexts/ClockContext";
 
 export interface TimeIntervalProps
   extends Omit<React.HTMLAttributes<HTMLSpanElement>, "children"> {
@@ -119,44 +120,24 @@ const formatInterval = (
   return { label, longLabel };
 };
 
-const computeAdaptiveRefreshMs = (absDiffMs: number): number => {
-  if (absDiffMs < 30 * 1000) return 1000; // update every second under 30s
-  if (absDiffMs < 60 * 1000) return 5000; // tighten until 1m
-  if (absDiffMs < 60 * 60 * 1000) return 30 * 1000; // under 1h
-  if (absDiffMs < 24 * 60 * 60 * 1000) return 60 * 1000; // under 1d
-  return 60 * 60 * 1000; // otherwise hourly
-};
-
 export const TimeInterval: React.FC<TimeIntervalProps> = ({
   value,
   condensed = false,
-  refreshMs,
+  refreshMs: _refreshMs, // Kept for API compatibility but now ignored
   now,
   className,
   title,
   ...rest
 }) => {
   const targetMs = useMemo(() => parseDate(value), [value]);
-  const initialNow = useMemo(() => {
+
+  // Use shared clock from context, or override if `now` prop is provided
+  const clockNowMs = useClock();
+  const nowMs = useMemo(() => {
     if (now instanceof Date) return now.getTime();
     if (typeof now === "number") return now;
-    return Date.now();
-  }, [now]);
-
-  const [nowMs, setNowMs] = useState<number>(initialNow);
-
-  useEffect(() => {
-    if (typeof targetMs !== "number") return;
-    if (refreshMs === false || refreshMs === 0) return;
-
-    const currentDiff = Math.abs(targetMs - Date.now());
-    const interval = typeof refreshMs === "number" && refreshMs > 0
-      ? refreshMs
-      : computeAdaptiveRefreshMs(currentDiff);
-
-    const id = window.setInterval(() => setNowMs(Date.now()), interval);
-    return () => window.clearInterval(id);
-  }, [targetMs, refreshMs]);
+    return clockNowMs;
+  }, [now, clockNowMs]);
 
   if (typeof targetMs !== "number") {
     return null;
