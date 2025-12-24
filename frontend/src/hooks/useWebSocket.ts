@@ -134,7 +134,6 @@ export const useWebSocket = (
           // Another connection became active before this one finished opening.
           return;
         }
-        console.log("🔌 WebSocket connected to:", url);
         setIsConnected(true);
         setError(null);
         reconnectAttempts.current = 0;
@@ -165,7 +164,6 @@ export const useWebSocket = (
             return;
           }
 
-          console.log("📨 WebSocket message received:", message.type, message);
 
           if (message.type === "ack") {
             const pending = pendingRequestsRef.current.get(message.requestId);
@@ -224,7 +222,6 @@ export const useWebSocket = (
           // state for the active socket.
           return;
         }
-        console.log("WebSocket disconnected", event.code, event.reason);
         setIsConnected(false);
         setSocket(null);
         socketRef.current = null;
@@ -306,7 +303,6 @@ export const useWebSocket = (
           setError(`Reconnecting... (attempt ${attempt})`);
         }
 
-        console.log(`🔌 WebSocket reconnecting in ${Math.round(delay / 1000)}s (attempt ${attempt}, code ${event.code})...`);
         reconnectTimeoutRef.current = window.setTimeout(connect, delay);
       };
 
@@ -474,7 +470,6 @@ export const useWebSocket = (
         throw connectionError;
       }
 
-      console.log("📤 Sending WebSocket message:", message);
       socket.send(JSON.stringify(message));
     },
     [socket, isConnected],
