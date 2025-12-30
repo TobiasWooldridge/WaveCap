@@ -59,7 +59,7 @@ transcribing multiple radio or pager feeds in real time.
   absolute time (e.g., “5 minutes ago”, “3 hours ago”, “yesterday”). The UI supports
   a condensed form where space is limited (e.g., “5m ago”). Future timestamps are
   shown symmetrically (e.g., “in 5 minutes”, “tomorrow”). Relative intervals update
-  live for recent entries and remain static for older items until the view refreshes.
+  live for recent entries and switch to minute-level refreshes for older items.
 - When the speech model returns no text but audio passes silence thresholds, show a "Silence" entry with playback controls. If the clip contains noisy speech the model cannot decode, surface it as `[unable to transcribe]` and keep the recording for operators to replay.
 - Segments that loop the same long phrase beyond configured repetition limits are treated as `[unable to transcribe]` entries so the log highlights bursts the model could not confidently decode.
 - Suppress hallucinated phrases on barely audible bursts; if a chunk lacks meaningful energy the backend drops the model's text entirely so the transcript log stays empty instead of fabricating callouts.

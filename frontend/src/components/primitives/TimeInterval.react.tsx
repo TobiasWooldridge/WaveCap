@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { useClock } from "../../contexts/ClockContext";
+import { useFastClock, useSlowClock } from "../../contexts/ClockContext";
 
 export interface TimeIntervalProps
   extends Omit<React.HTMLAttributes<HTMLSpanElement>, "children"> {
@@ -120,7 +120,7 @@ const formatInterval = (
   return { label, longLabel };
 };
 
-const DEFAULT_LIVE_WINDOW_MS = 10 * 60 * 1000;
+const DEFAULT_FAST_WINDOW_MS = 10 * 60 * 1000;
 
 const resolveNowMs = (now?: number | Date): number | null => {
   if (now instanceof Date) {
@@ -145,7 +145,34 @@ const LiveTimeInterval: React.FC<{
   title,
   ...rest
 }) => {
-  const nowMs = useClock();
+  const nowMs = useFastClock();
+  const { label, longLabel } = formatInterval(targetMs, nowMs, condensed);
+
+  return (
+    <span
+      {...rest}
+      className={className}
+      title={title ?? longLabel}
+      aria-label={longLabel}
+    >
+      {label}
+    </span>
+  );
+};
+
+const SlowTimeInterval: React.FC<{
+  targetMs: number;
+  condensed: boolean;
+  className?: string;
+  title?: string;
+} & Omit<React.HTMLAttributes<HTMLSpanElement>, "children">> = ({
+  targetMs,
+  condensed,
+  className,
+  title,
+  ...rest
+}) => {
+  const nowMs = useSlowClock();
   const { label, longLabel } = formatInterval(targetMs, nowMs, condensed);
 
   return (
@@ -206,15 +233,25 @@ export const TimeInterval: React.FC<TimeIntervalProps> = ({
 
   const baseNowMs = nowOverride ?? Date.now();
   const diffMs = Math.abs(targetMs - baseNowMs);
-  const allowLive =
-    _refreshMs !== false &&
-    _refreshMs !== 0 &&
-    nowOverride === null &&
-    (typeof _refreshMs === "number" || diffMs <= DEFAULT_LIVE_WINDOW_MS);
+  const hasExplicitRefresh = typeof _refreshMs === "number" && _refreshMs > 0;
+  const shouldUpdate =
+    _refreshMs !== false && _refreshMs !== 0 && nowOverride === null;
 
-  if (allowLive) {
+  if (shouldUpdate && (hasExplicitRefresh || diffMs <= DEFAULT_FAST_WINDOW_MS)) {
     return (
       <LiveTimeInterval
+        {...rest}
+        targetMs={targetMs}
+        condensed={condensed}
+        className={className}
+        title={title}
+      />
+    );
+  }
+
+  if (shouldUpdate && diffMs > DEFAULT_FAST_WINDOW_MS) {
+    return (
+      <SlowTimeInterval
         {...rest}
         targetMs={targetMs}
         condensed={condensed}
