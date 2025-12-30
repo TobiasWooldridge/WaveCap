@@ -101,11 +101,13 @@ export const CombinedTranscriptionLog: React.FC<CombinedTranscriptionLogProps> =
   const combinedItems = useMemo(() => {
     if (!streams || streams.length === 0) return [] as CombinedItem[];
     const items: CombinedItem[] = [];
+    const streamLimit = limit > 0 ? limit : null;
     streams.forEach((stream) => {
       const list = transcriptionsByStream.get(stream.id) ?? [];
+      const trimmedList = streamLimit ? list.slice(-streamLimit) : list;
       const source = stream.source ?? "audio";
       if (source === "pager") {
-        const normal = list.filter((t) => !isSystemTranscription(t));
+        const normal = trimmedList.filter((t) => !isSystemTranscription(t));
         const condensed = condensePagerTranscriptions(normal);
         condensed.forEach((msg) => {
           items.push({
@@ -118,7 +120,7 @@ export const CombinedTranscriptionLog: React.FC<CombinedTranscriptionLogProps> =
           });
         });
       } else {
-        list.forEach((t) => {
+        trimmedList.forEach((t) => {
           items.push({
             kind: "audio",
             id: t.id,
