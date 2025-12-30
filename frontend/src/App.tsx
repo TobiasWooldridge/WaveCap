@@ -34,6 +34,7 @@ import {
   ClientCommandType,
   Stream,
   StreamUpdate,
+  ServerToClientMessage,
   ThemeMode,
   TranscriptionResult,
   TranscriptionReviewStatus,
@@ -330,18 +331,88 @@ function App() {
   const [loginPassword, setLoginPassword] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const { showToast } = useToast();
+  const { keywordAlerts, handleAlertMatches, handleDismissAlert } =
+    useKeywordAlerts(streams);
 
   const {
     isConnected: wsConnected,
-    lastMessage,
     error: wsError,
     resetStream: wsResetStream,
     updateStream: wsUpdateStream,
     reconnect: wsReconnect,
-  } = useWebSocket("/ws", { token, onUnauthorized: requestLogin });
-  const { showToast } = useToast();
-  const { keywordAlerts, handleAlertMatches, handleDismissAlert } =
-    useKeywordAlerts(streams);
+  } = useWebSocket("/ws", {
+    token,
+    onUnauthorized: requestLogin,
+    onMessage: useCallback(
+      (message: ServerToClientMessage) => {
+        if (message.type === "transcription" && message.data) {
+          const transcription = message.data as TranscriptionResult;
+          addTranscription(transcription);
+          handleAlertMatches(transcription);
+          return;
+        }
+
+        if (message.type === "streams_update" && message.data) {
+          console.log("📡 Received streams_update:", message.data);
+          updateStreams(message.data as StreamUpdate[]);
+          return;
+        }
+
+        if (message.type === "ack") {
+          const resolvedMessage = resolveCommandMessage(
+            message.action,
+            message.message,
+            DEFAULT_ACK_MESSAGES,
+          );
+          showToast({ variant: "success", message: resolvedMessage });
+          return;
+        }
+
+        if (message.type === "error") {
+          if (message.message) {
+            console.error("WebSocket error:", message.message);
+          }
+
+          if (!message.requestId) {
+            const toastMessage =
+              message.message?.trim() || GENERIC_SERVER_ERROR_MESSAGE;
+            const normalized = toastMessage.toLowerCase();
+            if (
+              normalized.includes("editor access required") ||
+              normalized.includes("invalid or expired token")
+            ) {
+              requestLogin();
+            }
+            let title = "Server error";
+            if (normalized.includes("not found")) {
+              title = "Not found";
+            } else if (
+              normalized.includes("permission") ||
+              normalized.includes("access")
+            ) {
+              title = "Permission denied";
+            } else if (normalized.includes("timeout") || normalized.includes("timed out")) {
+              title = "Request timed out";
+            } else if (
+              normalized.includes("connection") ||
+              normalized.includes("network")
+            ) {
+              title = "Connection error";
+            }
+            showToast({ variant: "error", title, message: toastMessage });
+          }
+        }
+      },
+      [
+        addTranscription,
+        handleAlertMatches,
+        requestLogin,
+        showToast,
+        updateStreams,
+      ],
+    ),
+  });
   const [pendingStreamCommands, setPendingStreamCommands] =
     useState<Record<string, StreamCommandState>>({});
   const hadWsConnectionRef = useRef(false);
@@ -472,69 +543,6 @@ function App() {
 
     hadWsConnectionRef.current = true;
   }, [fetchStreams, wsConnected]);
-
-  // Handle real-time updates from WebSocket
-  useEffect(() => {
-    if (!lastMessage) {
-      return;
-    }
-
-    if (lastMessage.type === "transcription" && lastMessage.data) {
-      const transcription = lastMessage.data as TranscriptionResult;
-      addTranscription(transcription);
-      handleAlertMatches(transcription);
-      return;
-    }
-
-    switch (lastMessage.type) {
-      case "streams_update":
-        if (lastMessage.data) {
-          console.log("📡 Received streams_update:", lastMessage.data);
-          updateStreams(lastMessage.data as StreamUpdate[]);
-        }
-        break;
-      case "error":
-        console.error("WebSocket error:", lastMessage.message);
-        break;
-    }
-  }, [lastMessage, addTranscription, updateStreams, handleAlertMatches]);
-
-  useEffect(() => {
-    if (!lastMessage) {
-      return;
-    }
-
-    if (lastMessage.type === "ack") {
-      const resolvedMessage = resolveCommandMessage(
-        lastMessage.action,
-        lastMessage.message,
-        DEFAULT_ACK_MESSAGES,
-      );
-      showToast({ variant: "success", message: resolvedMessage });
-    } else if (lastMessage.type === "error" && !lastMessage.requestId) {
-      const message =
-        lastMessage.message?.trim() || GENERIC_SERVER_ERROR_MESSAGE;
-      const normalized = message.toLowerCase();
-      if (
-        normalized.includes("editor access required") ||
-        normalized.includes("invalid or expired token")
-      ) {
-        requestLogin();
-      }
-      // Provide more specific error titles based on error content
-      let title = "Server error";
-      if (normalized.includes("not found")) {
-        title = "Not found";
-      } else if (normalized.includes("permission") || normalized.includes("access")) {
-        title = "Permission denied";
-      } else if (normalized.includes("timeout") || normalized.includes("timed out")) {
-        title = "Request timed out";
-      } else if (normalized.includes("connection") || normalized.includes("network")) {
-        title = "Connection error";
-      }
-      showToast({ variant: "error", title, message });
-    }
-  }, [lastMessage, requestLogin, showToast]);
 
   const reportCommandFailure = useCallback(
     (action: ClientCommandType, message?: string) => {

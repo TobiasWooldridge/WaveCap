@@ -42,6 +42,7 @@ const createRequestId = (): string => {
 type UseWebSocketOptions = {
   token?: string | null;
   onUnauthorized?: () => void;
+  onMessage?: (message: ServerToClientMessage) => void;
 };
 
 export const useWebSocket = (
@@ -51,9 +52,6 @@ export const useWebSocket = (
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [lastMessage, setLastMessage] = useState<ServerToClientMessage | null>(
-    null,
-  );
   const [error, setError] = useState<string | null>(null);
   const reconnectTimeoutRef = useRef<number>();
   const reconnectAttempts = useRef(0);
@@ -71,6 +69,13 @@ export const useWebSocket = (
   // out the state for the connection that actually owns the UI.
   const authToken = options.token ?? null;
   const handleUnauthorized = options.onUnauthorized;
+  const onMessageRef = useRef<UseWebSocketOptions["onMessage"]>(
+    options.onMessage,
+  );
+
+  useEffect(() => {
+    onMessageRef.current = options.onMessage;
+  }, [options.onMessage]);
 
   const clearReconnectTimer = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -176,7 +181,7 @@ export const useWebSocket = (
               });
               pendingRequestsRef.current.delete(message.requestId);
             }
-            setLastMessage(message);
+            onMessageRef.current?.(message);
             return;
           }
 
@@ -197,7 +202,7 @@ export const useWebSocket = (
             ) {
               handleUnauthorized?.();
             }
-            setLastMessage(message);
+            onMessageRef.current?.(message);
             return;
           }
 
@@ -209,7 +214,7 @@ export const useWebSocket = (
             }
           }
 
-          setLastMessage(message);
+          onMessageRef.current?.(message);
         } catch (err) {
           console.error("Error parsing WebSocket message:", err);
         }
@@ -602,7 +607,6 @@ export const useWebSocket = (
   return {
     socket,
     isConnected,
-    lastMessage,
     error,
     sendMessage,
     sendCommand,
