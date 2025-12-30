@@ -431,7 +431,8 @@ the corresponding stage.
 Whisper occasionally emits stock phrases or punctuation during silent stretches. The backend now reads
 `whisper.silenceHallucinationPhrases` from your configuration files so you can maintain the block without
 touching the source. Provide any phrases you consider noise and the transcriber discards matching chunks
-when the surrounding audio is effectively silent.
+when the surrounding audio is effectively silent. Repeated instances of a configured phrase are treated
+as hallucinations even if the audio is otherwise active.
 
 ```yaml
 whisper:

@@ -1353,6 +1353,76 @@ async def test_worker_discards_repeated_hallucinated_phrase(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_worker_discards_repeated_hallucination_phrase_on_active_audio(tmp_path):
+    config = WhisperConfig(
+        sampleRate=16000,
+        chunkLength=4,
+        minChunkDurationSeconds=1.0,
+        contextSeconds=0.0,
+        silenceThreshold=0.01,
+        silenceLookbackSeconds=0.25,
+        silenceHoldSeconds=0.25,
+        activeSamplesInLookbackPct=0.1,
+        blankAudioMinDurationSeconds=0.5,
+        blankAudioMinActiveRatio=0.0,
+        blankAudioMinRms=0.0,
+        silenceHallucinationPhrases=["i'm going to go to the next one"],
+    )
+
+    bundle = TranscriptionResultBundle(
+        "I'm going to go to the next one. I'm going to go to the next one. "
+        "I'm going to go to the next one.",
+        [],
+        "en",
+        no_speech_prob=0.1,
+        avg_logprob=0.2,
+    )
+    transcriber = StubTranscriber([bundle])
+
+    stream = Stream(
+        id="stream-hallucination-repeat-active",
+        name="Hallucination",
+        url="http://example.com/audio",
+        status=StreamStatus.STOPPED,
+        createdAt=datetime.utcnow(),
+        transcriptions=[],
+        source=StreamSource.AUDIO,
+    )
+
+    db = StreamDatabase(tmp_path / "runtime.sqlite")
+    evaluator = TranscriptionAlertEvaluator(AlertsConfig(enabled=False, rules=[]))
+    captured: List[TranscriptionResult] = []
+
+    async def capture(transcription: TranscriptionResult) -> None:
+        captured.append(transcription)
+
+    async def noop_status(_stream: Stream, _status: StreamStatus) -> None:
+        return
+
+    worker = StreamWorker(
+        stream=stream,
+        transcriber=transcriber,
+        database=db,
+        alert_evaluator=evaluator,
+        on_transcription=capture,
+        on_status_change=noop_status,
+        config=config,
+    )
+
+    active_audio = np.zeros(16000, dtype=np.int16)
+    active_audio[:8000] = 2000
+
+    await worker._ingest_pcm_bytes(active_audio.tobytes())
+
+    assert len(captured) == 1
+    result = captured[0]
+    assert result.text == BLANK_AUDIO_TOKEN
+    assert result.segments is None
+    assert result.recordingUrl is None
+    assert len(transcriber.calls) == 1
+
+
+@pytest.mark.asyncio
 async def test_worker_discards_double_repeat_hallucination(tmp_path):
     config = WhisperConfig(
         sampleRate=16000,

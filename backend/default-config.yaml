@@ -82,6 +82,7 @@ whisper:
     - "alright here we go"
     - "all right let's go"
     - "alright let's go"
+    - "i'm going to go to the next one"
   # Automatically restart audio streams when upstream audio stays silent for
   # this long. Set to null to disable automatic reconnects for inactivity.
   noAudioReconnectSeconds: 3600

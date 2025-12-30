@@ -1818,6 +1818,8 @@ class StreamWorker:
         # regardless of audio energy level. No real speech repeats this much.
         if self._has_extreme_repetition(normalized):
             return True
+        if self._has_repeated_hallucination_phrase(normalized):
+            return True
         if not (
             self._matches_hallucination_phrase(normalized)
             or self._has_excessive_repetition(normalized)
@@ -1828,8 +1830,9 @@ class StreamWorker:
         return self._is_low_quality_transcription(avg_logprob)
 
     def _matches_hallucination_phrase(self, normalized_text: str) -> bool:
-        if normalized_text in self._hallucination_phrases:
-            return True
+        return normalized_text in self._hallucination_phrases
+
+    def _has_repeated_hallucination_phrase(self, normalized_text: str) -> bool:
         for phrase in self._hallucination_phrases:
             if self._is_repeated_phrase(normalized_text, phrase):
                 return True
