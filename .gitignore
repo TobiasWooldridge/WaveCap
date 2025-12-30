@@ -1,5 +1,7 @@
 # Dependencies
 node_modules/
+playwright-report/
+test-results/
 __pycache__/
 *.pyc
 *.pyo
@@ -122,4 +124,3 @@ backend/__tests__/tmp/
 !/state/recordings/.gitkeep
 !/state/temp/
 !/state/temp/.gitkeep
-

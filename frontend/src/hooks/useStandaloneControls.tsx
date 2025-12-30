@@ -191,33 +191,6 @@ export const useStandaloneControls = (options: UseStandaloneControlsOptions): St
     ],
   );
 
-  if (isPagerStream && onExportPagerFeed) {
-    toolButtonItems.push(
-      <Button
-        key="export-pager"
-        size="sm"
-        use="secondary"
-        appearance="outline"
-        onClick={() => {
-          onSelectPagerExportStream?.(streamId);
-          void onExportPagerFeed();
-        }}
-        startContent={
-          pagerExporting ? (
-            <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
-          ) : (
-            <Download size={14} />
-          )
-        }
-        isCondensed
-        tooltip="Export pager feed"
-        disabled={pagerExporting}
-      >
-        {pagerExporting ? "Exporting…" : "Export feed"}
-      </Button>,
-    );
-  }
-
   return useMemo<StandaloneStreamControls>(
     () => ({
       streamId,

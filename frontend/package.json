@@ -12,6 +12,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "tsc --project tsconfig.tests.json && node scripts/fix-test-imports.mjs && node scripts/run-tests.mjs",
+    "test:e2e": "playwright test",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "type-check": "tsc --noEmit"
   },
@@ -25,6 +26,7 @@
     "react-router-dom": "^7.9.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.57.0",
     "@types/node": "^20.0.0",
     "@types/react": "^18.2.37",
     "@types/react-dom": "^18.2.15",

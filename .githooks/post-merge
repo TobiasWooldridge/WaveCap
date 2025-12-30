@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ "${SKIP_WAVECAP_POST_MERGE:-}" = "1" ] || [ "${SKIP_WAVECAP_POST_MERGE:-}" = "true" ]; then
+  exit 0
+fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+CHANGED_FILES=$(git diff-tree -r --name-only ORIG_HEAD HEAD 2>/dev/null || true)
+
+if echo "$CHANGED_FILES" | grep -qE '^frontend/(package-lock\.json|package\.json)$'; then
+  printf "Frontend dependencies changed, installing..."
+  INSTALL_OUTPUT=$(npm --prefix frontend ci 2>&1)
+  INSTALL_EXIT=$?
+  if [ $INSTALL_EXIT -eq 0 ]; then
+    echo " done"
+  else
+    echo " failed!"
+    echo ""
+    echo "$INSTALL_OUTPUT"
+    exit $INSTALL_EXIT
+  fi
+fi
+
+if echo "$CHANGED_FILES" | grep -qE '^backend/(pyproject\.toml|poetry\.lock)$'; then
+  printf "Backend dependencies changed, installing..."
+  INSTALL_OUTPUT=$(poetry -C backend install 2>&1)
+  INSTALL_EXIT=$?
+  if [ $INSTALL_EXIT -eq 0 ]; then
+    echo " done"
+  else
+    echo " failed!"
+    echo ""
+    echo "$INSTALL_OUTPUT"
+    exit $INSTALL_EXIT
+  fi
+fi

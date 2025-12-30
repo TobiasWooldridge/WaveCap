@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ "${SKIP_WAVECAP_PREPUSH:-}" = "1" ] || [ "${SKIP_WAVECAP_PREPUSH:-}" = "true" ]; then
+  exit 0
+fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+echo "Running backend tests..."
+poetry -C backend run pytest
+
+echo "Running frontend tests..."
+npm --prefix frontend run test
+
+echo "Pre-push checks passed."

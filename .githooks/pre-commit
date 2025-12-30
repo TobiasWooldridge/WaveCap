@@ -23,6 +23,35 @@ fi
 
 mapfile -t STAGED_FILES < <(git diff --cached --name-only --diff-filter=ACM)
 
+mapfile -t LOCALHOST_FILES < <(
+  printf '%s\n' "${STAGED_FILES[@]}" \
+    | grep -v -E '\.(md|txt|rst)$' \
+    | grep -v -E '(\.env|CLAUDE\.md|pre-commit|/debug/|\.example$)' \
+    || true
+)
+
+if [ ${#LOCALHOST_FILES[@]} -gt 0 ]; then
+  localhost_refs=""
+  for file in "${LOCALHOST_FILES[@]}"; do
+    if git diff --cached -- "$file" \
+      | grep -E '^[+].*\b(localhost|127\.0\.0\.1|0\.0\.0\.0)\b' \
+      | grep -v -E '//.*localhost|#.*localhost|\*.*localhost' \
+      > /dev/null 2>&1; then
+      localhost_refs="$localhost_refs\n  - $file"
+    fi
+  done
+
+  if [ -n "$localhost_refs" ]; then
+    echo "Error: Found localhost references in staged files:$localhost_refs"
+    echo ""
+    echo "Hardcoded localhost references will break production."
+    echo "Use environment variables or dynamic host detection instead."
+    echo ""
+    echo "If this is intentional (e.g., fixtures), use 'git commit --no-verify'"
+    exit 1
+  fi
+fi
+
 run_ts=false
 run_py=false
 run_prettier=false

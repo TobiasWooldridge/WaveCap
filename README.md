@@ -47,15 +47,16 @@ is already prepared. If required artifacts are missing, the scripts fall back to
 
 ### Git Hooks
 
-The repository ships the pre-commit hook under `.githooks/pre-commit`. Install it once per clone so commits run TypeScript and
-Python type checking automatically:
+The repository ships Git hooks under `.githooks/`. Install them once per clone so commits run TypeScript and Python type
+checking automatically, merges update dependencies when lockfiles change, and pushes run the test suites:
 
 ```bash
 git config core.hooksPath .githooks
 ```
 
 After configuring the custom hook path, the pre-commit hook invokes `npm --prefix frontend run type-check` when TypeScript files
-are staged and `poetry -C backend run mypy` for staged Python files.
+are staged and `poetry -C backend run mypy` for staged Python files. Set `SKIP_WAVECAP_POST_MERGE=1` to bypass dependency
+installs on merge, or `SKIP_WAVECAP_PREPUSH=1` to skip the pre-push test run.
 
 ### Manual Start
 
