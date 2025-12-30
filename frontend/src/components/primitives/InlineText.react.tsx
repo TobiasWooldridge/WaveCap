@@ -32,7 +32,6 @@ type InlineTextProps<C extends ElementType> = InlineTextOwnProps<C> &
 
 type InlineTextComponent = (<C extends ElementType = "span">(
   props: InlineTextProps<C> & { ref?: PolymorphicRef<C> },
-// eslint-disable-next-line @typescript-eslint/no-invalid-void-type
 ) => ReactElement | null) & { displayName?: string };
 
 const InlineText = forwardRef(

@@ -299,6 +299,7 @@ export const useStandaloneControls = (options: UseStandaloneControlsOptions): St
       streamName,
       stream,
       transcriptCorrectionEnabled,
+      recordingAudioRefs,
       playingSegmentId,
       onPlaySegment,
       isSegmentCurrentlyPlaying,

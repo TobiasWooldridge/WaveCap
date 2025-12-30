@@ -53,7 +53,6 @@ export const HoveredSegmentProvider = ({
  * Hook to access hovered segment state.
  * Must be used within a HoveredSegmentProvider.
  */
-// eslint-disable-next-line react-refresh/only-export-components
 export const useHoveredSegment = () => {
   const context = useContext(HoveredSegmentContext);
 
@@ -70,7 +69,6 @@ export const useHoveredSegment = () => {
  * Hook for optional access to hovered segment state.
  * Returns null if not within a HoveredSegmentProvider.
  */
-// eslint-disable-next-line react-refresh/only-export-components
 export const useHoveredSegmentOptional = (): HoveredSegmentContextValue | null => {
   return useContext(HoveredSegmentContext) ?? null;
 };
@@ -78,7 +76,6 @@ export const useHoveredSegmentOptional = (): HoveredSegmentContextValue | null =
 /**
  * Build a segment identifier for hover matching.
  */
-// eslint-disable-next-line react-refresh/only-export-components
 export const buildHoveredSegmentId = (
   transcriptionId: string,
   segmentId: number,

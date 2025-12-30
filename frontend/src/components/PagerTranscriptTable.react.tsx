@@ -29,10 +29,9 @@ export const PagerTranscriptTable: React.FC<PagerTranscriptTableProps> = ({
   incidentLocationQuery,
   hideTimeColumn = false,
 }) => {
-  if (!messages || messages.length === 0) return null;
-
   const { googleMapsApiKey } = useUISettings();
   const [mapOpen, setMapOpen] = useState<boolean>(false);
+  const safeMessages = messages ?? [];
 
   const searchQuery = incidentLocationQuery ?? null;
   const mapEmbedUrl = useMemo(() => {
@@ -51,6 +50,10 @@ export const PagerTranscriptTable: React.FC<PagerTranscriptTableProps> = ({
     return `https://maps.google.com/maps?hl=en&q=${encoded}&ie=UTF8&z=15`;
   }, [incidentLocationUrls, searchQuery]);
 
+  if (safeMessages.length === 0) {
+    return null;
+  }
+
   return (
     <div className="transcript-thread__pager-group" key={`${groupId}-pager`}>      
       <table className="pager-table" aria-label="Pager messages">
@@ -67,7 +70,7 @@ export const PagerTranscriptTable: React.FC<PagerTranscriptTableProps> = ({
           </tr>
         </thead>
         <tbody>
-          {messages.map((message, index) => {
+          {safeMessages.map((message, index) => {
             const isOpen = Boolean(openMessageIds[message.id]);
             const firstFragment = message.fragments[0];
             const fragmentDisplayText = firstFragment ? getTranscriptionDisplayText(firstFragment) : null;
