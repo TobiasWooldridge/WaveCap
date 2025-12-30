@@ -11,8 +11,8 @@ export interface TimeIntervalProps
   condensed?: boolean;
   /**
    * Control auto-refreshing the label as time passes. Provide a millisecond
-   * interval, or set to 0/false to disable. If undefined, an adaptive
-   * interval is chosen based on the current difference.
+   * interval, or set to 0/false to disable. If undefined, updates are only
+   * enabled for recent timestamps to avoid re-rendering long lists.
    */
   refreshMs?: number | false;
   /**
@@ -120,29 +120,32 @@ const formatInterval = (
   return { label, longLabel };
 };
 
-export const TimeInterval: React.FC<TimeIntervalProps> = ({
-  value,
-  condensed = false,
-  refreshMs: _refreshMs, // Kept for API compatibility but now ignored
-  now,
+const DEFAULT_LIVE_WINDOW_MS = 10 * 60 * 1000;
+
+const resolveNowMs = (now?: number | Date): number | null => {
+  if (now instanceof Date) {
+    const t = now.getTime();
+    return Number.isFinite(t) ? t : null;
+  }
+  if (typeof now === "number") {
+    return Number.isFinite(now) ? now : null;
+  }
+  return null;
+};
+
+const LiveTimeInterval: React.FC<{
+  targetMs: number;
+  condensed: boolean;
+  className?: string;
+  title?: string;
+} & Omit<React.HTMLAttributes<HTMLSpanElement>, "children">> = ({
+  targetMs,
+  condensed,
   className,
   title,
   ...rest
 }) => {
-  const targetMs = useMemo(() => parseDate(value), [value]);
-
-  // Use shared clock from context, or override if `now` prop is provided
-  const clockNowMs = useClock();
-  const nowMs = useMemo(() => {
-    if (now instanceof Date) return now.getTime();
-    if (typeof now === "number") return now;
-    return clockNowMs;
-  }, [now, clockNowMs]);
-
-  if (typeof targetMs !== "number") {
-    return null;
-  }
-
+  const nowMs = useClock();
   const { label, longLabel } = formatInterval(targetMs, nowMs, condensed);
 
   return (
@@ -157,5 +160,80 @@ export const TimeInterval: React.FC<TimeIntervalProps> = ({
   );
 };
 
-export default TimeInterval;
+const StaticTimeInterval: React.FC<{
+  targetMs: number;
+  nowMs: number;
+  condensed: boolean;
+  className?: string;
+  title?: string;
+} & Omit<React.HTMLAttributes<HTMLSpanElement>, "children">> = ({
+  targetMs,
+  nowMs,
+  condensed,
+  className,
+  title,
+  ...rest
+}) => {
+  const { label, longLabel } = formatInterval(targetMs, nowMs, condensed);
 
+  return (
+    <span
+      {...rest}
+      className={className}
+      title={title ?? longLabel}
+      aria-label={longLabel}
+    >
+      {label}
+    </span>
+  );
+};
+
+export const TimeInterval: React.FC<TimeIntervalProps> = ({
+  value,
+  condensed = false,
+  refreshMs: _refreshMs,
+  now,
+  className,
+  title,
+  ...rest
+}) => {
+  const targetMs = useMemo(() => parseDate(value), [value]);
+  const nowOverride = useMemo(() => resolveNowMs(now), [now]);
+
+  if (typeof targetMs !== "number") {
+    return null;
+  }
+
+  const baseNowMs = nowOverride ?? Date.now();
+  const diffMs = Math.abs(targetMs - baseNowMs);
+  const allowLive =
+    _refreshMs !== false &&
+    _refreshMs !== 0 &&
+    nowOverride === null &&
+    (typeof _refreshMs === "number" || diffMs <= DEFAULT_LIVE_WINDOW_MS);
+
+  if (allowLive) {
+    return (
+      <LiveTimeInterval
+        {...rest}
+        targetMs={targetMs}
+        condensed={condensed}
+        className={className}
+        title={title}
+      />
+    );
+  }
+
+  return (
+    <StaticTimeInterval
+      {...rest}
+      targetMs={targetMs}
+      nowMs={baseNowMs}
+      condensed={condensed}
+      className={className}
+      title={title}
+    />
+  );
+};
+
+export default TimeInterval;
