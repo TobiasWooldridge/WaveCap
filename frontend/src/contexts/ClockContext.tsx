@@ -24,9 +24,11 @@ interface ClockContextValue {
 
 const FastClockContext = createContext<ClockContextValue | null>(null);
 const SlowClockContext = createContext<ClockContextValue | null>(null);
+const HourClockContext = createContext<ClockContextValue | null>(null);
 
 const FAST_TICK_INTERVAL_MS = 1000;
 const SLOW_TICK_INTERVAL_MS = 60 * 1000;
+const HOUR_TICK_INTERVAL_MS = 60 * 60 * 1000;
 
 interface ClockProviderProps {
   children: ReactNode;
@@ -35,9 +37,12 @@ interface ClockProviderProps {
 export const ClockProvider: React.FC<ClockProviderProps> = ({ children }) => {
   const [fastNowMs, setFastNowMs] = useState(() => Date.now());
   const [slowNowMs, setSlowNowMs] = useState(() => Date.now());
+  const [hourNowMs, setHourNowMs] = useState(() => Date.now());
   const fastIntervalRef = useRef<number | null>(null);
   const slowIntervalRef = useRef<number | null>(null);
+  const hourIntervalRef = useRef<number | null>(null);
   const slowTimeoutRef = useRef<number | null>(null);
+  const hourTimeoutRef = useRef<number | null>(null);
 
   const startClock = useCallback(() => {
     if (fastIntervalRef.current !== null) return;
@@ -61,6 +66,20 @@ export const ClockProvider: React.FC<ClockProviderProps> = ({ children }) => {
         setSlowNowMs(Date.now());
       }, SLOW_TICK_INTERVAL_MS);
     }, delay);
+
+    if (hourIntervalRef.current !== null || hourTimeoutRef.current !== null) {
+      return;
+    }
+
+    setHourNowMs(now);
+    const hourDelay = HOUR_TICK_INTERVAL_MS - (now % HOUR_TICK_INTERVAL_MS);
+    hourTimeoutRef.current = window.setTimeout(() => {
+      hourTimeoutRef.current = null;
+      setHourNowMs(Date.now());
+      hourIntervalRef.current = window.setInterval(() => {
+        setHourNowMs(Date.now());
+      }, HOUR_TICK_INTERVAL_MS);
+    }, hourDelay);
   }, []);
 
   const stopClock = useCallback(() => {
@@ -72,9 +91,17 @@ export const ClockProvider: React.FC<ClockProviderProps> = ({ children }) => {
       window.clearInterval(slowIntervalRef.current);
       slowIntervalRef.current = null;
     }
+    if (hourIntervalRef.current !== null) {
+      window.clearInterval(hourIntervalRef.current);
+      hourIntervalRef.current = null;
+    }
     if (slowTimeoutRef.current !== null) {
       window.clearTimeout(slowTimeoutRef.current);
       slowTimeoutRef.current = null;
+    }
+    if (hourTimeoutRef.current !== null) {
+      window.clearTimeout(hourTimeoutRef.current);
+      hourTimeoutRef.current = null;
     }
   }, []);
 
@@ -104,7 +131,9 @@ export const ClockProvider: React.FC<ClockProviderProps> = ({ children }) => {
   return (
     <FastClockContext.Provider value={{ nowMs: fastNowMs }}>
       <SlowClockContext.Provider value={{ nowMs: slowNowMs }}>
-        {children}
+        <HourClockContext.Provider value={{ nowMs: hourNowMs }}>
+          {children}
+        </HourClockContext.Provider>
       </SlowClockContext.Provider>
     </FastClockContext.Provider>
   );
@@ -129,6 +158,18 @@ export const useFastClock = (): number => {
  */
 export const useSlowClock = (): number => {
   const context = useContext(SlowClockContext);
+  if (!context) {
+    return Date.now();
+  }
+  return context.nowMs;
+};
+
+/**
+ * Hook to access the shared hourly clock. Returns the current time in milliseconds,
+ * updated once per hour when the page is visible.
+ */
+export const useHourClock = (): number => {
+  const context = useContext(HourClockContext);
   if (!context) {
     return Date.now();
   }

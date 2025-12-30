@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { useFastClock, useSlowClock } from "../../contexts/ClockContext";
+import { useFastClock, useHourClock, useSlowClock } from "../../contexts/ClockContext";
 
 export interface TimeIntervalProps
   extends Omit<React.HTMLAttributes<HTMLSpanElement>, "children"> {
@@ -121,6 +121,7 @@ const formatInterval = (
 };
 
 const DEFAULT_FAST_WINDOW_MS = 10 * 60 * 1000;
+const DEFAULT_SLOW_WINDOW_MS = 60 * 60 * 1000;
 
 const resolveNowMs = (now?: number | Date): number | null => {
   if (now instanceof Date) {
@@ -173,6 +174,33 @@ const SlowTimeInterval: React.FC<{
   ...rest
 }) => {
   const nowMs = useSlowClock();
+  const { label, longLabel } = formatInterval(targetMs, nowMs, condensed);
+
+  return (
+    <span
+      {...rest}
+      className={className}
+      title={title ?? longLabel}
+      aria-label={longLabel}
+    >
+      {label}
+    </span>
+  );
+};
+
+const HourTimeInterval: React.FC<{
+  targetMs: number;
+  condensed: boolean;
+  className?: string;
+  title?: string;
+} & Omit<React.HTMLAttributes<HTMLSpanElement>, "children">> = ({
+  targetMs,
+  condensed,
+  className,
+  title,
+  ...rest
+}) => {
+  const nowMs = useHourClock();
   const { label, longLabel } = formatInterval(targetMs, nowMs, condensed);
 
   return (
@@ -249,9 +277,25 @@ export const TimeInterval: React.FC<TimeIntervalProps> = ({
     );
   }
 
-  if (shouldUpdate && diffMs > DEFAULT_FAST_WINDOW_MS) {
+  if (
+    shouldUpdate &&
+    diffMs > DEFAULT_FAST_WINDOW_MS &&
+    diffMs <= DEFAULT_SLOW_WINDOW_MS
+  ) {
     return (
       <SlowTimeInterval
+        {...rest}
+        targetMs={targetMs}
+        condensed={condensed}
+        className={className}
+        title={title}
+      />
+    );
+  }
+
+  if (shouldUpdate && diffMs > DEFAULT_SLOW_WINDOW_MS) {
+    return (
+      <HourTimeInterval
         {...rest}
         targetMs={targetMs}
         condensed={condensed}
