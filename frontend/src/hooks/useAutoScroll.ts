@@ -91,16 +91,48 @@ export const useAutoScroll = () => {
       return;
     }
 
-    const observer = new ResizeObserver(() => {
-      if (isAtBottomRef.current) {
-        scrollToBottom("auto");
+    let frameId: number | null = null;
+
+    const scheduleScroll = () => {
+      if (!isAtBottomRef.current) {
+        return;
       }
+
+      if (
+        typeof window === "undefined" ||
+        typeof window.requestAnimationFrame !== "function"
+      ) {
+        scrollToBottom("auto");
+        return;
+      }
+
+      if (frameId !== null) {
+        return;
+      }
+
+      frameId = window.requestAnimationFrame(() => {
+        frameId = null;
+        if (isAtBottomRef.current) {
+          scrollToBottom("auto");
+        }
+      });
+    };
+
+    const observer = new ResizeObserver(() => {
+      scheduleScroll();
     });
 
     observer.observe(container);
 
     return () => {
       observer.disconnect();
+      if (
+        frameId !== null &&
+        typeof window !== "undefined" &&
+        typeof window.cancelAnimationFrame === "function"
+      ) {
+        window.cancelAnimationFrame(frameId);
+      }
     };
   }, [observedNode, scrollToBottom]);
 
