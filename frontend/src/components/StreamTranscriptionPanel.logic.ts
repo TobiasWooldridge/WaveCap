@@ -9,6 +9,18 @@ export const GAP_MULTIPLIER = 1.6;
 export const DURATION_SILENCE_SCALE = 0.6;
 export const PAGER_INCIDENT_GROUP_WINDOW_MS = 90_000;
 
+const preparedTranscriptionsCache = new WeakMap<
+  TranscriptionResult[],
+  {
+    sortedTranscriptions: TranscriptionResult[];
+    groupedTranscriptions: TranscriptionGroup[];
+  }
+>();
+const dedupeTranscriptionsCache = new WeakMap<
+  TranscriptionResult[],
+  TranscriptionResult[]
+>();
+
 export interface TranscriptionGroup {
   id: string;
   startTimestamp: string;
@@ -300,12 +312,19 @@ export const prepareTranscriptions = (
     };
   }
 
+  const cached = preparedTranscriptionsCache.get(transcriptions);
+  if (cached) {
+    return cached;
+  }
+
   const sortedTranscriptions = [...transcriptions].sort(
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
   );
   const groupedTranscriptions = groupTranscriptions(sortedTranscriptions);
+  const result = { sortedTranscriptions, groupedTranscriptions };
+  preparedTranscriptionsCache.set(transcriptions, result);
 
-  return { sortedTranscriptions, groupedTranscriptions };
+  return result;
 };
 
 export const dedupeAndSortTranscriptions = (
@@ -315,14 +334,21 @@ export const dedupeAndSortTranscriptions = (
     return [];
   }
 
+  const cached = dedupeTranscriptionsCache.get(transcriptions);
+  if (cached) {
+    return cached;
+  }
+
   const map = new Map<string, TranscriptionResult>();
   transcriptions.forEach((transcription) => {
     map.set(transcription.id, transcription);
   });
 
-  return Array.from(map.values()).sort(
+  const result = Array.from(map.values()).sort(
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
   );
+  dedupeTranscriptionsCache.set(transcriptions, result);
+  return result;
 };
 
 const sortByTimestampDescending = (
