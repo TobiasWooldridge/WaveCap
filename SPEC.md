@@ -45,8 +45,10 @@ transcribing multiple radio or pager feeds in real time.
 - See stream status and unread badges in the sidebar. Unread counts persist per browser session via localStorage so refreshes don’t reset them. Start/Stop controls are removed; enable/disable streams via `state/config.yaml`.
 - Controls that trigger backend actions disable their buttons and show a spinner while the backend processes the request, preventing duplicate submissions.
 - Panels that may take time to populate display loading spinners until data arrives so operators understand the UI is still working.
+- If the backend is unavailable, the UI surfaces a connection error and keeps retrying stream fetches with backoff instead of spamming the logs.
 - Check aggregate counters for transcript volume, confidence, and recent activity.
 - Activate “Listen live” on any enabled audio stream to start a persistent live player. Playback continues while navigating other streams, surfaces a top-of-screen banner and header badge that name the current feed, and automatically switches over when you start listening to a different stream.
+- When a browser cannot decode the live audio format, the UI surfaces a clear unsupported-format error and stops playback cleanly.
 - Receive real-time transcript bursts; contiguous speech is grouped for readability.
 - Pager feed messages that share an incident number and arrive within roughly a minute
   collapse into a single grouped thread, showing parsed incident details like the call

@@ -37,6 +37,7 @@ export const useLiveAudio = (
 ): UseLiveAudioResult => {
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [formatSupported, setFormatSupported] = useState<boolean | null>(null);
   const elementRef = useRef<HTMLAudioElement | null>(null);
   const [attachVersion, setAttachVersion] = useState(0);
   const [streamNonce, setStreamNonce] = useState<string | null>(null);
@@ -53,11 +54,14 @@ export const useLiveAudio = (
   const setAudio = useCallback((node: HTMLAudioElement | null) => {
     elementRef.current = node;
     if (node) {
+      const supportResult = node.canPlayType("audio/wav");
+      setFormatSupported(supportResult !== "");
       console.info("[live-audio] element attached", {
-        canPlayType: node.canPlayType("audio/wav"),
+        canPlayType: supportResult,
       });
       setAttachVersion((prev) => prev + 1);
     } else {
+      setFormatSupported(null);
       console.info("[live-audio] element detached");
       setAttachVersion((prev) => prev + 1);
     }
@@ -81,11 +85,17 @@ export const useLiveAudio = (
       console.info("[live-audio] start skipped", { canListen });
       return;
     }
+    if (formatSupported === false) {
+      const message = "Live audio stream format is not supported by this browser.";
+      setError(message);
+      console.warn("[live-audio] start blocked by unsupported format");
+      return;
+    }
     setIsListening(true);
     setStreamNonce(`${Date.now()}`);
     setError(null);
     console.info("[live-audio] start requested", { canListen });
-  }, [canListen]);
+  }, [canListen, formatSupported]);
 
   const stop = useCallback(() => {
     if (!isListening) {
@@ -140,6 +150,14 @@ export const useLiveAudio = (
     const audio = elementRef.current;
     const mediaError = audio?.error ?? null;
     const message = describeMediaError(mediaError);
+    const audioSnapshot = audio
+      ? {
+          currentSrc: audio.currentSrc || audio.src || null,
+          networkState: audio.networkState,
+          readyState: audio.readyState,
+          canPlayType: audio.canPlayType("audio/wav"),
+        }
+      : null;
     if (mediaError) {
       // MediaError doesn't have enumerable properties, so extract them explicitly
       console.error("❌ Live audio playback error:", {
@@ -149,12 +167,24 @@ export const useLiveAudio = (
         MEDIA_ERR_NETWORK: mediaError.code === 2,
         MEDIA_ERR_DECODE: mediaError.code === 3,
         MEDIA_ERR_SRC_NOT_SUPPORTED: mediaError.code === 4,
+        audio: audioSnapshot,
       });
     } else {
-      console.error("❌ Live audio playback error: unknown error (no MediaError)");
+      console.error("❌ Live audio playback error: unknown error (no MediaError)", {
+        audio: audioSnapshot,
+      });
     }
     setError(message);
   }, []);
+
+  useEffect(() => {
+    if (formatSupported === false && isListening) {
+      const message = "Live audio stream format is not supported by this browser.";
+      setIsListening(false);
+      setStreamNonce(null);
+      setError(message);
+    }
+  }, [formatSupported, isListening]);
 
   useEffect(() => {
     if (!isListening) return;

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Stream,
@@ -11,6 +11,18 @@ import { useAuth } from "../contexts/AuthContext";
 const API_BASE = "/api";
 export const STREAM_TRANSCRIPTION_PREVIEW_LIMIT = 100;
 const STREAMS_QUERY_KEY = ["streams"] as const;
+const STREAMS_LOG_THROTTLE_MS = 30000;
+const STREAMS_RETRY_LIMIT = 5;
+
+const describeStreamError = (error: Error): string => {
+  if (error.message.toLowerCase().includes("http error! status: 401")) {
+    return "Authentication required to load streams.";
+  }
+  if (error.message.toLowerCase().includes("http error! status: 403")) {
+    return "Access denied while loading streams.";
+  }
+  return "Unable to load streams. Check your connection; WaveCap will keep retrying.";
+};
 
 const toError = (value: unknown, fallback: string): Error => {
   if (value instanceof Error) {
@@ -31,6 +43,9 @@ export const useStreams = () => {
   const [error, setError] = useState<string | null>(null);
   const { authFetch } = useAuth();
   const queryClient = useQueryClient();
+  const lastErrorLogRef = useRef<{ message: string; timestamp: number } | null>(
+    null,
+  );
 
   const buildHeaders = useCallback((contentType?: string): HeadersInit => {
     const headers: Record<string, string> = {};
@@ -59,8 +74,17 @@ export const useStreams = () => {
       return normalized;
     } catch (err) {
       const errorObject = toError(err, "Failed to fetch streams");
-      console.error("Error fetching streams:", errorObject);
-      setError(errorObject.message);
+      const now = Date.now();
+      const lastLog = lastErrorLogRef.current;
+      if (
+        !lastLog ||
+        lastLog.message !== errorObject.message ||
+        now - lastLog.timestamp > STREAMS_LOG_THROTTLE_MS
+      ) {
+        console.error("Error fetching streams:", errorObject);
+        lastErrorLogRef.current = { message: errorObject.message, timestamp: now };
+      }
+      setError(describeStreamError(errorObject));
       throw errorObject;
     }
   }, [authFetch]);
@@ -68,6 +92,14 @@ export const useStreams = () => {
   const streamsQuery = useQuery<Stream[], Error>({
     queryKey: STREAMS_QUERY_KEY,
     queryFn: fetchStreamsRequest,
+    retry: (failureCount, err) => {
+      if (err.message.toLowerCase().includes("http error! status: 4")) {
+        return false;
+      }
+      return failureCount < STREAMS_RETRY_LIMIT;
+    },
+    retryDelay: (attemptIndex) =>
+      Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 
   const { data: streamsData, isFetching, isFetched, refetch } = streamsQuery;
@@ -87,7 +119,7 @@ export const useStreams = () => {
       await refetch({ throwOnError: true });
     } catch (err) {
       const errorObject = toError(err, "Failed to fetch streams");
-      setError(errorObject.message);
+      setError(describeStreamError(errorObject));
       throw errorObject;
     }
   }, [refetch]);

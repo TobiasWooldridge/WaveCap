@@ -28,6 +28,7 @@ const STALE_CHECK_INTERVAL_MS = 30 * 1000; // 30 seconds
 const MAX_RECONNECT_DELAY_MS = 5 * 60 * 1000;
 // After this many fast retries, switch to slower reconnection
 const FAST_RETRY_THRESHOLD = 5;
+const ERROR_LOG_THROTTLE_MS = 15000;
 
 const createRequestId = (): string => {
   if (
@@ -63,6 +64,7 @@ export const useWebSocket = (
   const connectionIdRef = useRef(0);
   const lastMessageTimeRef = useRef<number>(Date.now());
   const staleCheckIntervalRef = useRef<number>();
+  const lastErrorLogRef = useRef<number>(0);
   // Each WebSocket we create gets a monotonically increasing identifier. When
   // we reconnect (e.g. after the user logs in) the previous socket may close a
   // moment later. We ignore events from those stale sockets so they cannot wipe
@@ -133,6 +135,14 @@ export const useWebSocket = (
       const connectionId = connectionIdRef.current + 1;
       connectionIdRef.current = connectionId;
       const ws = new WebSocket(resolveBaseUrl());
+      const logErrorThrottled = (label: string, details: Record<string, unknown>) => {
+        const now = Date.now();
+        if (now - lastErrorLogRef.current < ERROR_LOG_THROTTLE_MS) {
+          return;
+        }
+        lastErrorLogRef.current = now;
+        console.error(label, details);
+      };
 
       ws.onopen = () => {
         if (connectionIdRef.current !== connectionId) {
@@ -227,6 +237,16 @@ export const useWebSocket = (
           // state for the active socket.
           return;
         }
+        const closeDetails = {
+          code: event.code,
+          reason: event.reason || "No reason provided",
+          wasClean: event.wasClean,
+          url: ws.url,
+          readyState: ws.readyState,
+        };
+        if (event.code !== IDLE_DISCONNECT_CLOSE_CODE) {
+          console.warn("WebSocket closed:", closeDetails);
+        }
         setIsConnected(false);
         setSocket(null);
         socketRef.current = null;
@@ -317,7 +337,11 @@ export const useWebSocket = (
         }
         // Only log, don't set error - let onclose handle the retry logic
         // and only show error to user after multiple failed attempts
-        console.error("WebSocket error:", event);
+        logErrorThrottled("WebSocket error:", {
+          isTrusted: event.isTrusted,
+          url: ws.url,
+          readyState: ws.readyState,
+        });
       };
 
       setSocket(ws);

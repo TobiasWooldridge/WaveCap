@@ -7,6 +7,7 @@ import inspect
 import logging
 import platform
 import threading
+import time
 import warnings
 from typing import Any, List, Optional, Tuple, TYPE_CHECKING
 
@@ -683,6 +684,21 @@ def _mlx_worker_process(
                     "result": result,
                 })
             except Exception as exc:
+                is_broken_pipe = isinstance(exc, BrokenPipeError) or (
+                    isinstance(exc, OSError) and exc.errno == 32
+                )
+                if is_broken_pipe:
+                    LOGGER.error("MLX subprocess encountered broken pipe, exiting")
+                    try:
+                        response_queue.put({
+                            "type": "fatal",
+                            "id": request_id,
+                            "error": str(exc),
+                            "error_type": type(exc).__name__,
+                        })
+                    except Exception:
+                        pass
+                    break
                 response_queue.put({
                     "type": "error",
                     "id": request_id,
@@ -750,15 +766,24 @@ class SubprocessMLXTranscriber(AbstractTranscriber):
             if self._process is not None:
                 LOGGER.warning("MLX subprocess died, respawning...")
                 self._cleanup_subprocess()
-                self._respawn_count += 1
-                if self._respawn_count > self.MAX_RESPAWN_ATTEMPTS:
-                    LOGGER.error(
-                        "MLX subprocess respawn limit (%d) exceeded",
-                        self.MAX_RESPAWN_ATTEMPTS,
-                    )
-                    return False
+            if self._respawn_count >= self.MAX_RESPAWN_ATTEMPTS:
+                LOGGER.error(
+                    "MLX subprocess respawn limit (%d) exceeded",
+                    self.MAX_RESPAWN_ATTEMPTS,
+                )
+                return False
 
-            return self._spawn_subprocess()
+            if self._spawn_subprocess():
+                self._respawn_count = 0
+                return True
+
+            self._respawn_count += 1
+            if self._respawn_count > self.MAX_RESPAWN_ATTEMPTS:
+                LOGGER.error(
+                    "MLX subprocess respawn limit (%d) exceeded after startup failure",
+                    self.MAX_RESPAWN_ATTEMPTS,
+                )
+            return False
 
     def _spawn_subprocess(self) -> bool:
         """Spawn a new subprocess. Must be called with lock held."""
@@ -785,17 +810,26 @@ class SubprocessMLXTranscriber(AbstractTranscriber):
 
             # Wait for ready signal
             try:
+                start_time = time.monotonic()
                 response = self._response_queue.get(timeout=self.STARTUP_TIMEOUT)
                 if response.get("type") == "ready":
                     LOGGER.info("MLX subprocess ready (PID: %d)", self._process.pid)
-                    self._respawn_count = 0  # Reset on successful start
                     return True
                 elif response.get("type") == "fatal":
                     LOGGER.error("MLX subprocess failed to start: %s", response.get("error"))
                     self._cleanup_subprocess()
                     return False
             except Exception as exc:
-                LOGGER.error("MLX subprocess startup timeout: %s", exc)
+                elapsed = time.monotonic() - start_time
+                alive = self._process.is_alive() if self._process else False
+                exitcode = self._process.exitcode if self._process else None
+                LOGGER.error(
+                    "MLX subprocess startup timeout after %.1fs (alive=%s, exitcode=%s): %s",
+                    elapsed,
+                    alive,
+                    exitcode,
+                    exc,
+                )
                 self._cleanup_subprocess()
                 return False
 
@@ -892,7 +926,18 @@ class SubprocessMLXTranscriber(AbstractTranscriber):
 
         for attempt in range(max_retries + 1):
             if not self._ensure_subprocess():
-                raise RuntimeError("Failed to start MLX subprocess")
+                last_error = RuntimeError("Failed to start MLX subprocess")
+                if attempt < max_retries:
+                    delay = min(5.0, 0.5 * (2 ** attempt))
+                    LOGGER.warning(
+                        "MLX subprocess unavailable (attempt %d/%d), retrying in %.1fs",
+                        attempt + 1,
+                        max_retries + 1,
+                        delay,
+                    )
+                    time.sleep(delay)
+                    continue
+                raise last_error
 
             try:
                 return self._send_transcription_request(audio, language, initial_prompt)
@@ -951,12 +996,15 @@ class SubprocessMLXTranscriber(AbstractTranscriber):
         effective_prompt = initial_prompt or self._config_dict.get("initialPrompt")
 
         # Send request
-        self._request_queue.put({
-            "id": request_id,
-            "audio": audio,
-            "language": effective_language,
-            "initial_prompt": effective_prompt,
-        })
+        try:
+            self._request_queue.put({
+                "id": request_id,
+                "audio": audio,
+                "language": effective_language,
+                "initial_prompt": effective_prompt,
+            })
+        except Exception as exc:
+            raise RuntimeError(f"MLX request queue error: {exc}") from exc
 
         # Wait for response
         start_time = threading.Event()
@@ -977,15 +1025,23 @@ class SubprocessMLXTranscriber(AbstractTranscriber):
                 if response.get("type") == "result":
                     return MLXWhisperTranscriber._build_result_bundle(response["result"])
                 elif response.get("type") == "error":
-                    raise RuntimeError(f"MLX transcription error: {response.get('error')}")
+                    error_type = response.get("error_type")
+                    error_detail = response.get("error")
+                    if error_type:
+                        error_detail = f"{error_type}: {error_detail}"
+                    raise RuntimeError(f"MLX transcription error: {error_detail}")
                 elif response.get("type") == "fatal":
-                    raise RuntimeError(f"MLX subprocess crashed: {response.get('error')}")
+                    error_type = response.get("error_type")
+                    error_detail = response.get("error")
+                    if error_type:
+                        error_detail = f"{error_type}: {error_detail}"
+                    raise RuntimeError(f"MLX subprocess crashed: {error_detail}")
 
             except Exception as exc:
                 if "Empty" in type(exc).__name__:
                     deadline -= 1.0
                     continue
-                raise
+                raise RuntimeError(f"MLX response queue error: {exc}") from exc
 
         raise RuntimeError("MLX transcription timeout")
 
