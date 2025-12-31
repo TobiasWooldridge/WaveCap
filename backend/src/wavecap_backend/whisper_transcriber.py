@@ -180,8 +180,9 @@ class WhisperTranscriber(AbstractTranscriber):
                     ) from cpu_exc
             LOGGER.critical(
                 "Failed to initialize Whisper model '%s'. This usually indicates missing "
-                "runtime dependencies such as CUDA or cuDNN.",
+                "runtime dependencies such as %s.",
                 self.config.model,
+                self._runtime_dependency_hint(),
                 exc_info=exc,
             )
             raise RuntimeError(
@@ -190,8 +191,9 @@ class WhisperTranscriber(AbstractTranscriber):
         except Exception as exc:  # pragma: no cover - unexpected exceptions
             LOGGER.critical(
                 "Failed to initialize Whisper model '%s'. This usually indicates missing "
-                "runtime dependencies such as CUDA or cuDNN.",
+                "runtime dependencies such as %s.",
                 self.config.model,
+                self._runtime_dependency_hint(),
                 exc_info=exc,
             )
             raise RuntimeError(
@@ -207,6 +209,12 @@ class WhisperTranscriber(AbstractTranscriber):
         if parsed <= 0:
             return 1
         return parsed
+
+    @staticmethod
+    def _runtime_dependency_hint() -> str:
+        if is_apple_silicon():
+            return "Metal/MLX"
+        return "CUDA or cuDNN"
 
     def _ensure_model_blocking(self) -> WhisperModel:
         if self._model is None:
