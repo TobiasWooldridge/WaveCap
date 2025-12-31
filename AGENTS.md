@@ -116,6 +116,8 @@ pwsh -File start-app.ps1    # Windows
  - Do not boast about the technology stack. In user-facing docs, focus on outcomes and workflows; avoid naming frameworks/libraries unless strictly required for setup or troubleshooting.
 
 ## Workflow Notes
+- Do not create or commit unnecessary images (e.g., PNG/JPG/JPEG) when updating documentation or workflows.
+- Always run the relevant linters and tests for the areas you change.
 - Follow repository-specific instructions in nested `AGENTS.md` files if present; their scope applies to the directory in which they reside and its descendants.
 - Run all required project checks and tests after making changes.
 - Before publishing a change for review, run the full automated test suite locally and confirm it passes without failures.
