@@ -1,5 +1,6 @@
 import React from "react";
 import { ChevronDown, ChevronUp, MapPin } from "lucide-react";
+import type { MapLocationUrls } from "@types";
 import { type CondensedPagerMessage } from "../utils/pagerMessages";
 import { getNotifiableAlerts, getTranscriptionDisplayText } from "../utils/transcriptions";
 import Button from "./primitives/Button.react";
@@ -11,7 +12,7 @@ export interface PagerTranscriptGroupProps {
   elementMap: Map<string, React.ReactNode[]>;
   openMessageIds: Record<string, boolean>;
   onToggleMessage: (id: string) => void;
-  incidentLocationUrls?: { embed: string; link?: string } | null;
+  incidentLocationUrls?: MapLocationUrls | null;
   incidentLocationQuery?: string | null;
 }
 
@@ -29,7 +30,8 @@ export const PagerTranscriptGroup: React.FC<PagerTranscriptGroupProps> = ({
   return (
     <div className="transcript-thread__pager-group" key={`${groupId}-pager`}>
       {messages.map((message, index) => {
-        const shouldShowIncidentMap = Boolean(incidentLocationUrls && index === 0);
+        const mapEmbedUrl = incidentLocationUrls?.embed ?? null;
+        const shouldShowIncidentMap = Boolean(mapEmbedUrl && index === 0);
         const fragmentElements = message.fragments.flatMap(
           (fragment) => elementMap.get(fragment.id) ?? [],
         );
@@ -92,25 +94,25 @@ export const PagerTranscriptGroup: React.FC<PagerTranscriptGroupProps> = ({
           return true;
         });
 
-        const mapSection = shouldShowIncidentMap && incidentLocationUrls ? (
+        const mapSection = shouldShowIncidentMap ? (
           <div className="pager-transcript__map" key="map">
             <iframe
               title={`Incident map for ${incidentLocationQuery}`}
-              src={incidentLocationUrls.embed}
+              src={mapEmbedUrl ?? undefined}
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
               allowFullScreen
               className="pager-transcript__map-frame"
             />
-            {incidentLocationUrls.link ? (
+            {incidentLocationUrls?.link ? (
               <a
-                href={incidentLocationUrls.link}
+                href={incidentLocationUrls?.link}
                 target="_blank"
                 rel="noreferrer noopener"
                 className="pager-transcript__map-link"
               >
                 <MapPin size={14} />
-                Open in Google Maps
+                Open in OpenStreetMap
               </a>
             ) : null}
           </div>

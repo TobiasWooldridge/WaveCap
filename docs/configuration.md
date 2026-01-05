@@ -183,12 +183,14 @@ ui:
   reviewExportStatuses:
     - corrected
     - verified
-  # Optional API key for richer Google Maps embeds shown in pager views.
-  # When unset, the UI falls back to a basic public embed. Create a key with
-  # the Google Maps Embed API enabled and restrict it to your site origin.
-  # googleMapsApiKey: YOUR_EMBED_API_KEY
+  # Optional Nominatim endpoint for OpenStreetMap geocoding in pager views.
+  # Defaults to the public OpenStreetMap service; set this to your own
+  # Nominatim instance if you need higher rate limits.
+  # osmNominatimEndpoint: "https://nominatim.openstreetmap.org/search"
+  # Optional contact email appended to Nominatim requests to follow the usage policy.
+  # osmNominatimEmail: "ops@example.com"
   # Optional regional hint appended to partial addresses when building
-  # Google Maps links/embeds in the UI. Useful when pager messages omit
+  # OpenStreetMap links/embeds in the UI. Useful when pager messages omit
   # the state or country.
   # baseLocation:
   #   state: SA
@@ -200,17 +202,19 @@ ui:
 - `transcriptCorrectionEnabled`: Reveal review/editing controls on first load.
 - `reviewExportStatuses`: Pre-select the review states included in the ZIP export.
 - `baseLocation` (optional): Provide `state` and/or `country` so the UI can
-  append them to incomplete addresses when constructing Google Maps embeds and
+  append them to incomplete addresses when constructing OpenStreetMap embeds and
   links. This helps disambiguate locations without requiring full addresses in
   pager messages.
-- `googleMapsApiKey` (optional): Supply a Google Maps Embed API key to enable
-  the richer, authenticated map preview inside the pager address dialog. When
-  omitted, the UI uses a basic public embed which may lack some features.
+- `osmNominatimEndpoint` (optional): Override the OpenStreetMap Nominatim
+  endpoint used to geocode addresses for map embeds. Configure this when you
+  run your own Nominatim instance or need different rate limits.
+- `osmNominatimEmail` (optional): Contact email appended to Nominatim requests
+  to comply with the usage policy.
 
 ## Stream-level base location
 
 When different streams cover different regions, set a per-stream base location
-to improve Google Maps results for partial addresses:
+to improve OpenStreetMap results for partial addresses:
 
 ```yaml
 streams:

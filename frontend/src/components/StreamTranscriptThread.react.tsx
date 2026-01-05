@@ -21,6 +21,7 @@ import { PagerTranscriptTable } from "./PagerTranscriptTable.react";
 import { TranscriptionReviewControls } from "./TranscriptionReviewControls.react";
 import AudioElement from "./primitives/AudioElement.react";
 import { useUISettings } from "../contexts/UISettingsContext";
+import { useOpenStreetMapLocationUrls } from "../hooks/useOpenStreetMap";
 
 type PlayAllHandler = (
   streamId: string,
@@ -95,7 +96,7 @@ const StreamTranscriptThread: React.FC<StreamTranscriptThreadProps> = ({
     (item) => item.pagerIncident?.incidentId,
   );
   const incidentDetails = incidentSource?.pagerIncident ?? null;
-  const { baseLocation, googleMapsApiKey } = useUISettings();
+  const { baseLocation } = useUISettings();
   const effectiveBaseLocation = streamBaseLocation ?? baseLocation;
   const baseLocationSuffix = useMemo(() => {
     if (!effectiveBaseLocation) return null;
@@ -132,18 +133,8 @@ const StreamTranscriptThread: React.FC<StreamTranscriptThreadProps> = ({
     return parts.length > 0 ? parts.join(", ") : null;
   })();
 
-  const incidentLocationUrls = incidentLocationQuery
-    ? (() => {
-        const encodedQuery = encodeURIComponent(incidentLocationQuery);
-        const embed = googleMapsApiKey
-          ? `https://www.google.com/maps/embed/v1/search?key=${googleMapsApiKey}&q=${encodedQuery}&zoom=15`
-          : `https://maps.google.com/maps?hl=en&q=${encodedQuery}&ie=UTF8&output=embed`;
-        return {
-          embed,
-          link: `https://maps.google.com/maps?hl=en&q=${encodedQuery}&ie=UTF8&z=15`,
-        } as const;
-      })()
-    : null;
+  const { urls: incidentLocationUrls } =
+    useOpenStreetMapLocationUrls(incidentLocationQuery);
 
   const transcriptionElements = group.transcriptions.map((transcription) => {
     const items: JSX.Element[] = [];
@@ -323,9 +314,10 @@ const StreamTranscriptThread: React.FC<StreamTranscriptThreadProps> = ({
   // Only render the header map when not using the pager detail view.
   // Compute a narrowed reference so TypeScript knows it's non-null in JSX.
   const headerLocationUrls =
-    incidentLocationUrls && !(streamIsPager && pagerMessages.length > 0)
+    incidentLocationUrls?.embed && !(streamIsPager && pagerMessages.length > 0)
       ? incidentLocationUrls
       : null;
+  const headerMapEmbed = headerLocationUrls?.embed ?? null;
 
   // When rendering the compact pager table, keep only a short header
   // (incident id + call type). Suppress address/meta/narrative.
@@ -379,11 +371,11 @@ const StreamTranscriptThread: React.FC<StreamTranscriptThreadProps> = ({
             {!useCompactPagerHeader && incidentNarrative ? (
               <div className="transcript-thread__incident-narrative">{incidentNarrative}</div>
             ) : null}
-            {headerLocationUrls ? (
+            {headerLocationUrls && headerMapEmbed ? (
               <div className="transcript-thread__incident-map">
                 <iframe
                   className="transcript-thread__incident-map-frame"
-                  src={headerLocationUrls.embed}
+                  src={headerMapEmbed ?? undefined}
                   title="Incident location"
                   aria-label="Incident map"
                 />
@@ -393,7 +385,7 @@ const StreamTranscriptThread: React.FC<StreamTranscriptThreadProps> = ({
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  View in Google Maps
+                  View in OpenStreetMap
                 </a>
               </div>
             ) : null}

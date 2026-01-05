@@ -33,7 +33,8 @@ interface UISettingsContextValue {
   setTranscriptCorrectionEnabled: (enabled: boolean) => void;
   defaultReviewExportStatuses: TranscriptionReviewStatus[];
   baseLocation: BaseLocation | null;
-  googleMapsApiKey: string | null;
+  osmNominatimEndpoint: string | null;
+  osmNominatimEmail: string | null;
 }
 
 const THEME_STORAGE_KEY = "wavecap-theme-mode";
@@ -132,7 +133,8 @@ export const UISettingsProvider = ({ children }: { children: ReactNode }) => {
       ...FALLBACK_REVIEW_EXPORT_STATUSES,
     ]);
   const [baseLocation, setBaseLocation] = useState<BaseLocation | null>(null);
-  const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string | null>(null);
+  const [osmNominatimEndpoint, setOsmNominatimEndpoint] = useState<string | null>(null);
+  const [osmNominatimEmail, setOsmNominatimEmail] = useState<string | null>(null);
   const [uiDefaultsApplied, setUiDefaultsApplied] = useState(false);
 
   useEffect(() => {
@@ -319,7 +321,7 @@ export const UISettingsProvider = ({ children }: { children: ReactNode }) => {
           }
         }
 
-        // Optional base location for Google Maps queries
+        // Optional base location for OpenStreetMap queries
         const cfgBase = (data as UISettingsConfig).baseLocation as
           | BaseLocation
           | null
@@ -333,10 +335,13 @@ export const UISettingsProvider = ({ children }: { children: ReactNode }) => {
           }
         }
 
-        // Optional Google Maps API key for richer embeds
-        const key = (data as UISettingsConfig).googleMapsApiKey;
-        if (typeof key === "string" && key.trim().length > 0) {
-          setGoogleMapsApiKey(key.trim());
+        const endpoint = (data as UISettingsConfig).osmNominatimEndpoint;
+        if (typeof endpoint === "string" && endpoint.trim().length > 0) {
+          setOsmNominatimEndpoint(endpoint.trim());
+        }
+        const email = (data as UISettingsConfig).osmNominatimEmail;
+        if (typeof email === "string" && email.trim().length > 0) {
+          setOsmNominatimEmail(email.trim());
         }
       } catch (error) {
         console.warn("Unable to load UI configuration", error);
@@ -384,7 +389,8 @@ export const UISettingsProvider = ({ children }: { children: ReactNode }) => {
       setTranscriptCorrectionEnabled,
       defaultReviewExportStatuses,
       baseLocation,
-      googleMapsApiKey,
+      osmNominatimEndpoint,
+      osmNominatimEmail,
     }),
     [
       themeMode,
@@ -396,7 +402,8 @@ export const UISettingsProvider = ({ children }: { children: ReactNode }) => {
       setTranscriptCorrectionEnabled,
       defaultReviewExportStatuses,
       baseLocation,
-      googleMapsApiKey,
+      osmNominatimEndpoint,
+      osmNominatimEmail,
     ],
   );
 

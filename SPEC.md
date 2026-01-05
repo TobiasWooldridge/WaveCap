@@ -54,7 +54,7 @@ transcribing multiple radio or pager feeds in real time.
   collapse into a single grouped thread, showing parsed incident details like the call
   type, location, and alarm level alongside the individual updates.
   When pager messages include a partial address, the UI appends a base location
-  (state and/or country) to Google Maps searches so links and embeds resolve
+  (state and/or country) to OpenStreetMap searches so links and embeds resolve
   within the expected region. A per-stream `baseLocation` takes precedence; the
   global `ui.baseLocation` is used as a fallback.
 - Timestamps in transcript and pager views include a relative interval after the
@@ -103,10 +103,11 @@ transcribing multiple radio or pager feeds in real time.
   alarm level, priority, talkgroup, units, and alerts. Each row expands to
   reveal details and the original fragments on demand.
 - When pager incidents include an address or map grid, the pager list places a
-  Google Maps icon at the start of the Address column. Clicking it opens a
-  dialog with an embedded map and an optional "Open in Google Maps" link. When
-  `ui.googleMapsApiKey` is configured, the dialog uses the richer Google Maps
-  Embed API; otherwise it falls back to a basic public embed.
+  OpenStreetMap icon at the start of the Address column. Clicking it opens a
+  dialog with an embedded map and an optional "Open in OpenStreetMap" link. The
+  embed uses OpenStreetMap tiles and geocodes addresses through Nominatim; use
+  `ui.osmNominatimEndpoint` (and optional `ui.osmNominatimEmail`) to point at a
+  self-hosted service or to supply contact details for the public endpoint.
 - Export reviewed transcripts as a ZIP with audio via header controls, choosing corrected, verified, or pending items.
 - Export pager feeds as ZIP archives from the settings modal; downloads include JSONL pager messages and incident details.
 - `python -m wavecap_backend.tools.export_transcriptions --output-dir <path>` builds a fine-tuning dataset with JSONL metadata, optional audio copies, and notebook guidance.

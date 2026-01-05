@@ -246,7 +246,8 @@ export interface UISettingsConfig {
   colorCodingEnabled?: boolean;
   transcriptCorrectionEnabled?: boolean;
   reviewExportStatuses?: TranscriptionReviewStatus[];
-  googleMapsApiKey?: string;
+  osmNominatimEndpoint?: string;
+  osmNominatimEmail?: string;
   baseLocation?: BaseLocation | null;
 }
 
@@ -275,6 +276,11 @@ export interface RemoteUpstreamState {
 export interface BaseLocation {
   state?: string | null;
   country?: string | null;
+}
+
+export interface MapLocationUrls {
+  embed: string | null;
+  link: string;
 }
 
 export interface CombinedStreamView {

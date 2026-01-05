@@ -1,12 +1,13 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { AlertTriangle, ChevronDown, ChevronRight, MapPin } from "lucide-react";
+import type { MapLocationUrls } from "@types";
 import { type CondensedPagerMessage, getCondensedFieldValue } from "../utils/pagerMessages";
 import { getNotifiableAlerts, getTranscriptionDisplayText } from "../utils/transcriptions";
 import { Timestamp } from "./primitives/Timestamp.react";
 import { TimeInterval } from "./primitives/TimeInterval.react";
 import { AlertChips } from "./chips/AlertChips.react";
 import Dialog from "./primitives/Dialog.react";
-import { useUISettings } from "../contexts/UISettingsContext";
+import { useOpenStreetMapLocationUrls } from "../hooks/useOpenStreetMap";
 
 export interface PagerTranscriptTableProps {
   groupId: string;
@@ -14,7 +15,7 @@ export interface PagerTranscriptTableProps {
   elementMap: Map<string, React.ReactNode[]>;
   openMessageIds: Record<string, boolean>;
   onToggleMessage: (id: string) => void;
-  incidentLocationUrls?: { embed: string; link?: string } | null;
+  incidentLocationUrls?: MapLocationUrls | null;
   incidentLocationQuery?: string | null;
   hideTimeColumn?: boolean;
 }
@@ -29,26 +30,15 @@ export const PagerTranscriptTable: React.FC<PagerTranscriptTableProps> = ({
   incidentLocationQuery,
   hideTimeColumn = false,
 }) => {
-  const { googleMapsApiKey } = useUISettings();
   const [mapOpen, setMapOpen] = useState<boolean>(false);
   const safeMessages = messages ?? [];
 
   const searchQuery = incidentLocationQuery ?? null;
-  const mapEmbedUrl = useMemo(() => {
-    if (!searchQuery) return null;
-    const encoded = encodeURIComponent(searchQuery);
-    if (googleMapsApiKey) {
-      return `https://www.google.com/maps/embed/v1/search?key=${googleMapsApiKey}&q=${encoded}&zoom=15`;
-    }
-    return `https://maps.google.com/maps?hl=en&q=${encoded}&ie=UTF8&output=embed`;
-  }, [searchQuery, googleMapsApiKey]);
-
-  const mapLinkUrl = useMemo(() => {
-    if (incidentLocationUrls?.link) return incidentLocationUrls.link;
-    if (!searchQuery) return null;
-    const encoded = encodeURIComponent(searchQuery);
-    return `https://maps.google.com/maps?hl=en&q=${encoded}&ie=UTF8&z=15`;
-  }, [incidentLocationUrls, searchQuery]);
+  const { urls: lookupUrls, isLoading: mapLoading } =
+    useOpenStreetMapLocationUrls(searchQuery);
+  const mapUrls = incidentLocationUrls?.embed ? incidentLocationUrls : lookupUrls;
+  const mapEmbedUrl = mapUrls?.embed ?? null;
+  const mapLinkUrl = mapUrls?.link ?? null;
 
   if (safeMessages.length === 0) {
     return null;
@@ -280,6 +270,8 @@ export const PagerTranscriptTable: React.FC<PagerTranscriptTableProps> = ({
               aria-label="Incident map"
             />
           </div>
+        ) : mapLoading ? (
+          <div className="text-body-secondary">Loading map...</div>
         ) : (
           <div className="text-body-secondary">Location not available.</div>
         )}
